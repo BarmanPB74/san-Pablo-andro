@@ -1,0 +1,9 @@
+{
+  "appId": "com.barmanpb74.sanpabloandro",
+  "appName": "San Pablo Medellin AI",
+  "webDir": "www",
+  "bundledWebRuntime": false,
+  "android": {
+    "allowMixedContent": true
+  }
+}
