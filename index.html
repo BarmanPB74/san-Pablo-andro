@@ -1,0 +1,1895 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>San Pablo: Medellín AI Tactics — Open-World GTA Style</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; user-select: none; -webkit-user-select: none; }
+    body, html {
+      margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden;
+      background-color: #0b0f17; font-family: 'Inter', sans-serif; color: #f8fafc;
+    }
+    .mono { font-family: 'JetBrains Mono', monospace; }
+    .gta-shadow { text-shadow: 2px 2px 0px #000, -1px -1px 0px #000, 1px -1px 0px #000, -1px 1px 0px #000; }
+    .hud-glass {
+      background: rgba(11, 15, 25, 0.84);
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+    }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #0f172a; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+    @keyframes pulseBorder {
+      0%, 100% { border-color: rgba(239, 68, 68, 0.9); }
+      50% { border-color: rgba(59, 130, 246, 0.9); }
+    }
+    .police-flash { animation: pulseBorder 0.7s infinite; }
+  </style>
+</head>
+<body class="relative w-full h-full select-none overflow-hidden">
+
+  <!-- MAIN GAME CANVAS -->
+  <canvas id="gameCanvas" class="block w-full h-full cursor-crosshair"></canvas>
+
+  <!-- TOP NAVIGATION & MULTI-AGENT BAR -->
+  <header class="fixed top-2 left-2 right-2 z-20 flex flex-wrap items-center justify-between gap-2 pointer-events-none">
+    <!-- Left: Zone & Socioeconomic Stratum Badge -->
+    <div class="hud-glass rounded-xl px-3 py-2 flex items-center gap-3 pointer-events-auto shadow-lg">
+      <div id="zoneBadgeColor" class="w-3 h-10 rounded-full bg-amber-500"></div>
+      <div>
+        <div class="flex items-center gap-2">
+          <span id="hudZoneName" class="font-extrabold text-sm sm:text-base tracking-tight uppercase text-amber-400 gta-shadow">NV.1: SANTO DOMINGO SAVIO / POPULAR</span>
+          <span id="hudEstrato" class="text-[11px] font-bold px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 mono">ESTRATO 1-2</span>
+        </div>
+        <div class="flex items-center gap-3 text-xs text-slate-300 mt-0.5">
+          <span id="hudSlopeInfo" class="mono">Pendiente: 42% (Ladera Nororiental)</span>
+          <span class="text-slate-500">•</span>
+          <span id="hudUnlockCount" class="text-emerald-400 font-semibold">Zonas: 1/5</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Center: Navigation Tabs for Architecture, Armory, SITVA, CS Lab, GitHub/APK -->
+    <nav class="hud-glass rounded-xl p-1 flex flex-wrap items-center gap-1 pointer-events-auto shadow-lg">
+      <button id="btnOpenArmory" class="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-slate-800/90 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 transition flex items-center gap-1.5">
+        <span>🔫</span><span>Armería</span>
+      </button>
+      <button id="btnOpenSITVA" class="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-slate-800/90 hover:bg-sky-500/20 text-sky-300 border border-sky-500/30 transition flex items-center gap-1.5">
+        <span>🚈</span><span>Metro SITVA</span>
+      </button>
+      <button id="btnOpenCSLab" class="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-slate-800/90 hover:bg-purple-500/20 text-purple-300 border border-purple-500/30 transition flex items-center gap-1.5">
+        <span>💻</span><span>Juegos CS</span>
+      </button>
+      <button id="btnOpenAgents" class="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-slate-800/90 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 transition flex items-center gap-1.5">
+        <span>🤖</span><span>Multi-Agente (<span id="hudTokenCount">142</span> tok)</span>
+      </button>
+      <button id="btnOpenGitHub" class="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-slate-800/90 hover:bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 transition flex items-center gap-1.5">
+        <span>📦</span><span>GitHub / APK</span>
+      </button>
+      <button id="btnToggleAudio" class="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-slate-800/90 hover:bg-slate-700 text-slate-200 border border-slate-600 transition" title="Sonido WebAudio">
+        🔊
+      </button>
+    </nav>
+
+    <!-- Right: GTA V Style Wanted Stars, Cash, AI Knowledge & Equipped Weapon -->
+    <div class="hud-glass rounded-xl px-3.5 py-2 flex items-center gap-4 pointer-events-auto shadow-lg">
+      <div class="text-right">
+        <div id="hudStars" class="flex items-center justify-end gap-0.5 text-base tracking-widest">
+          <span class="text-slate-600">★</span><span class="text-slate-600">★</span><span class="text-slate-600">★</span><span class="text-slate-600">★</span><span class="text-slate-600">★</span>
+        </div>
+        <div class="text-emerald-400 font-extrabold text-sm sm:text-base mono gta-shadow" id="hudPoints">$ 250 PTS</div>
+        <div class="text-[11px] text-cyan-300 mono" id="hudAICount">🧠 Datos IA: 0 / 20</div>
+      </div>
+      <div class="border-l border-slate-700 pl-3 text-right">
+        <div class="text-[10px] uppercase tracking-wider text-slate-400 font-bold">Arma Activa (Q/E)</div>
+        <div id="hudWeaponName" class="text-xs sm:text-sm font-extrabold text-amber-400">Pistola 9mm Táctica</div>
+        <div id="hudStance" class="text-[11px] font-bold text-emerald-400 mono">Postura: De Pie (Normal)</div>
+      </div>
+    </div>
+  </header>
+
+  <!-- FLOATING AI FACT POPUP BANNER (WHEN BILLBOARD DESTROYED) -->
+  <div id="aiToastBanner" class="fixed top-20 left-1/2 -translate-x-1/2 z-20 w-[92%] max-w-xl hud-glass border-2 border-cyan-400/70 rounded-2xl p-3.5 shadow-2xl transition-all duration-300 opacity-0 pointer-events-none -translate-y-4">
+    <div class="flex items-start justify-between gap-3">
+      <div class="flex items-center gap-2.5">
+        <div class="w-9 h-9 rounded-xl bg-cyan-500/20 border border-cyan-400 flex items-center justify-center text-lg shrink-0">🧠</div>
+        <div>
+          <div class="flex items-center gap-2">
+            <span class="text-[10px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded bg-cyan-500/30 text-cyan-200 mono">LETRERO IA DESTRUIDO</span>
+            <span id="toastRewardPts" class="text-xs font-extrabold text-emerald-400 mono">+150 PTS</span>
+          </div>
+          <h4 id="toastAITitle" class="font-bold text-sm sm:text-base text-white mt-0.5">Mecanismo de Atención (Self-Attention)</h4>
+        </div>
+      </div>
+      <button id="btnCloseToast" class="text-slate-400 hover:text-white text-xs px-2 py-1 rounded bg-slate-800 pointer-events-auto">✕</button>
+    </div>
+    <p id="toastAIDesc" class="text-xs sm:text-sm text-slate-200 mt-2 leading-relaxed"></p>
+  </div>
+
+  <!-- POLICE BLOCKADE WARNING BANNER -->
+  <div id="policeAlertBanner" class="fixed top-36 left-1/2 -translate-x-1/2 z-20 hidden hud-glass police-flash border-2 rounded-xl px-4 py-2.5 text-center shadow-2xl max-w-md">
+    <div class="text-xs font-extrabold uppercase tracking-wider text-rose-400 flex items-center justify-center gap-2">
+      <span>🚨 BLOQUEO POLICIAL METROPOLITANO 🚨</span>
+    </div>
+    <p id="policeAlertText" class="text-xs text-slate-200 mt-1">Zona bloqueada. Acércate a la Terminal Táctica del Retén (Tecla F o botón Hackear) y resuelve la función de Ciencias de la Computación para levantar la barricada.</p>
+  </div>
+
+  <!-- BOTTOM-LEFT GTA V RADAR / TOPOGRAPHIC MINIMAP & HEALTH/ARMOR/TACTICAL BARS -->
+  <div class="fixed bottom-3 left-3 z-20 flex flex-col gap-1.5 pointer-events-none">
+    <div class="hud-glass rounded-xl p-1.5 shadow-2xl border border-slate-600/80 pointer-events-auto">
+      <div class="flex items-center justify-between text-[10px] font-bold px-1 pb-1 text-slate-300">
+        <span>RADAR VALLE DE ABURRÁ</span>
+        <span id="radarCoords" class="mono text-amber-400">N 6.29° W 75.54°</span>
+      </div>
+      <canvas id="radarCanvas" width="190" height="136" class="rounded-lg bg-slate-950 block border border-slate-800"></canvas>
+      <!-- GTA V Style Health / Armor / Stamina Tactical Bar -->
+      <div class="grid grid-cols-3 gap-1 mt-1.5">
+        <div class="h-2 bg-slate-800 rounded overflow-hidden">
+          <div id="barHealth" class="h-full bg-emerald-500 transition-all" style="width: 100%;"></div>
+        </div>
+        <div class="h-2 bg-slate-800 rounded overflow-hidden">
+          <div id="barArmor" class="h-full bg-sky-400 transition-all" style="width: 85%;"></div>
+        </div>
+        <div class="h-2 bg-slate-800 rounded overflow-hidden">
+          <div id="barStamina" class="h-full bg-amber-400 transition-all" style="width: 100%;"></div>
+        </div>
+      </div>
+      <div class="flex justify-between text-[9px] text-slate-400 px-0.5 mt-0.5 mono">
+        <span>SALUD</span><span>BLINDAJE</span><span>TÁCTICA</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- BOTTOM-CENTER LIVE SUPERVISOR MULTI-AGENT TELEMETRY STRIP -->
+  <div class="fixed bottom-3 left-1/2 -translate-x-1/2 z-20 hidden lg:flex items-center gap-3 hud-glass px-3.5 py-2 rounded-xl text-xs pointer-events-auto shadow-xl border border-emerald-500/30">
+    <div class="flex items-center gap-1.5">
+      <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+      <span class="font-bold text-emerald-300 mono">SUPERVISOR:</span>
+      <span id="supervisorLiveStatus" class="text-slate-200 mono">KinematicsAgent + EduCSAgent activos | Delta-State: OK</span>
+    </div>
+    <span class="text-slate-600">|</span>
+    <div class="text-slate-400">
+      Controles: <kbd class="px-1.5 py-0.5 bg-slate-800 rounded text-slate-200 mono text-[10px]">WASD</kbd> Mover
+      <kbd class="px-1.5 py-0.5 bg-slate-800 rounded text-slate-200 mono text-[10px]">Click</kbd> Disparar Letrero
+      <kbd class="px-1.5 py-0.5 bg-slate-800 rounded text-slate-200 mono text-[10px]">C</kbd> Sigilo/Cobertura
+      <kbd class="px-1.5 py-0.5 bg-slate-800 rounded text-slate-200 mono text-[10px]">F</kbd> Interactuar Retén/Metro
+    </div>
+  </div>
+
+  <!-- BOTTOM-RIGHT TACTICAL ACTION BUTTONS (MOBILE & DESKTOP ACCESSIBLE) -->
+  <div class="fixed bottom-3 right-3 z-20 flex flex-col items-end gap-2 pointer-events-auto">
+    <!-- Contextual Interact Button -->
+    <button id="btnContextInteract" class="hidden px-4 py-2.5 rounded-xl font-extrabold text-xs sm:text-sm bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-xl transition transform active:scale-95 flex items-center gap-2">
+      <span>🔓</span><span id="btnContextLabel">INTERACTUAR (F)</span>
+    </button>
+
+    <div class="flex items-center gap-2">
+      <!-- Virtual D-Pad for Touch/Mobile -->
+      <div class="grid grid-cols-3 gap-1 bg-slate-900/80 p-1.5 rounded-xl border border-slate-700/80 sm:opacity-85 hover:opacity-100">
+        <div></div>
+        <button data-Move="up" class="btn-move w-9 h-9 rounded-lg bg-slate-800 active:bg-amber-500 active:text-black flex items-center justify-center font-bold text-xs">▲</button>
+        <div></div>
+        <button data-Move="left" class="btn-move w-9 h-9 rounded-lg bg-slate-800 active:bg-amber-500 active:text-black flex items-center justify-center font-bold text-xs">◀</button>
+        <button data-Move="down" class="btn-move w-9 h-9 rounded-lg bg-slate-800 active:bg-amber-500 active:text-black flex items-center justify-center font-bold text-xs">▼</button>
+        <button data-Move="right" class="btn-move w-9 h-9 rounded-lg bg-slate-800 active:bg-amber-500 active:text-black flex items-center justify-center font-bold text-xs">▶</button>
+      </div>
+
+      <!-- Tactical Stance, Sprint, Switch Weapon & Fire Buttons -->
+      <div class="flex flex-col gap-1.5">
+        <div class="flex gap-1.5">
+          <button id="btnCrouch" class="px-3 py-2 rounded-xl bg-slate-800/95 hover:bg-slate-700 border border-slate-600 text-xs font-bold text-emerald-300">
+            🥷 Sigilo (C)
+          </button>
+          <button id="btnCycleWeapon" class="px-3 py-2 rounded-xl bg-slate-800/95 hover:bg-slate-700 border border-slate-600 text-xs font-bold text-amber-300">
+            🔄 Arma (Q)
+          </button>
+        </div>
+        <button id="btnFireWeapon" class="w-full py-2.5 px-4 rounded-xl bg-rose-600 hover:bg-rose-500 active:scale-95 text-white font-extrabold text-xs sm:text-sm shadow-lg border border-rose-400/50">
+          🎯 DISPARAR LETRERO
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- MODAL 1: POLICE CHECKPOINT CS FUNCTION CHALLENGE (DESBLOQUEO DE NIVEL)    -->
+  <!-- ========================================================================= -->
+  <div id="modalCheckpoint" class="fixed inset-0 z-30 hidden bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
+    <div class="hud-glass border-2 border-amber-500/70 rounded-2xl max-w-2xl w-full p-5 shadow-2xl max-h-[90vh] overflow-y-auto">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <div class="flex items-center gap-2.5">
+          <span class="text-2xl">🚧</span>
+          <div>
+            <span class="text-[10px] font-extrabold uppercase tracking-widest px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/40 mono">RETÉN POLICIAL TÁCTICO — FRONTERA DE ZONA</span>
+            <h3 id="cpModalTitle" class="text-lg font-extrabold text-white mt-0.5">Desbloquear Nivel 2: Zamora, Moravia y Río Norte</h3>
+          </div>
+        </div>
+        <button id="btnCloseCheckpoint" class="text-slate-400 hover:text-white px-2.5 py-1 rounded-lg bg-slate-800 text-sm">✕</button>
+      </div>
+
+      <div class="mt-3 bg-slate-900/90 border border-slate-800 rounded-xl p-3 text-xs text-slate-300">
+        <p id="cpModalLore" class="leading-relaxed"></p>
+      </div>
+
+      <div class="mt-4">
+        <div class="flex items-center justify-between text-xs font-bold text-amber-300 mb-1.5">
+          <span>💻 RETO DE FUNCIÓN: ¿Qué retorna o realiza exactamente esta función?</span>
+          <span id="cpDifficultyTag" class="mono text-[11px] bg-amber-500/20 px-2 py-0.5 rounded">Complejidad: O(n)</span>
+        </div>
+        <pre id="cpCodeBlock" class="bg-slate-950 border border-slate-700 rounded-xl p-3.5 text-xs sm:text-sm text-emerald-300 mono overflow-x-auto leading-relaxed"></pre>
+      </div>
+
+      <div id="cpOptionsContainer" class="mt-4 grid grid-cols-1 gap-2"></div>
+
+      <div id="cpFeedbackBox" class="mt-3 hidden rounded-xl p-3 text-xs font-semibold"></div>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- MODAL 2: SITVA MEDELLÍN TRANSPORT SYSTEM (METRO / METROCABLE / TRANVÍA)   -->
+  <!-- ========================================================================= -->
+  <div id="modalSITVA" class="fixed inset-0 z-30 hidden bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
+    <div class="hud-glass border-2 border-sky-500/70 rounded-2xl max-w-2xl w-full p-5 shadow-2xl max-h-[90vh] overflow-y-auto">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <div class="flex items-center gap-2.5">
+          <span class="text-2xl">🚈</span>
+          <div>
+            <span class="text-[10px] font-extrabold uppercase tracking-widest px-2 py-0.5 rounded bg-sky-500/20 text-sky-300 border border-sky-500/40 mono">SITVA — SISTEMA INTEGRADO DEL VALLE DE ABURRÁ</span>
+            <h3 class="text-lg font-extrabold text-white mt-0.5">Red Metro, Metrocable (Líneas K y J) y Tranvía</h3>
+          </div>
+        </div>
+        <button id="btnCloseSITVA" class="text-slate-400 hover:text-white px-2.5 py-1 rounded-lg bg-slate-800 text-sm">✕</button>
+      </div>
+
+      <p class="text-xs text-slate-300 mt-3 leading-relaxed">
+        Selecciona una estación para viajar rápidamente con tu tarjeta <strong>Cívica Táctica</strong>. Si intentas desplazarte hacia una comuna aún no desbloqueada, el <strong>Bloqueo Policial</strong> detendrá el tránsito en la frontera.
+      </p>
+
+      <div id="sitvaStationsList" class="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-2.5"></div>
+
+      <div id="sitvaStatusMsg" class="mt-3 hidden rounded-xl p-3 text-xs font-bold"></div>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- MODAL 3: TACTICAL ARMORY (COMPRA DE ARMAS CON PUNTOS DE LETREROS IA)      -->
+  <!-- ========================================================================= -->
+  <div id="modalArmory" class="fixed inset-0 z-30 hidden bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
+    <div class="hud-glass border-2 border-amber-500/70 rounded-2xl max-w-2xl w-full p-5 shadow-2xl max-h-[90vh] overflow-y-auto">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <div class="flex items-center gap-2.5">
+          <span class="text-2xl">🔫</span>
+          <div>
+            <span class="text-[10px] font-extrabold uppercase tracking-widest px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 mono">ARMERÍA TÁCTICA SAN PABLO</span>
+            <h3 class="text-lg font-extrabold text-white mt-0.5">Canjea tus Puntos de Letreros IA por Nuevas Armas</h3>
+          </div>
+        </div>
+        <button id="btnCloseArmory" class="text-slate-400 hover:text-white px-2.5 py-1 rounded-lg bg-slate-800 text-sm">✕</button>
+      </div>
+
+      <div class="flex items-center justify-between bg-slate-900/90 border border-slate-800 rounded-xl px-4 py-2.5 mt-3">
+        <span class="text-xs text-slate-300">Puntos disponibles (obtenidos destruyendo letreros de IA y superando retos CS):</span>
+        <span id="armoryPointsDisplay" class="text-base font-extrabold text-emerald-400 mono">$ 250 PTS</span>
+      </div>
+
+      <div id="armoryWeaponsGrid" class="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3"></div>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- MODAL 4: INTERACTIVE COMPUTER SCIENCE MINI-GAMES & AI ENCYCLOPEDIA        -->
+  <!-- ========================================================================= -->
+  <div id="modalCSLab" class="fixed inset-0 z-30 hidden bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
+    <div class="hud-glass border-2 border-purple-500/70 rounded-2xl max-w-3xl w-full p-5 shadow-2xl max-h-[90vh] overflow-y-auto">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <div class="flex items-center gap-2.5">
+          <span class="text-2xl">💻</span>
+          <div>
+            <span class="text-[10px] font-extrabold uppercase tracking-widest px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/40 mono">LABORATORIO INTERACTIVO DE CIENCIAS DE LA COMPUTACIÓN E IA</span>
+            <h3 class="text-lg font-extrabold text-white mt-0.5">Entrenamiento del Personaje y Datos de IA Recolectados</h3>
+          </div>
+        </div>
+        <button id="btnCloseCSLab" class="text-slate-400 hover:text-white px-2.5 py-1 rounded-lg bg-slate-800 text-sm">✕</button>
+      </div>
+
+      <!-- Sub-tabs inside CS Lab -->
+      <div class="flex flex-wrap gap-2 mt-3 border-b border-slate-800 pb-3">
+        <button data-cstab="sorting" class="cs-tab-btn px-3 py-1.5 rounded-lg text-xs font-bold bg-purple-600 text-white">1. Juego: Ordenamiento de Paquetes (Arrays)</button>
+        <button data-cstab="binary" class="cs-tab-btn px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-800 text-slate-300">2. Juego: Radar Búsqueda Binaria O(log n)</button>
+        <button data-cstab="aifacts" class="cs-tab-btn px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-800 text-slate-300">3. Enciclopedia de Letreros IA Destruidos</button>
+      </div>
+
+      <!-- Mini-Game 1: Array Packet Swapper -->
+      <div id="csTabSorting" class="mt-4">
+        <p class="text-xs text-slate-300 leading-relaxed">
+          <strong>Misión Interactiva (Algoritmos de Ordenamiento):</strong> El personaje interceptó un vector de frecuencias de radio en Barrio Triste. Intercambia dos nodos adyacentes o distantes para ordenar el arreglo de menor a mayor en el menor número de operaciones y gana <strong>+200 PTS</strong>.
+        </p>
+        <div id="sortArrayContainer" class="flex items-center justify-center gap-2 my-5 flex-wrap"></div>
+        <div class="flex items-center justify-between bg-slate-900 p-3 rounded-xl border border-slate-800 text-xs">
+          <span id="sortStatusText" class="text-amber-300 font-semibold">Haz clic en dos bloques para intercambiarlos (`swap(i, j)`).</span>
+          <button id="btnResetSortGame" class="px-3 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-white font-bold">Nuevo Vector</button>
+        </div>
+      </div>
+
+      <!-- Mini-Game 2: Binary Search Radar -->
+      <div id="csTabBinary" class="mt-4 hidden">
+        <p class="text-xs text-slate-300 leading-relaxed">
+          <strong>Misión Interactiva (Búsqueda Binaria `O(log n)`):</strong> Localiza la frecuencia oculta del dron en las colinas de Robledo entre 16 canales ordenados usando máximo <strong>4 intentos</strong> (`mid = floor((low + high) / 2)`). Gana <strong>+250 PTS</strong>.
+        </p>
+        <div id="binaryGridContainer" class="grid grid-cols-4 sm:grid-cols-8 gap-2 my-4"></div>
+        <div class="flex items-center justify-between bg-slate-900 p-3 rounded-xl border border-slate-800 text-xs">
+          <span id="binaryStatusText" class="text-cyan-300 font-semibold">Intentos restantes: 4 / 4</span>
+          <button id="btnResetBinaryGame" class="px-3 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-bold">Reiniciar Radar</button>
+        </div>
+      </div>
+
+      <!-- Tab 3: Collected AI Billboard Facts -->
+      <div id="csTabAIFacts" class="mt-4 hidden">
+        <p class="text-xs text-slate-300 mb-3">Cada vez que destruyes un letrero luminoso en las calles de Medellín, el dato de IA queda almacenado aquí:</p>
+        <div id="aiFactsCollectionList" class="grid grid-cols-1 gap-2 max-h-72 overflow-y-auto pr-1"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- MODAL 5: MULTI-AGENT SUPERVISOR & TOKEN PROTECTION DASHBOARD              -->
+  <!-- ========================================================================= -->
+  <div id="modalAgents" class="fixed inset-0 z-30 hidden bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
+    <div class="hud-glass border-2 border-emerald-500/70 rounded-2xl max-w-3xl w-full p-5 shadow-2xl max-h-[90vh] overflow-y-auto">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <div class="flex items-center gap-2.5">
+          <span class="text-2xl">🤖</span>
+          <div>
+            <span class="text-[10px] font-extrabold uppercase tracking-widest px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 mono">ARQUITECTURA MULTI-AGENTE CON PROTECCIÓN DE TOKENS</span>
+            <h3 class="text-lg font-extrabold text-white mt-0.5">Supervisor Orquestador y Sub-Agentes Dinámicos</h3>
+          </div>
+        </div>
+        <button id="btnCloseAgents" class="text-slate-400 hover:text-white px-2.5 py-1 rounded-lg bg-slate-800 text-sm">✕</button>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 mt-3 text-xs">
+        <div class="bg-slate-900/90 border border-slate-800 rounded-xl p-3">
+          <div class="text-slate-400">Presupuesto de Tokens / Tick</div>
+          <div id="agentTokenMetric" class="text-lg font-extrabold text-emerald-400 mono mt-0.5">142 / 512 tok</div>
+          <div class="text-[11px] text-slate-400 mt-1">Ahorro por Delta-Cache: <strong>78.4%</strong></div>
+        </div>
+        <div class="bg-slate-900/90 border border-slate-800 rounded-xl p-3">
+          <div class="text-slate-400">Agentes Activos en Comuna</div>
+          <div id="agentCountMetric" class="text-lg font-extrabold text-amber-400 mono mt-0.5">5 + 0 Dinámicos</div>
+          <div class="text-[11px] text-slate-400 mt-1">Orquestados por `SupervisorAgent`</div>
+        </div>
+        <div class="bg-slate-900/90 border border-slate-800 rounded-xl p-3 flex flex-col justify-between">
+          <div class="text-slate-400">Escalado Dinámico</div>
+          <button id="btnSpawnWorkerAgent" class="mt-1.5 w-full py-1.5 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition">
+            + Instanciar Sub-Agente Táctico
+          </button>
+        </div>
+      </div>
+
+      <div id="agentsTableContainer" class="mt-4 space-y-2"></div>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- MODAL 6: GITHUB REPO PUSH & ANDROID APK BUILD PIPELINE                    -->
+  <!-- ========================================================================= -->
+  <div id="modalGitHub" class="fixed inset-0 z-30 hidden bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
+    <div class="hud-glass border-2 border-indigo-500/70 rounded-2xl max-w-2xl w-full p-5 shadow-2xl max-h-[90vh] overflow-y-auto">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <div class="flex items-center gap-2.5">
+          <span class="text-2xl">📦</span>
+          <div>
+            <span class="text-[10px] font-extrabold uppercase tracking-widest px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 mono">REPOSITORIO & PIPELINE ANDROID APK</span>
+            <h3 class="text-lg font-extrabold text-white mt-0.5">BarmanPB74 / san-Pablo-andro</h3>
+          </div>
+        </div>
+        <button id="btnCloseGitHub" class="text-slate-400 hover:text-white px-2.5 py-1 rounded-lg bg-slate-800 text-sm">✕</button>
+      </div>
+
+      <div class="mt-3 space-y-3 text-xs text-slate-300 leading-relaxed">
+        <p>
+          El proyecto está estructurado en <strong>TypeScript / ES2022 + HTML5 Canvas + CapacitorJS</strong> para compilar directamente el archivo <code>.apk</code> de Android en la siguiente fase cuando lo indiques.
+        </p>
+        <div class="bg-slate-950 border border-slate-800 rounded-xl p-3 mono text-[11px] text-emerald-300 overflow-x-auto">
+# 1. Subir el paquete generado a tu repositorio GitHub:<br/>
+unzip san-Pablo-andro-repo.zip -d san-Pablo-andro<br/>
+cd san-Pablo-andro<br/>
+git init && git branch -M main<br/>
+git remote add origin https://github.com/BarmanPB74/san-Pablo-andro.git<br/>
+git add . && git commit -m "feat(phase1): Medellin open-world GTA style, multi-agent & CS checkpoints"<br/>
+git push -u origin main<br/><br/>
+# 2. Compilar APK cuando lo indiques en la Fase 2:<br/>
+npm install && npx cap add android && npx cap sync<br/>
+cd android && ./gradlew assembleDebug
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ============================================================================
+    // 1. WEB AUDIO SYNTHESIZER (NO EXTERNAL SOUND FILES REQUIRED)
+    // ============================================================================
+    class SoundEngine {
+      constructor() {
+        this.ctx = null;
+        this.muted = false;
+      }
+      init() {
+        if (!this.ctx) {
+          const AudioCtx = window.AudioContext || window.webkitAudioContext;
+          if (AudioCtx) this.ctx = new AudioCtx();
+        }
+        if (this.ctx && this.ctx.state === 'suspended') {
+          this.ctx.resume();
+        }
+      }
+      playShoot(pitch = 180) {
+        if (this.muted) return;
+        this.init();
+        if (!this.ctx) return;
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(pitch, now);
+        osc.frequency.exponentialRampToValueAtTime(45, now + 0.11);
+        gain.gain.setValueAtTime(0.18, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.12);
+      }
+      playBillboardDestroy() {
+        if (this.muted) return;
+        this.init();
+        if (!this.ctx) return;
+        const now = this.ctx.currentTime;
+        [523.25, 659.25, 783.99, 1046.5].forEach((freq, idx) => {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(freq, now + idx * 0.05);
+          gain.gain.setValueAtTime(0.14, now + idx * 0.05);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.05 + 0.22);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start(now + idx * 0.05);
+          osc.stop(now + idx * 0.05 + 0.23);
+        });
+      }
+      playPoliceSiren() {
+        if (this.muted) return;
+        this.init();
+        if (!this.ctx) return;
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(620, now);
+        osc.frequency.linearRampToValueAtTime(920, now + 0.18);
+        osc.frequency.linearRampToValueAtTime(620, now + 0.35);
+        gain.gain.setValueAtTime(0.1, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.36);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.36);
+      }
+    }
+    const sfx = new SoundEngine();
+
+    // ============================================================================
+    // 2. MEDELLÍN TOPOGRAPHIC ZONES & SOCIOECONOMIC LEVELS (FROM UPLOADED MAP)
+    // ============================================================================
+    const MEDELLIN_ZONES = [
+      {
+        id: 1,
+        name: "NV.1: SANTO DOMINGO SAVIO / POPULAR",
+        shortName: "Santo Domingo / Popular",
+        comuna: "Comuna 1 — Nororiental",
+        estrato: "ESTRATO 1 - 2",
+        slopePct: 42,
+        slopeFactor: 0.84, // Steeper eastern hills slow movement slightly
+        unlocked: true,
+        bounds: { x1: 1850, y1: 80, x2: 3100, y2: 760 },
+        color: "#f59e0b",
+        bgTint: "#291d12",
+        station: { name: "Estación Santo Domingo (Metrocable Línea K)", x: 2520, y: 340, line: "Metrocable Línea K" },
+        description: "Ladera nororiental alta con pendientes superiores al 40%, callejones de ladrillo, miradores sobre el Valle de Aburrá y telecabinas del Metrocable Línea K."
+      },
+      {
+        id: 2,
+        name: "NV.2: ZAMORA / MORAVIA / RÍO NORTE",
+        shortName: "Zamora / Moravia",
+        comuna: "Frontera Norte & Comuna 4 Aranjuez",
+        estrato: "ESTRATO 2 - 3",
+        slopePct: 18,
+        slopeFactor: 0.94,
+        unlocked: false,
+        bounds: { x1: 1150, y1: 80, x2: 1850, y2: 960 },
+        color: "#10b981",
+        bgTint: "#132620",
+        station: { name: "Estación Acevedo / Moravia (Metro Línea A)", x: 1520, y: 480, line: "Metro Línea A" },
+        description: "Transición desde las laderas hacia la ribera norte del Río Medellín, incluyendo el morro cultural de Moravia, Zamora y urbanismo denso."
+      },
+      {
+        id: 3,
+        name: "NV.3: BARRIO TRISTE / CENTRO LA CANDELARIA",
+        shortName: "Barrio Triste / Centro",
+        comuna: "Comuna 10 — La Candelaria",
+        estrato: "ESTRATO 3",
+        slopePct: 6,
+        slopeFactor: 1.0,
+        unlocked: false,
+        bounds: { x1: 1150, y1: 960, x2: 2250, y2: 1680 },
+        color: "#38bdf8",
+        bgTint: "#131c2e",
+        station: { name: "Estación San Antonio / Cisneros (Líneas A/B/T)", x: 1680, y: 1280, line: "Metro A/B + Tranvía T" },
+        description: "Corredor plano del valle central junto al Río Medellín. Zona de talleres mecánicos en Barrio Triste, comercio intenso y patrullaje táctico."
+      },
+      {
+        id: 4,
+        name: "NV.4: ROBLEDO / CERRO EL VOLADOR",
+        shortName: "Robledo (Occidente)",
+        comuna: "Comuna 7 — Noroccidental",
+        estrato: "ESTRATO 2 - 3 - 4",
+        slopePct: 28,
+        slopeFactor: 0.90,
+        unlocked: false,
+        bounds: { x1: 120, y1: 420, x2: 1150, y2: 1950 },
+        color: "#a855f7",
+        bgTint: "#1f162b",
+        station: { name: "Estación Robledo / San Javier (Metrocable J)", x: 640, y: 1220, line: "Metrocable Línea J / Ruta 80" },
+        description: "Ladera occidental hacia la Cordillera Occidental. Combina barrios tradicionales, el ecoparque Cerro El Volador y la ciudadela universitaria."
+      },
+      {
+        id: 5,
+        name: "NV.5: EL POBLADO / MILLA DE ORO",
+        shortName: "El Poblado (Suroriente)",
+        comuna: "Comuna 14 — Suroriental",
+        estrato: "ESTRATO 5 - 6",
+        slopePct: 22,
+        slopeFactor: 0.95,
+        unlocked: false,
+        bounds: { x1: 1850, y1: 1680, x2: 3100, y2: 2320 },
+        color: "#ec4899",
+        bgTint: "#261423",
+        station: { name: "Estación El Poblado (Metro Línea A Sur)", x: 2380, y: 2020, line: "Metro Línea A" },
+        description: "Centro financiero y empresarial del suroriente (95% estratos 5 y 6). Torres corporativas en la Milla de Oro, Provenza y ascenso a Las Palmas."
+      }
+    ];
+
+    // ============================================================================
+    // 3. COMPUTER SCIENCE CHECKPOINT CHALLENGES (UNLOCK BLOCKADES BETWEEN ZONES)
+    // ============================================================================
+    const CHECKPOINTS = [
+      {
+        id: "cp_1_to_2",
+        targetZoneId: 2,
+        x: 1850,
+        y: 420,
+        orientation: "vertical",
+        title: "Retén Policial #1: Descenso a Zamora y Moravia (Nivel 2)",
+        lore: "La Policía Metropolitana mantiene bloqueado el puente de descenso desde Popular hacia Zamora y Moravia (Estratos 2-3). Para desactivar la barrera láser, debes demostrar que comprendes cómo filtra datos el sistema de control.",
+        complexity: "O(n) — Filtrado Funcional",
+        code: `function filtrarCedulasAutorizadas(altitudes) {\n  // altitudes = [2100, 1520, 1890, 1480, 1610]\n  return altitudes.filter(h => h <= 1650).map(h => h + 10);\n}\n// ¿Qué retorna exactamente filtrarCedulasAutorizadas([2100, 1520, 1890, 1480, 1610])?`,
+        options: [
+          { text: "[1530, 1490, 1620] — Filtra las altitudes <= 1650m y suma 10m a cada una.", correct: true },
+          { text: "[2110, 1530, 1900, 1490, 1620] — Suma 10m a todos los elementos sin filtrar.", correct: false },
+          { text: "[2100, 1890] — Conserva únicamente las laderas superiores a 1650m.", correct: false },
+          { text: "true — Retorna un booleano indicando si todas las zonas están bajas.", correct: false }
+        ]
+      },
+      {
+        id: "cp_2_to_3",
+        targetZoneId: 3,
+        x: 1520,
+        y: 960,
+        orientation: "horizontal",
+        title: "Retén Policial #2: Acceso a Barrio Triste y Centro (Nivel 3)",
+        lore: "El corredor industrial de Barrio Triste y La Candelaria (Estrato 3) está acordonado por patrullas tácticas. El firewall del retén ejecuta un algoritmo clásico sobre una estructura de datos.",
+        complexity: "O(1) — Estructura LIFO (Stack)",
+        code: `function procesarOrdenTactica(eventos) {\n  const pila = [];\n  for (const ev of eventos) {\n    if (ev === "RETROCEDER") pila.pop();\n    else pila.push(ev);\n  }\n  return pila[pila.length - 1];\n}\n// Entrada: ["NORTE", "PUENTE", "RETROCEDER", "CENTRO"]`,
+        options: [
+          { text: "\"CENTRO\" — Usa una Pila (LIFO: Last-In, First-Out); 'PUENTE' se elimina con pop() y 'CENTRO' queda en la cima.", correct: true },
+          { text: "\"NORTE\" — Usa una Cola (FIFO) y devuelve el primer elemento insertado.", correct: false },
+          { text: "\"PUENTE\" — Porque pop() elimina el primer elemento del arreglo.", correct: false },
+          { text: "undefined — La pila queda completamente vacía tras el ciclo.", correct: false }
+        ]
+      },
+      {
+        id: "cp_3_to_4",
+        targetZoneId: 4,
+        x: 1150,
+        y: 1260,
+        orientation: "vertical",
+        title: "Retén Policial #3: Cruce del Río Medellín hacia Robledo (Nivel 4)",
+        lore: "Para cruzar el puente occidental del Río Medellín rumbo a Robledo y el Cerro El Volador (Estratos 2-4, zona universitaria), el comando policial exige desencriptar esta función recursiva.",
+        complexity: "O(log n) — Búsqueda Binaria",
+        code: `function buscarFrecuencia(arr, objetivo, izq = 0, der = arr.length - 1) {\n  if (izq > der) return -1;\n  const medio = Math.floor((izq + der) / 2);\n  if (arr[medio] === objetivo) return medio;\n  return arr[medio] < objetivo\n    ? buscarFrecuencia(arr, objetivo, medio + 1, der)\n    : buscarFrecuencia(arr, objetivo, izq, medio - 1);\n}`,
+        options: [
+          { text: "Implementa Búsqueda Binaria O(log n): divide el espacio ordenado a la mitad en cada llamada hasta hallar el índice.", correct: true },
+          { text: "Ordena el arreglo de mayor a menor usando Bubble Sort en complejidad O(n²).", correct: false },
+          { text: "Recorre todos los elementos uno por uno de izquierda a derecha en O(n).", correct: false },
+          { text: "Calcula el promedio aritmético de todas las frecuencias del espectro.", correct: false }
+        ]
+      },
+      {
+        id: "cp_3_to_5",
+        targetZoneId: 5,
+        x: 2050,
+        y: 1680,
+        orientation: "horizontal",
+        title: "Retén Policial #4: Anillo Blindado de El Poblado (Nivel 5)",
+        lore: "El acceso suroriental hacia El Poblado y la Milla de Oro (Estratos 5 y 6) cuenta con blindaje electrónico de nivel militar. Analiza la función de activación e inferencia neuronal para abrir la frontera final.",
+        complexity: "O(d) — Neurona & ReLU",
+        code: `function activarNeuronaTactica(entradas, pesos, sesgo) {\n  let z = sesgo;\n  for (let i = 0; i < entradas.length; i++) {\n    z += entradas[i] * pesos[i];\n  }\n  return Math.max(0, z); // Función ReLU\n}\n// Si entradas = [2, -3], pesos = [4, 5], sesgo = 1: ¿qué retorna?`,
+        options: [
+          { text: "0 — Porque el producto punto más sesgo es z = (2*4) + (-3*5) + 1 = -6, y ReLU Math.max(0, -6) devuelve 0.", correct: true },
+          { text: "-6 — Devuelve la suma ponderada lineal sin aplicar ninguna no-linealidad.", correct: false },
+          { text: "24 — Multiplica todos los valores en valor absoluto y les suma el sesgo.", correct: false },
+          { text: "1 — Devuelve siempre el valor del sesgo cuando hay entradas negativas.", correct: false }
+        ]
+      }
+    ];
+
+    // ============================================================================
+    // 4. AI KNOWLEDGE BILLBOARDS (SHOOT TO DESTROY -> AI FACT + WEAPON POINTS)
+    // ============================================================================
+    const AI_BILLBOARDS_DATA = [
+      { id: 1, zoneId: 1, x: 2150, y: 240, label: "LETRERO IA #01: TOKENS", title: "Tokenización y Sub-palabras (BPE)", pts: 150, fact: "Los modelos de lenguaje dividen el texto en 'tokens' mediante algoritmos como Byte-Pair Encoding (BPE). Un token equivale aproximadamente a 0.75 palabras en español e impacta directamente el costo de memoria." },
+      { id: 2, zoneId: 1, x: 2680, y: 210, label: "LETRERO IA #02: EMBEDDINGS", title: "Vectores de Embeddings Semánticos", pts: 150, fact: "Un Embedding transforma palabras, imágenes o nodos en vectores de números reales en un espacio multidimensional donde conceptos con significado similar quedan geométricamente cerca (similitud coseno)." },
+      { id: 3, zoneId: 1, x: 2340, y: 560, label: "LETRERO IA #03: GRADIENTE", title: "Descenso de Gradiente Estocástico (SGD)", pts: 160, fact: "Así como bajas por las pendientes del 40% en Santo Domingo Savio, el Descenso de Gradiente calcula la derivada parcial de la función de pérdida para ajustar los pesos de una red en dirección al error mínimo." },
+      { id: 4, zoneId: 1, x: 2860, y: 520, label: "LETRERO IA #04: OVERFITTING", title: "Sobreajuste (Overfitting) vs Generalización", pts: 160, fact: "Ocurre cuando un modelo memoriza el ruido de los datos de entrenamiento pero falla ante datos nuevos. Se mitiga con Dropout, regularización L2 (Weight Decay) y validación cruzada." },
+      { id: 5, zoneId: 2, x: 1380, y: 260, label: "LETRERO IA #05: ATENCIÓN", title: "Self-Attention en Transformers", pts: 180, fact: "El mecanismo de Atención calcula matrices Query (Q), Key (K) y Value (V) mediante softmax(QK^T / √d_k)V, permitiendo ponderar la relevancia de cada token sin importar su distancia en la oración." },
+      { id: 6, zoneId: 2, x: 1660, y: 680, label: "LETRERO IA #06: RAG", title: "Generación Aumentada por Recuperación (RAG)", pts: 180, fact: "RAG combina un buscador vectorial con un modelo generativo para inyectar documentos verificados en el prompt antes de responder, reduciendo alucinaciones y ahorrando reentrenamientos costosos." },
+      { id: 7, zoneId: 2, x: 1320, y: 740, label: "LETRERO IA #07: MULTI-AGENTE", title: "Sistemas Multi-Agente (Supervisor-Worker)", pts: 200, fact: "En una arquitectura Multi-Agente, un agente Supervisor descompone objetivos complejos y delega subtareas a agentes especialistas con contextos aislados, protegiendo la ventana de tokens." },
+      { id: 8, zoneId: 3, x: 1450, y: 1180, label: "LETRERO IA #08: CNN VISION", title: "Redes Convolucionales (CNN) y Kernels", pts: 210, fact: "Las CNN aplican filtros matriciales (kernels) deslizantes sobre una imagen para detectar bordes, texturas y objetos con invariancia espacial, esenciales en cámaras de visión por computadora." },
+      { id: 9, zoneId: 3, x: 1920, y: 1220, label: "LETRERO IA #09: RL REWARD", title: "Aprendizaje por Refuerzo (Bellman & Q-Learning)", pts: 220, fact: "Un agente aprende una política óptima π(s) interactuando con el entorno para maximizar la recompensa acumulada descontada γ, balanceando exploración y explotación." },
+      { id: 10, zoneId: 3, x: 1720, y: 1520, label: "LETRERO IA #10: QUANTIZATION", title: "Cuantización de Modelos (FP16 a INT4)", pts: 230, fact: "Reducir la precisión de los pesos neuronales de 16 bits a 4 bits (INT4) disminuye el uso de RAM en un 75% y acelera la inferencia en dispositivos móviles Android (NPUs)." },
+      { id: 11, zoneId: 4, x: 480, y: 780, label: "LETRERO IA #11: GNN GRAFOS", title: "Graph Neural Networks (GNN)", pts: 240, fact: "Las GNN operan directamente sobre estructuras de grafos como la red vial o el Metro de Medellín, agregando mensajes entre nodos vecinos para predecir tráfico y rutas óptimas." },
+      { id: 12, zoneId: 4, x: 820, y: 1480, label: "LETRERO IA #12: BACKPROP", title: "Retropropagación del Error (Regla de la Cadena)", pts: 250, fact: "Backpropagation propaga el error desde la capa de salida hacia las capas ocultas aplicando la regla de la cadena del cálculo diferencial para actualizar cada sinapsis." },
+      { id: 13, zoneId: 5, x: 2180, y: 1920, label: "LETRERO IA #13: MOE EXPERTS", title: "Mixture of Experts (MoE)", pts: 300, fact: "Una arquitectura MoE activa únicamente un subconjunto disperso de 'expertos' (sub-redes) por cada token mediante una red enrutadora, logrando modelos masivos con bajo costo de inferencia." },
+      { id: 14, zoneId: 5, x: 2740, y: 2080, label: "LETRERO IA #14: ALIGNMENT", title: "RLHF y Alineamiento de Seguridad en IA", pts: 320, fact: "El Aprendizaje por Refuerzo con Retroalimentación Humana (RLHF) entrena un modelo de recompensa basado en preferencias humanas para alinear al agente con respuestas útiles y seguras." }
+    ].map(b => ({ ...b, hp: 100, maxHp: 100, destroyed: false, respawnTimer: 0 }));
+
+    // ============================================================================
+    // 5. WEAPONS CATALOG (UNLOCKED WITH POINTS FROM AI BILLBOARDS)
+    // ============================================================================
+    const WEAPONS = [
+      { id: "pistol", name: "Pistola 9mm Táctica", cost: 0, unlocked: true, damage: 36, fireRateMs: 260, speed: 15, spread: 0.04, recoil: 1.2, color: "#fbbf24", pitch: 210, desc: "Arma reglamentaria semiautomática. Precisa y ligera para patrullaje urbano." },
+      { id: "smg", name: "Subfusil Vector-MDE", cost: 300, unlocked: false, damage: 28, fireRateMs: 110, speed: 17, spread: 0.09, recoil: 1.6, color: "#38bdf8", pitch: 280, desc: "Alta cadencia de disparo para destruir letreros de IA a corta y media distancia." },
+      { id: "shotgun", name: "Escopeta de Impulso (3 Perdigones)", cost: 650, unlocked: false, damage: 34, pellets: 3, fireRateMs: 520, speed: 14, spread: 0.16, recoil: 3.8, color: "#f97316", pitch: 120, desc: "Dispara 3 haces cinéticos simultáneos con retroceso balístico pronunciado." },
+      { id: "rifle", name: "Rifle Neural de Precisión", cost: 1100, unlocked: false, damage: 100, fireRateMs: 420, speed: 23, spread: 0.01, recoil: 2.5, color: "#a855f7", pitch: 150, desc: "Destruye cualquier letrero de IA de un solo impacto certero a larga distancia." }
+    ];
+
+    // ============================================================================
+    // 6. MULTI-AGENT SUPERVISOR & SPECIALIST AGENTS ARCHITECTURE
+    // ============================================================================
+    class MultiAgentSystem {
+      constructor() {
+        this.tokenBudgetMax = 512;
+        this.currentTokens = 142;
+        this.dynamicWorkers = 0;
+        this.agents = [
+          { id: "sup-01", name: "SupervisorOrchestratorAgent", role: "Orquestador Central y Presupuesto de Tokens", layer: "Capa 0: Meta-Control", tokens: 32, status: "ACTIVO", detail: "Coordina sub-agentes por zona y comprime mensajes en deltas (<120 tok)." },
+          { id: "phy-02", name: "KinematicsPhysicsAgent", role: "Física de Cápsula, Inercia y Pendientes", layer: "Capa 1: Locomoción Humana", tokens: 28, status: "ACTIVO", detail: "Calcula fricción, deslizamiento en muros y factor topográfico del Valle de Aburrá." },
+          { id: "tac-03", name: "TacticalPoliceAgent", role: "Retenes Policiales, FOV y Estrellas GTA", layer: "Capa 2: Táctica Militar", tokens: 34, status: "ACTIVO", detail: "Controla patrullas, conos de visión, cobertura tras obstáculos y bloqueos de comuna." },
+          { id: "edu-04", name: "EduCSKnowledgeAgent", role: "Letreros de IA y Terminales de Funciones CS", layer: "Capa 3: Pedagogía Interactiva", tokens: 26, status: "ACTIVO", detail: "Valida retos de Ciencias de la Computación y administra las cápsulas de IA." },
+          { id: "trn-05", name: "SITVATransportAgent", role: "Metro, Metrocable (K/J) y Tranvía", layer: "Capa 4: Movilidad Urbana", tokens: 22, status: "ACTIVO", detail: "Verifica permisos territoriales entre estaciones desbloqueadas y bloqueadas." }
+        ];
+      }
+      spawnWorker(zoneName) {
+        this.dynamicWorkers++;
+        const newTokens = 18;
+        this.currentTokens = Math.min(this.tokenBudgetMax, this.currentTokens + newTokens);
+        this.agents.push({
+          id: `wrk-0${5 + this.dynamicWorkers}`,
+          name: `PatrolBehaviorWorker#${this.dynamicWorkers}`,
+          role: `Comportamiento Humano NPC (${zoneName})`,
+          layer: "Capa Dinámica: Percepción Local",
+          tokens: newTokens,
+          status: "INSTANCIADO",
+          detail: "Asignado por el Supervisor para simular rutinas de peatones y reacción al sonido balístico."
+        });
+        this.updateUI();
+      }
+      updateTelemetry(playerZone, wantedLevel, crouching) {
+        const base = 130 + this.dynamicWorkers * 18 + wantedLevel * 9 + (crouching ? 4 : 0);
+        this.currentTokens = Math.min(this.tokenBudgetMax, base);
+        const tokEl = document.getElementById("hudTokenCount");
+        if (tokEl) tokEl.textContent = this.currentTokens;
+        const statusEl = document.getElementById("supervisorLiveStatus");
+        if (statusEl) {
+          statusEl.textContent = `Zona ${playerZone.id} (${playerZone.estrato}) | Pendiente ${playerZone.slopePct}% | Sigilo: ${crouching ? 'ON' : 'OFF'} | Estrellas: ${wantedLevel}`;
+        }
+      }
+      updateUI() {
+        const metricEl = document.getElementById("agentTokenMetric");
+        const countEl = document.getElementById("agentCountMetric");
+        const container = document.getElementById("agentsTableContainer");
+        if (metricEl) metricEl.textContent = `${this.currentTokens} / ${this.tokenBudgetMax} tok`;
+        if (countEl) countEl.textContent = `5 Base + ${this.dynamicWorkers} Dinámicos`;
+        if (!container) return;
+        container.innerHTML = this.agents.map(a => `
+          <div class="bg-slate-900/95 border border-slate-800 rounded-xl p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div>
+              <div class="flex items-center gap-2">
+                <span class="px-2 py-0.5 rounded text-[10px] font-extrabold bg-emerald-500/20 text-emerald-300 mono">${a.layer}</span>
+                <span class="font-bold text-xs text-white mono">${a.name}</span>
+              </div>
+              <div class="text-xs text-amber-300 font-semibold mt-0.5">${a.role}</div>
+              <div class="text-[11px] text-slate-400 mt-0.5">${a.detail}</div>
+            </div>
+            <div class="text-right shrink-0">
+              <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-sky-500/20 text-sky-300 mono">${a.tokens} tok/tick</span>
+              <div class="text-[10px] text-emerald-400 font-bold mt-1 mono">● ${a.status}</div>
+            </div>
+          </div>
+        `).join("");
+      }
+    }
+    const multiAgent = new MultiAgentSystem();
+
+    // ============================================================================
+    // 7. OPEN-WORLD GAME STATE, CHARACTER PHYSICS & TACTICAL OBSTACLES
+    // ============================================================================
+    const WORLD_W = 3200;
+    const WORLD_H = 2400;
+
+    const player = {
+      x: 2420,
+      y: 420,
+      vx: 0,
+      vy: 0,
+      radius: 16,
+      skinWidth: 2, // 10%+ skin width to prevent wall sticking
+      angle: 0,
+      baseAccel: 0.72,
+      friction: 0.84,
+      maxSpeed: 5.4,
+      crouching: false,
+      inCover: false,
+      health: 100,
+      armor: 85,
+      stamina: 100,
+      points: 250,
+      wantedStars: 0,
+      wantedDecayTimer: 0,
+      weaponIndex: 0,
+      lastShotTime: 0,
+      collectedAIFacts: []
+    };
+
+    const bullets = [];
+    const particles = [];
+
+    // Tactical cover obstacles & buildings across Medellín's 5 zones
+    const obstacles = [
+      // Zone 1: Santo Domingo Savio / Popular brick houses & tactical cover walls
+      { x: 2020, y: 160, w: 110, h: 70, type: "building", label: "Casa Ladera #102", color: "#9a3412" },
+      { x: 2260, y: 290, w: 120, h: 65, type: "building", label: "Mirador Santo Domingo", color: "#7c2d12" },
+      { x: 2600, y: 400, w: 140, h: 80, type: "building", label: "Biblioteca Ladera", color: "#334155" },
+      { x: 2150, y: 480, w: 90, h: 24, type: "cover", label: "Trinchera Táctica", color: "#475569" },
+      { x: 2480, y: 540, w: 95, h: 24, type: "cover", label: "Barricada Sacos", color: "#475569" },
+
+      // Zone 2: Zamora / Moravia buildings & covers
+      { x: 1250, y: 340, w: 150, h: 85, type: "building", label: "Centro Cultural Moravia", color: "#065f46" },
+      { x: 1580, y: 220, w: 120, h: 75, type: "building", label: "Bodega Zamora", color: "#1e293b" },
+      { x: 1420, y: 580, w: 100, h: 24, type: "cover", label: "Muro de Cobertura", color: "#475569" },
+
+      // Zone 3: Barrio Triste / La Candelaria
+      { x: 1320, y: 1280, w: 160, h: 90, type: "building", label: "Talleres Barrio Triste", color: "#1e3a8a" },
+      { x: 1850, y: 1360, w: 150, h: 85, type: "building", label: "Torres La Candelaria", color: "#334155" },
+      { x: 1600, y: 1120, w: 110, h: 26, type: "cover", label: "Contenedor Blindado", color: "#475569" },
+
+      // Zone 4: Robledo / Cerro El Volador
+      { x: 380, y: 940, w: 170, h: 95, type: "building", label: "Facultad de Minas", color: "#581c87" },
+      { x: 680, y: 680, w: 150, h: 90, type: "building", label: "Ecoparque El Volador", color: "#14532d" },
+      { x: 580, y: 1360, w: 110, h: 26, type: "cover", label: "Muro Universitario", color: "#475569" },
+
+      // Zone 5: El Poblado / Milla de Oro
+      { x: 2120, y: 2040, w: 180, h: 100, type: "building", label: "Torre Financiera Milla de Oro", color: "#831843" },
+      { x: 2560, y: 1860, w: 170, h: 95, type: "building", label: "Complejo Provenza Tech", color: "#312e81" },
+      { x: 2340, y: 1840, w: 120, h: 26, type: "cover", label: "Barrera Balística", color: "#475569" }
+    ];
+
+    // NPC Citizens & Tactical Police Patrol Units
+    const npcs = [
+      { x: 2320, y: 390, vx: 0.8, vy: 0.2, role: "citizen", name: "Vecino Popular", color: "#fde047" },
+      { x: 2680, y: 310, vx: -0.7, vy: 0.4, role: "citizen", name: "Comerciante Ladera", color: "#38bdf8" },
+      { x: 1480, y: 420, vx: 0.9, vy: -0.3, role: "police", name: "Patrulla Moravia", color: "#ef4444" },
+      { x: 1650, y: 1380, vx: -1.0, vy: 0.2, role: "police", name: "Escuadrón Candelaria", color: "#ef4444" },
+      { x: 720, y: 1120, vx: 0.7, vy: 0.6, role: "citizen", name: "Estudiante Robledo", color: "#c084fc" },
+      { x: 2450, y: 2020, vx: -0.8, vy: -0.4, role: "police", name: "Escolta Milla de Oro", color: "#ef4444" }
+    ];
+
+    // ============================================================================
+    // 8. INPUT HANDLING (KEYBOARD, MOUSE, TOUCH D-PAD)
+    // ============================================================================
+    const keys = {};
+    const touchMove = { up: false, down: false, left: false, right: false };
+    let mouseScreen = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+
+    window.addEventListener("keydown", (e) => {
+      const k = e.key.toLowerCase();
+      keys[k] = true;
+      if (k === "c") toggleCrouch();
+      if (k === "q") cycleWeapon(-1);
+      if (k === "e") cycleWeapon(1);
+      if (k === "f") triggerContextualAction();
+    });
+    window.addEventListener("keyup", (e) => {
+      keys[e.key.toLowerCase()] = false;
+    });
+
+    const canvas = document.getElementById("gameCanvas");
+    const ctx = canvas.getContext("2d");
+    const radarCanvas = document.getElementById("radarCanvas");
+    const rctx = radarCanvas.getContext("2d");
+
+    function resizeCanvas() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    }
+    window.addEventListener("resize", resizeCanvas);
+    resizeCanvas();
+
+    canvas.addEventListener("mousemove", (e) => {
+      mouseScreen.x = e.clientX;
+      mouseScreen.y = e.clientY;
+    });
+    canvas.addEventListener("mousedown", (e) => {
+      if (e.button === 0) {
+        mouseScreen.x = e.clientX;
+        mouseScreen.y = e.clientY;
+        fireWeapon();
+      }
+    });
+
+    // Touch / Virtual D-Pad bindings
+    document.querySelectorAll(".btn-move").forEach(btn => {
+      const dir = btn.getAttribute("data-Move");
+      const start = (ev) => { ev.preventDefault(); touchMove[dir] = true; };
+      const end = (ev) => { ev.preventDefault(); touchMove[dir] = false; };
+      btn.addEventListener("mousedown", start);
+      btn.addEventListener("mouseup", end);
+      btn.addEventListener("mouseleave", end);
+      btn.addEventListener("touchstart", start, { passive: false });
+      btn.addEventListener("touchend", end, { passive: false });
+    });
+
+    document.getElementById("btnCrouch").addEventListener("click", toggleCrouch);
+    document.getElementById("btnCycleWeapon").addEventListener("click", () => cycleWeapon(1));
+    document.getElementById("btnFireWeapon").addEventListener("click", () => {
+      // Auto-aim at nearest intact AI billboard if using button
+      let nearest = null;
+      let minDist = Infinity;
+      AI_BILLBOARDS_DATA.forEach(b => {
+        if (!b.destroyed) {
+          const d = Math.hypot(b.x - player.x, b.y - player.y);
+          if (d < minDist) { minDist = d; nearest = b; }
+        }
+      });
+      if (nearest && minDist < 750) {
+        player.angle = Math.atan2(nearest.y - player.y, nearest.x - player.x);
+      }
+      fireWeapon(true);
+    });
+    document.getElementById("btnContextInteract").addEventListener("click", triggerContextualAction);
+
+    function toggleCrouch() {
+      player.crouching = !player.crouching;
+      updateHUD();
+    }
+
+    function cycleWeapon(step) {
+      const unlockedList = WEAPONS.map((w, idx) => ({ w, idx })).filter(item => item.w.unlocked);
+      if (unlockedList.length <= 1) return;
+      const curPos = unlockedList.findIndex(item => item.idx === player.weaponIndex);
+      const nextPos = (curPos + step + unlockedList.length) % unlockedList.length;
+      player.weaponIndex = unlockedList[nextPos].idx;
+      updateHUD();
+    }
+
+    // ============================================================================
+    // 9. SHOOTING, BALLISTICS & AI BILLBOARD DESTRUCTION
+    // ============================================================================
+    function fireWeapon(keepAngle = false) {
+      const now = performance.now();
+      const weapon = WEAPONS[player.weaponIndex];
+      if (now - player.lastShotTime < weapon.fireRateMs) return;
+      player.lastShotTime = now;
+
+      const camX = player.x - canvas.width / 2;
+      const camY = player.y - canvas.height / 2;
+      if (!keepAngle) {
+        player.angle = Math.atan2((mouseScreen.y + camY) - player.y, (mouseScreen.x + camX) - player.x);
+      }
+
+      const pellets = weapon.pellets || 1;
+      const spreadMod = player.crouching ? 0.45 : 1.0; // Tactical crouch improves accuracy
+
+      for (let i = 0; i < pellets; i++) {
+        const angleOffset = (Math.random() - 0.5) * weapon.spread * spreadMod;
+        const finalAngle = player.angle + angleOffset;
+        bullets.push({
+          x: player.x + Math.cos(finalAngle) * 22,
+          y: player.y + Math.sin(finalAngle) * 22,
+          vx: Math.cos(finalAngle) * weapon.speed,
+          vy: Math.sin(finalAngle) * weapon.speed,
+          damage: weapon.damage,
+          color: weapon.color,
+          life: 55
+        });
+      }
+
+      // Apply realistic ballistic recoil impulse opposite to firing vector
+      player.vx -= Math.cos(player.angle) * (weapon.recoil * 0.35);
+      player.vy -= Math.sin(player.angle) * (weapon.recoil * 0.35);
+
+      sfx.playShoot(weapon.pitch);
+    }
+
+    function showAIFactToast(billboard) {
+      const banner = document.getElementById("aiToastBanner");
+      document.getElementById("toastAITitle").textContent = `${billboard.label} — ${billboard.title}`;
+      document.getElementById("toastRewardPts").textContent = `+${billboard.pts} PTS`;
+      document.getElementById("toastAIDesc").textContent = billboard.fact;
+      banner.classList.remove("opacity-0", "pointer-events-none", "-translate-y-4");
+      banner.classList.add("opacity-100", "translate-y-0");
+
+      if (!player.collectedAIFacts.some(f => f.id === billboard.id)) {
+        player.collectedAIFacts.unshift(billboard);
+      }
+      updateHUD();
+    }
+
+    document.getElementById("btnCloseToast").addEventListener("click", () => {
+      const banner = document.getElementById("aiToastBanner");
+      banner.classList.add("opacity-0", "pointer-events-none", "-translate-y-4");
+      banner.classList.remove("opacity-100", "translate-y-0");
+    });
+
+    // ============================================================================
+    // 10. ZONE DETECTION, POLICE BLOCKADES & CONTEXTUAL INTERACTIONS
+    // ============================================================================
+    function getZoneAt(x, y) {
+      for (const z of MEDELLIN_ZONES) {
+        if (x >= z.bounds.x1 && x <= z.bounds.x2 && y >= z.bounds.y1 && y <= z.bounds.y2) {
+          return z;
+        }
+      }
+      return MEDELLIN_ZONES[0];
+    }
+
+    let activeNearCheckpoint = null;
+    let activeNearStation = null;
+
+    function checkProximityInteractions() {
+      activeNearCheckpoint = null;
+      activeNearStation = null;
+
+      for (const cp of CHECKPOINTS) {
+        const targetZone = MEDELLIN_ZONES.find(z => z.id === cp.targetZoneId);
+        if (targetZone && !targetZone.unlocked) {
+          const dist = Math.hypot(player.x - cp.x, player.y - cp.y);
+          if (dist < 115) {
+            activeNearCheckpoint = cp;
+            break;
+          }
+        }
+      }
+
+      if (!activeNearCheckpoint) {
+        for (const z of MEDELLIN_ZONES) {
+          const st = z.station;
+          if (Math.hypot(player.x - st.x, player.y - st.y) < 95) {
+            activeNearStation = z;
+            break;
+          }
+        }
+      }
+
+      const btn = document.getElementById("btnContextInteract");
+      const label = document.getElementById("btnContextLabel");
+      if (activeNearCheckpoint) {
+        btn.classList.remove("hidden");
+        label.textContent = `HACKEAR TERMINAL DEL RETÉN (F)`;
+      } else if (activeNearStation) {
+        btn.classList.remove("hidden");
+        label.textContent = `ABRIR TRANSPORTE SITVA (F)`;
+      } else {
+        btn.classList.add("hidden");
+      }
+    }
+
+    function triggerContextualAction() {
+      if (activeNearCheckpoint) {
+        openCheckpointModal(activeNearCheckpoint);
+      } else if (activeNearStation) {
+        openSITVAModal();
+      }
+    }
+
+    // ============================================================================
+    // 11. CHARACTER KINEMATICS & PHYSICS UPDATE LOOP
+    // ============================================================================
+    let policeAlertTimeout = null;
+
+    function triggerPoliceBlockadeWarning(zoneName) {
+      player.wantedStars = Math.min(5, Math.max(2, player.wantedStars + 1));
+      player.wantedDecayTimer = 420;
+      sfx.playPoliceSiren();
+      updateHUD();
+
+      const alertBanner = document.getElementById("policeAlertBanner");
+      const alertText = document.getElementById("policeAlertText");
+      alertText.innerHTML = `<strong>¡Alto ahí! Bloqueo Policial en la frontera hacia ${zoneName}.</strong><br/>No puedes cruzar a una zona bloqueada. Acércate a la Terminal Amarilla del Retén y responde qué hace la función de Ciencias de la Computación para levantar el bloqueo.`;
+      alertBanner.classList.remove("hidden");
+      if (policeAlertTimeout) clearTimeout(policeAlertTimeout);
+      policeAlertTimeout = setTimeout(() => {
+        alertBanner.classList.add("hidden");
+      }, 4800);
+    }
+
+    function updatePhysics() {
+      const currentZone = getZoneAt(player.x, player.y);
+
+      // 1. Gather directional input vector
+      let ix = 0, iy = 0;
+      if (keys["w"] || keys["arrowup"] || touchMove.up) iy -= 1;
+      if (keys["s"] || keys["arrowdown"] || touchMove.down) iy += 1;
+      if (keys["a"] || keys["arrowleft"] || touchMove.left) ix -= 1;
+      if (keys["d"] || keys["arrowright"] || touchMove.right) ix += 1;
+
+      if (ix !== 0 && iy !== 0) {
+        const inv = 1 / Math.SQRT2;
+        ix *= inv;
+        iy *= inv;
+      }
+
+      // 2. Check tactical cover proximity
+      player.inCover = false;
+      for (const ob of obstacles) {
+        if (ob.type === "cover") {
+          const cx = Math.max(ob.x, Math.min(player.x, ob.x + ob.w));
+          const cy = Math.max(ob.y, Math.min(player.y, ob.y + ob.h));
+          if (Math.hypot(player.x - cx, player.y - cy) < player.radius + 18) {
+            player.inCover = true;
+            break;
+          }
+        }
+      }
+
+      // 3. Apply slope factor (Medellín hill physics) & tactical stance modifier
+      const stanceMultiplier = player.crouching ? 0.58 : 1.0;
+      const slopeMultiplier = currentZone.slopeFactor;
+      const effectiveAccel = player.baseAccel * stanceMultiplier * slopeMultiplier;
+
+      player.vx = (player.vx + ix * effectiveAccel) * player.friction;
+      player.vy = (player.vy + iy * effectiveAccel) * player.friction;
+
+      // Clamp minimum velocity to 0 (Min Move Distance = 0.02 to prevent micro-jitter)
+      if (Math.abs(player.vx) < 0.02) player.vx = 0;
+      if (Math.abs(player.vy) < 0.02) player.vy = 0;
+
+      // Update facing angle when moving if not actively aiming
+      if (Math.hypot(ix, iy) > 0.1) {
+        player.stamina = Math.max(15, player.stamina - 0.05);
+      } else {
+        player.stamina = Math.min(100, player.stamina + 0.25);
+      }
+
+      // 4. Capsule / Circle Collision with Slide-Along-Wall & Locked Zone Police Blockade
+      let nextX = Math.max(40, Math.min(WORLD_W - 40, player.x + player.vx));
+      let nextY = Math.max(40, Math.min(WORLD_H - 40, player.y + player.vy));
+
+      // Check if next position enters a LOCKED Medellín Zone -> Police Blockade pushback!
+      const candidateZone = getZoneAt(nextX, nextY);
+      if (!candidateZone.unlocked) {
+        // Push player back and trigger police blockade alert
+        player.vx *= -1.3;
+        player.vy *= -1.3;
+        nextX = player.x + player.vx;
+        nextY = player.y + player.vy;
+        triggerPoliceBlockadeWarning(candidateZone.shortName);
+      }
+
+      // Check Obstacle Collisions (Slide along wall using separate X and Y resolution)
+      const effR = player.radius + player.skinWidth;
+      for (const ob of obstacles) {
+        if (
+          nextX + effR > ob.x &&
+          nextX - effR < ob.x + ob.w &&
+          player.y + effR > ob.y &&
+          player.y - effR < ob.y + ob.h
+        ) {
+          nextX = player.x;
+          player.vx = 0;
+        }
+        if (
+           nextX + effR > ob.x &&
+          nextX - effR < ob.x + ob.w &&
+          nextY + effR > ob.y &&
+          nextY - effR < ob.y + ob.h
+        ) {
+          nextY = player.y;
+          player.vy = 0;
+        }
+      }
+
+      player.x = nextX;
+      player.y = nextY;
+
+      // 5. Wanted Level Decay (faster when in tactical stealth/cover)
+      if (player.wantedStars > 0) {
+        const decayRate = (player.crouching || player.inCover) ? 2.5 : 0.7;
+        player.wantedDecayTimer -= decayRate;
+        if (player.wantedDecayTimer <= 0) {
+          player.wantedStars = Math.max(0, player.wantedStars - 1);
+          player.wantedDecayTimer = 360;
+          updateHUD();
+        }
+      }
+
+      // 6. Update Bullets & Check Hits on AI Billboards
+      for (let i = bullets.length - 1; i >= 0; i--) {
+        const b = bullets[i];
+        b.x += b.vx;
+        b.y += b.vy;
+        b.life--;
+
+        let hit = false;
+        for (const bb of AI_BILLBOARDS_DATA) {
+          if (!bb.destroyed && Math.abs(b.x - bb.x) < 46 && Math.abs(b.y - bb.y) < 28) {
+            bb.hp -= b.damage;
+            hit = true;
+            // Spawn hit sparks
+            for (let p = 0; p < 6; p++) {
+              particles.push({
+                x: b.x, y: b.y,
+                vx: (Math.random() - 0.5) * 5,
+                vy: (Math.random() - 0.5) * 5,
+                life: 22,
+                color: "#22d3ee"
+              });
+            }
+            if (bb.hp <= 0) {
+              bb.destroyed = true;
+              bb.respawnTimer = 950; // Respawns after a while so player can keep practicing
+              player.points += bb.pts;
+              sfx.playBillboardDestroy();
+              showAIFactToast(bb);
+              for (let p = 0; p < 18; p++) {
+                particles.push({
+                  x: bb.x, y: bb.y,
+                  vx: (Math.random() - 0.5) * 8,
+                  vy: (Math.random() - 0.5) * 8,
+                  life: 35,
+                  color: p % 2 === 0 ? "#fbbf24" : "#22d3ee"
+                });
+              }
+            }
+            break;
+          }
+        }
+
+        if (hit || b.life <= 0) {
+          bullets.splice(i, 1);
+        }
+      }
+
+      // Respawn destroyed billboards after cooldown
+      for (const bb of AI_BILLBOARDS_DATA) {
+        if (bb.destroyed) {
+          bb.respawnTimer--;
+          if (bb.respawnTimer <= 0) {
+            bb.destroyed = false;
+            bb.hp = bb.maxHp;
+          }
+        }
+      }
+
+      // Update Particles
+      for (let i = particles.length - 1; i >= 0; i--) {
+        const pt = particles[i];
+        pt.x += pt.vx;
+        pt.y += pt.vy;
+        pt.life--;
+        if (pt.life <= 0) particles.splice(i, 1);
+      }
+
+      // Update NPCs
+      for (const npc of npcs) {
+        npc.x += npc.vx;
+        npc.y += npc.vy;
+        if (Math.random() < 0.015) {
+          npc.vx = (Math.random() - 0.5) * 1.6;
+          npc.vy = (Math.random() - 0.5) * 1.6;
+        }
+        npc.x = Math.max(150, Math.min(WORLD_W - 150, npc.x));
+        npc.y = Math.max(150, Math.min(WORLD_H - 150, npc.y));
+      }
+
+      checkProximityInteractions();
+      multiAgent.updateTelemetry(currentZone, player.wantedStars, player.crouching || player.inCover);
+      updateZoneBanner(currentZone);
+    }
+
+    // ============================================================================
+    // 12. RENDERING ENGINE (MEDELLÍN TOPOGRAPHY, RIVER, METROCABLE, HUD & RADAR)
+    // ============================================================================
+    function drawWorld() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      const camX = player.x - canvas.width / 2;
+      const camY = player.y - canvas.height / 2;
+
+      ctx.save();
+      ctx.translate(-camX, -camY);
+
+      // 1. Draw Zone Grounds & Topographic Contour Lines
+      for (const z of MEDELLIN_ZONES) {
+        const w = z.bounds.x2 - z.bounds.x1;
+        const h = z.bounds.y2 - z.bounds.y1;
+        ctx.fillStyle = z.unlocked ? z.bgTint : "#18181b";
+        ctx.fillRect(z.bounds.x1, z.bounds.y1, w, h);
+
+        // Topographic elevation grid lines
+        ctx.strokeStyle = z.unlocked ? "rgba(255,255,255,0.05)" : "rgba(239,68,68,0.08)";
+        ctx.lineWidth = 1;
+        for (let gx = z.bounds.x1; gx < z.bounds.x2; gx += 90) {
+          ctx.beginPath();
+          ctx.moveTo(gx, z.bounds.y1);
+          ctx.lineTo(gx, z.bounds.y2);
+          ctx.stroke();
+        }
+        for (let gy = z.bounds.y1; gy < z.bounds.y2; gy += 90) {
+          ctx.beginPath();
+          ctx.moveTo(z.bounds.x1, gy);
+          ctx.lineTo(z.bounds.x2, gy);
+          ctx.stroke();
+        }
+
+        // Zone Border & Title Watermark
+        ctx.strokeStyle = z.unlocked ? z.color : "#ef4444";
+        ctx.lineWidth = 3;
+        ctx.strokeRect(z.bounds.x1, z.bounds.y1, w, h);
+
+        ctx.fillStyle = z.unlocked ? "rgba(255,255,255,0.13)" : "rgba(239,68,68,0.22)";
+        ctx.font = "800 28px Inter, sans-serif";
+        ctx.fillText(z.name, z.bounds.x1 + 28, z.bounds.y1 + 46);
+        ctx.font = "600 15px JetBrains Mono, monospace";
+        ctx.fillText(`${z.comuna} • ${z.estrato} • Pendiente: ${z.slopePct}%`, z.bounds.x1 + 28, z.bounds.y1 + 72);
+
+        if (!z.unlocked) {
+          ctx.fillStyle = "rgba(239,68,68,0.35)";
+          ctx.font = "700 18px JetBrains Mono, monospace";
+          ctx.fillText("🔒 ZONA BLOQUEADA POR RETÉN POLICIAL — RESUELVE LA FUNCIÓN CS EN LA FRONTERA", z.bounds.x1 + 28, z.bounds.y1 + 104);
+        }
+      }
+
+      // 2. Draw Río Medellín (South-to-North Central Valley Axis)
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(1750, 2380);
+      ctx.bezierCurveTo(1620, 1700, 1480, 1100, 1380, 60);
+      ctx.lineWidth = 64;
+      ctx.strokeStyle = "#0ea5e9";
+      ctx.globalAlpha = 0.28;
+      ctx.stroke();
+      ctx.lineWidth = 36;
+      ctx.strokeStyle = "#38bdf8";
+      ctx.globalAlpha = 0.45;
+      ctx.stroke();
+      ctx.restore();
+
+      // 3. Draw SITVA Metrocable / Metro Lines & Stations
+      ctx.save();
+      ctx.setLineDash([10, 8]);
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = "rgba(56, 189, 248, 0.55)";
+      ctx.beginPath();
+      ctx.moveTo(MEDELLIN_ZONES[0].station.x, MEDELLIN_ZONES[0].station.y);
+      ctx.lineTo(MEDELLIN_ZONES[1].station.x, MEDELLIN_ZONES[1].station.y);
+      ctx.lineTo(MEDELLIN_ZONES[2].station.x, MEDELLIN_ZONES[2].station.y);
+      ctx.lineTo(MEDELLIN_ZONES[4].station.x, MEDELLIN_ZONES[4].station.y);
+      ctx.moveTo(MEDELLIN_ZONES[2].station.x, MEDELLIN_ZONES[2].station.y);
+      ctx.lineTo(MEDELLIN_ZONES[3].station.x, MEDELLIN_ZONES[3].station.y);
+      ctx.stroke();
+      ctx.restore();
+
+      for (const z of MEDELLIN_ZONES) {
+        const st = z.station;
+        ctx.fillStyle = z.unlocked ? "#0284c7" : "#475569";
+        ctx.beginPath();
+        ctx.arc(st.x, st.y, 26, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = "#e0f2fe";
+        ctx.stroke();
+
+        ctx.fillStyle = "#ffffff";
+        ctx.font = "700 12px Inter, sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText("🚈 " + st.line, st.x, st.y - 34);
+        ctx.font = "600 11px JetBrains Mono, monospace";
+        ctx.fillStyle = "#bae6fd";
+        ctx.fillText("[F] Viaje Rápido SITVA", st.x, st.y + 42);
+      }
+
+      // 4. Draw Buildings & Tactical Cover Obstacles
+      for (const ob of obstacles) {
+        ctx.fillStyle = ob.color;
+        ctx.fillRect(ob.x, ob.y, ob.w, ob.h);
+        ctx.strokeStyle = ob.type === "cover" ? "#94a3b8" : "#0f172a";
+        ctx.lineWidth = 2;
+        ctx.strokeRect(ob.x, ob.y, ob.w, ob.h);
+
+        ctx.fillStyle = "#f8fafc";
+        ctx.font = "700 11px Inter, sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText(ob.label, ob.x + ob.w / 2, ob.y + ob.h / 2 + 4);
+      }
+
+      // 5. Draw Police Checkpoints & CS Function Terminals
+      const pulse = (Math.sin(performance.now() * 0.008) + 1) * 0.5;
+      for (const cp of CHECKPOINTS) {
+        const targetZone = MEDELLIN_ZONES.find(z => z.id === cp.targetZoneId);
+        const isLocked = targetZone && !targetZone.unlocked;
+
+        // Draw Police Barricade & Flashing Lights
+        ctx.save();
+        ctx.translate(cp.x, cp.y);
+        if (isLocked) {
+          ctx.fillStyle = pulse > 0.5 ? "rgba(239, 68, 68, 0.85)" : "rgba(59, 130, 246, 0.85)";
+          if (cp.orientation === "vertical") {
+            ctx.fillRect(-10, -70, 20, 140);
+          } else {
+            ctx.fillRect(-70, -10, 140, 20);
+          }
+          // CS Terminal Kiosk
+          ctx.fillStyle = "#f59e0b";
+          ctx.beginPath();
+          ctx.arc(0, 0, 20, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.strokeStyle = "#ffffff";
+          ctx.lineWidth = 2.5;
+          ctx.stroke();
+
+          ctx.fillStyle = "#ffffff";
+          ctx.font = "800 12px Inter, sans-serif";
+          ctx.textAlign = "center";
+          ctx.fillText("🚨 RETÉN POLICIAL — FUNCIÓN CS [F]", 0, -32);
+          ctx.font = "600 11px JetBrains Mono, monospace";
+          ctx.fillStyle = "#fde047";
+          ctx.fillText(`Desbloquear ${targetZone.shortName}`, 0, 36);
+        } else {
+          ctx.fillStyle = "rgba(16, 185, 129, 0.35)";
+          ctx.beginPath();
+          ctx.arc(0, 0, 18, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = "#6ee7b7";
+          ctx.font = "700 11px JetBrains Mono, monospace";
+          ctx.textAlign = "center";
+          ctx.fillText("✓ FRONTERA ABIERTA", 0, -24);
+        }
+        ctx.restore();
+      }
+
+      // 6. Draw Destructible AI Knowledge Billboards
+      for (const bb of AI_BILLBOARDS_DATA) {
+        if (bb.destroyed) {
+          ctx.fillStyle = "rgba(30, 41, 59, 0.6)";
+          ctx.fillRect(bb.x - 42, bb.y - 18, 84, 36);
+          ctx.fillStyle = "#64748b";
+          ctx.font = "600 10px JetBrains Mono, monospace";
+          ctx.textAlign = "center";
+          ctx.fillText("✓ DATO IA EXTRAÍDO", bb.x, bb.y + 4);
+          continue;
+        }
+
+        // Neon Billboard Frame
+        ctx.fillStyle = "#0f172a";
+        ctx.fillRect(bb.x - 48, bb.y - 24, 96, 48);
+        ctx.strokeStyle = "#22d3ee";
+        ctx.lineWidth = 2.5;
+        ctx.strokeRect(bb.x - 48, bb.y - 24, 96, 48);
+
+        ctx.fillStyle = "#67e8f9";
+        ctx.font = "800 10px JetBrains Mono, monospace";
+        ctx.textAlign = "center";
+        ctx.fillText(bb.label, bb.x, bb.y - 5);
+
+        ctx.fillStyle = "#fde047";
+        ctx.font = "700 10px Inter, sans-serif";
+        ctx.fillText(`🎯 Dispara (+${bb.pts} PTS)`, bb.x, bb.y + 11);
+
+        // Health bar
+        const hpRatio = Math.max(0, bb.hp / bb.maxHp);
+        ctx.fillStyle = "#1e293b";
+        ctx.fillRect(bb.x - 40, bb.y + 16, 80, 4);
+        ctx.fillStyle = "#10b981";
+        ctx.fillRect(bb.x - 40, bb.y + 16, 80 * hpRatio, 4);
+      }
+
+      // 7. Draw NPCs (Citizens & Police Units with FOV Cones)
+      for (const npc of npcs) {
+        if (npc.role === "police") {
+          const heading = Math.atan2(npc.vy, npc.vx);
+          ctx.save();
+          ctx.translate(npc.x, npc.y);
+          ctx.rotate(heading);
+          ctx.fillStyle = "rgba(239, 68, 68, 0.14)";
+          ctx.beginPath();
+          ctx.moveTo(0, 0);
+          ctx.arc(0, 0, 120, -0.45, 0.45);
+          ctx.closePath();
+          ctx.fill();
+          ctx.restore();
+        }
+
+        ctx.fillStyle = npc.color;
+        ctx.beginPath();
+        ctx.arc(npc.x, npc.y, 12, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = "#000";
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        ctx.fillStyle = "#e2e8f0";
+        ctx.font = "600 10px Inter, sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText(npc.name, npc.x, npc.y - 16);
+      }
+
+      // 8. Draw Bullets & Sparks
+      for (const b of bullets) {
+        ctx.fillStyle = b.color;
+        ctx.beginPath();
+        ctx.arc(b.x, b.y, 4, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      for (const pt of particles) {
+        ctx.fillStyle = pt.color;
+        ctx.fillRect(pt.x - 2, pt.y - 2, 4, 4);
+      }
+
+      // 9. Draw Player Character (GTA Style Top-Down Tactical Avatar)
+      ctx.save();
+      ctx.translate(player.x, player.y);
+
+      // Stealth / Cover ring indicator
+      if (player.crouching || player.inCover) {
+        ctx.strokeStyle = "#10b981";
+        ctx.lineWidth = 2;
+        ctx.setLineDash([4, 4]);
+        ctx.beginPath();
+        ctx.arc(0, 0, player.radius + 9, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+
+      ctx.rotate(player.angle);
+      // Gun barrel
+      ctx.fillStyle = "#94a3b8";
+      ctx.fillRect(10, 3, 18, 5);
+      // Shoulders & Body
+      ctx.fillStyle = player.crouching ? "#059669" : "#f59e0b";
+      ctx.beginPath();
+      ctx.arc(0, 0, player.radius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.lineWidth = 2.5;
+      ctx.strokeStyle = "#ffffff";
+      ctx.stroke();
+      ctx.restore();
+
+      ctx.restore();
+    }
+
+    function drawRadar() {
+      rctx.clearRect(0, 0, radarCanvas.width, radarCanvas.height);
+      const sx = radarCanvas.width / WORLD_W;
+      const sy = radarCanvas.height / WORLD_H;
+
+      for (const z of MEDELLIN_ZONES) {
+        rctx.fillStyle = z.unlocked ? z.color + "33" : "#ef444422";
+        rctx.strokeStyle = z.unlocked ? z.color : "#ef4444";
+        rctx.lineWidth = 1;
+        rctx.fillRect(z.bounds.x1 * sx, z.bounds.y1 * sy, (z.bounds.x2 - z.bounds.x1) * sx, (z.bounds.y2 - z.bounds.y1) * sy);
+        rctx.strokeRect(z.bounds.x1 * sx, z.bounds.y1 * sy, (z.bounds.x2 - z.bounds.x1) * sx, (z.bounds.y2 - z.bounds.y1) * sy);
+      }
+
+      // Draw AI Billboards on radar
+      for (const bb of AI_BILLBOARDS_DATA) {
+        if (!bb.destroyed) {
+          rctx.fillStyle = "#22d3ee";
+          rctx.fillRect(bb.x * sx - 1.5, bb.y * sy - 1.5, 3, 3);
+        }
+      }
+
+      // Draw Checkpoints on radar
+      for (const cp of CHECKPOINTS) {
+        const tz = MEDELLIN_ZONES.find(z => z.id === cp.targetZoneId);
+        if (tz && !tz.unlocked) {
+          rctx.fillStyle = "#f59e0b";
+          rctx.beginPath();
+          rctx.arc(cp.x * sx, cp.y * sy, 3.5, 0, Math.PI * 2);
+          rctx.fill();
+        }
+      }
+
+      // Draw Player blip on radar
+      rctx.fillStyle = "#ffffff";
+      rctx.beginPath();
+      rctx.arc(player.x * sx, player.y * sy, 4, 0, Math.PI * 2);
+      rctx.fill();
+    }
+
+    // ============================================================================
+    // 13. UI & MODALS LOGIC (CHECKPOINTS, SITVA, ARMORY, CS LAB, AGENTS)
+    // ============================================================================
+    function updateZoneBanner(z) {
+      document.getElementById("hudZoneName").textContent = z.name;
+      document.getElementById("hudEstrato").textContent = z.estrato;
+      document.getElementById("hudSlopeInfo").textContent = `Pendiente: ${z.slopePct}% (${z.comuna})`;
+      const unlockedCount = MEDELLIN_ZONES.filter(zone => zone.unlocked).length;
+      document.getElementById("hudUnlockCount").textContent = `Zonas: ${unlockedCount}/${MEDELLIN_ZONES.length}`;
+      document.getElementById("barStamina").style.width = `${Math.round(player.stamina)}%`;
+    }
+
+    function updateHUD() {
+      document.getElementById("hudPoints").textContent = `$ ${player.points} PTS`;
+      document.getElementById("armoryPointsDisplay").textContent = `$ ${player.points} PTS`;
+      document.getElementById("hudAICount").textContent = `🧠 Datos IA: ${player.collectedAIFacts.length} / ${AI_BILLBOARDS_DATA.length}`;
+      const w = WEAPONS[player.weaponIndex];
+      document.getElementById("hudWeaponName").textContent = w.name;
+      document.getElementById("hudStance").textContent = player.crouching
+        ? (player.inCover ? "Postura: Cobertura Blindada" : "Postura: Sigilo Táctico")
+        : (player.inCover ? "Postura: En Cobertura" : "Postura: De Pie (Normal)");
+
+      const starsContainer = document.getElementById("hudStars");
+      let starsHTML = "";
+      for (let i = 1; i <= 5; i++) {
+        starsHTML += i <= player.wantedStars
+          ? `<span class="text-amber-400">★</span>`
+          : `<span class="text-slate-600">★</span>`;
+      }
+      starsContainer.innerHTML = starsHTML;
+    }
+
+    // --- CHECKPOINT MODAL ---
+    function openCheckpointModal(cp) {
+      const modal = document.getElementById("modalCheckpoint");
+      document.getElementById("cpModalTitle").textContent = cp.title;
+      document.getElementById("cpModalLore").textContent = cp.lore;
+      document.getElementById("cpDifficultyTag").textContent = cp.complexity;
+      document.getElementById("cpCodeBlock").textContent = cp.code;
+      const fb = document.getElementById("cpFeedbackBox");
+      fb.classList.add("hidden");
+
+      const optsDiv = document.getElementById("cpOptionsContainer");
+      optsDiv.innerHTML = "";
+      cp.options.forEach((opt) => {
+        const btn = document.createElement("button");
+        btn.className = "w-full text-left p-3 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-xs sm:text-sm text-slate-200 font-medium transition";
+        btn.textContent = opt.text;
+        btn.addEventListener("click", () => {
+          fb.classList.remove("hidden");
+          if (opt.correct) {
+            const targetZone = MEDELLIN_ZONES.find(z => z.id === cp.targetZoneId);
+            if (targetZone) targetZone.unlocked = true;
+            player.points += 300;
+            player.wantedStars = 0;
+            sfx.playBillboardDestroy();
+            updateHUD();
+            fb.className = "mt-3 rounded-xl p-3 text-xs font-bold bg-emerald-500/20 border border-emerald-400 text-emerald-200";
+            fb.textContent = `¡Correcto! Función verificada. El bloqueo policial se ha levantado y has desbloqueado ${targetZone.name} (+300 PTS).`;
+            setTimeout(() => modal.classList.add("hidden"), 1600);
+          } else {
+            sfx.playPoliceSiren();
+            fb.className = "mt-3 rounded-xl p-3 text-xs font-bold bg-rose-500/20 border border-rose-400 text-rose-200";
+            fb.textContent = "Respuesta incorrecta. Analiza el flujo de la función e inténtalo de nuevo para abrir el retén policial.";
+          }
+        });
+        optsDiv.appendChild(btn);
+      });
+      modal.classList.remove("hidden");
+    }
+    document.getElementById("btnCloseCheckpoint").addEventListener("click", () => {
+      document.getElementById("modalCheckpoint").classList.add("hidden");
+    });
+
+    // --- SITVA TRANSPORT MODAL ---
+    function openSITVAModal() {
+      const modal = document.getElementById("modalSITVA");
+      const list = document.getElementById("sitvaStationsList");
+      const msg = document.getElementById("sitvaStatusMsg");
+      msg.classList.add("hidden");
+
+      list.innerHTML = "";
+      MEDELLIN_ZONES.forEach(z => {
+        const card = document.createElement("div");
+        card.className = `p-3.5 rounded-xl border ${z.unlocked ? 'bg-slate-900/95 border-sky-500/40' : 'bg-slate-950/90 border-rose-500/40 opacity-85'} flex flex-col justify-between gap-2`;
+        card.innerHTML = `
+          <div>
+            <div class="flex items-center justify-between gap-2">
+              <span class="text-[10px] font-extrabold px-2 py-0.5 rounded ${z.unlocked ? 'bg-sky-500/20 text-sky-300' : 'bg-rose-500/20 text-rose-300'} mono">${z.station.line}</span>
+              <span class="text-[10px] font-bold text-amber-300 mono">${z.estrato}</span>
+            </div>
+            <div class="font-bold text-sm text-white mt-1">${z.station.name}</div>
+            <div class="text-[11px] text-slate-400 mt-0.5">${z.comuna}</div>
+          </div>
+        `;
+        const btn = document.createElement("button");
+        btn.className = `w-full py-2 px-3 rounded-lg font-extrabold text-xs transition ${z.unlocked ? 'bg-sky-600 hover:bg-sky-500 text-white' : 'bg-rose-950/80 hover:bg-rose-900 text-rose-300 border border-rose-500/40'}`;
+        btn.textContent = z.unlocked ? "🚈 Viajar a esta Estación" : "🔒 Bloqueo Policial Activo";
+        btn.addEventListener("click", () => {
+          msg.classList.remove("hidden");
+          if (z.unlocked) {
+            player.x = z.station.x;
+            player.y = z.station.y + 30;
+            player.vx = 0;
+            player.vy = 0;
+            sfx.playBillboardDestroy();
+            msg.className = "mt-3 rounded-xl p-3 text-xs font-bold bg-emerald-500/20 border border-emerald-400 text-emerald-200";
+            msg.textContent = `Viaje completado por SITVA hacia ${z.station.name}.`;
+            setTimeout(() => modal.classList.add("hidden"), 900);
+          } else {
+            sfx.playPoliceSiren();
+            msg.className = "mt-3 rounded-xl p-3 text-xs font-bold bg-rose-500/20 border border-rose-400 text-rose-200";
+            msg.textContent = `🚨 ACCESO DENEGADO POR BLOQUEO POLICIAL: La estación en ${z.shortName} pertenece a una zona bloqueada. Dirígete a la frontera y resuelve el reto de Ciencias de la Computación para abrir el paso.`;
+          }
+        });
+        card.appendChild(btn);
+        list.appendChild(card);
+      });
+      modal.classList.remove("hidden");
+    }
+    document.getElementById("btnOpenSITVA").addEventListener("click", openSITVAModal);
+    document.getElementById("btnCloseSITVA").addEventListener("click", () => {
+      document.getElementById("modalSITVA").classList.add("hidden");
+    });
+
+    // --- ARMORY MODAL ---
+    function openArmoryModal() {
+      const modal = document.getElementById("modalArmory");
+      updateHUD();
+      const grid = document.getElementById("armoryWeaponsGrid");
+      grid.innerHTML = "";
+
+      WEAPONS.forEach((w, idx) => {
+        const card = document.createElement("div");
+        const isEquipped = player.weaponIndex === idx;
+        card.className = `p-3.5 rounded-xl border ${isEquipped ? 'bg-amber-500/15 border-amber-400' : 'bg-slate-900/95 border-slate-800'} flex flex-col justify-between gap-2`;
+        card.innerHTML = `
+          <div>
+            <div class="flex items-center justify-between">
+              <span class="font-extrabold text-sm text-white">${w.name}</span>
+              <span class="text-xs font-bold mono text-amber-300">${w.unlocked ? 'DESBLOQUEADA' : '$ ' + w.cost + ' PTS'}</span>
+            </div>
+            <p class="text-[11px] text-slate-300 mt-1">${w.desc}</p>
+            <div class="text-[10px] text-slate-400 mono mt-2">Daño: ${w.damage} | Cadencia: ${w.fireRateMs}ms | Retroceso: ${w.recoil}</div>
+          </div>
+        `;
+        const btn = document.createElement("button");
+        btn.className = `w-full py-2 px-3 rounded-lg font-extrabold text-xs transition ${isEquipped ? 'bg-emerald-600 text-white' : (w.unlocked ? 'bg-amber-500 hover:bg-amber-400 text-slate-950' : 'bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-500/40')}`;
+        btn.textContent = isEquipped ? "✓ Equipada Actualmente" : (w.unlocked ? "Equipar Arma" : `Comprar por $ ${w.cost} PTS`);
+        btn.addEventListener("click", () => {
+          if (w.unlocked) {
+            player.weaponIndex = idx;
+            updateHUD();
+            openArmoryModal();
+          } else if (player.points >= w.cost) {
+            player.points -= w.cost;
+            w.unlocked = true;
+            player.weaponIndex = idx;
+            sfx.playBillboardDestroy();
+            updateHUD();
+            openArmoryModal();
+          } else {
+            sfx.playPoliceSiren();
+          }
+        });
+        card.appendChild(btn);
+        grid.appendChild(card);
+      });
+      modal.classList.remove("hidden");
+    }
+    document.getElementById("btnOpenArmory").addEventListener("click", openArmoryModal);
+    document.getElementById("btnCloseArmory").addEventListener("click", () => {
+      document.getElementById("modalArmory").classList.add("hidden");
+    });
+
+    // --- CS LAB INTERACTIVE MINI-GAMES ---
+    let sortArr = [42, 15, 78, 23, 9, 64];
+    let selectedSwapIdx = null;
+
+    function renderSortGame() {
+      const container = document.getElementById("sortArrayContainer");
+      const status = document.getElementById("sortStatusText");
+      container.innerHTML = "";
+      const isSorted = sortArr.every((v, i, a) => i === 0 || a[i - 1] <= v);
+
+      sortArr.forEach((val, idx) => {
+        const btn = document.createElement("button");
+        const isSel = selectedSwapIdx === idx;
+        btn.className = `w-14 h-16 rounded-xl font-extrabold text-base mono transition flex flex-col items-center justify-center border-2 ${isSorted ? 'bg-emerald-600/30 border-emerald-400 text-emerald-200' : (isSel ? 'bg-amber-500 text-slate-950 border-white scale-105' : 'bg-slate-900 border-purple-500/50 text-white hover:border-purple-400')}`;
+        btn.innerHTML = `<span>${val}</span><span class="text-[9px] text-slate-400">[${idx}]</span>`;
+        btn.addEventListener("click", () => {
+          if (isSorted) return;
+          if (selectedSwapIdx === null) {
+            selectedSwapIdx = idx;
+          } else if (selectedSwapIdx === idx) {
+            selectedSwapIdx = null;
+          } else {
+            const tmp = sortArr[selectedSwapIdx];
+            sortArr[selectedSwapIdx] = sortArr[idx];
+            sortArr[idx] = tmp;
+            selectedSwapIdx = null;
+            sfx.playShoot(320);
+            const nowSorted = sortArr.every((v, i, a) => i === 0 || a[i - 1] <= v);
+            if (nowSorted) {
+              player.points += 200;
+              sfx.playBillboardDestroy();
+              updateHUD();
+              status.textContent = "🎉 ¡Arreglo ordenado ascendentemente! Ganaste +200 PTS.";
+            }
+          }
+          renderSortGame();
+        });
+        container.appendChild(btn);
+      });
+    }
+
+    document.getElementById("btnResetSortGame").addEventListener("click", () => {
+      sortArr = Array.from({ length: 6 }, () => Math.floor(Math.random() * 89) + 10);
+      selectedSwapIdx = null;
+      document.getElementById("sortStatusText").textContent = "Haz clic en dos bloques para intercambiarlos (swap(i, j)).";
+      renderSortGame();
+    });
+
+    // Binary Search Game
+    let binSortedArr = [];
+    let binTargetIdx = 0;
+    let binAttempts = 4;
+    let binRevealed = {};
+
+    function initBinaryGame() {
+      binSortedArr = Array.from({ length: 16 }, (_, i) => 100 + i * 12);
+      binTargetIdx = Math.floor(Math.random() * 16);
+      binAttempts = 4;
+      binRevealed = {};
+      document.getElementById("binaryStatusText").textContent = `Objetivo: Busca la frecuencia ${binSortedArr[binTargetIdx]} MHz | Intentos: ${binAttempts}`;
+      renderBinaryGame();
+    }
+
+    function renderBinaryGame() {
+      const grid = document.getElementById("binaryGridContainer");
+      const status = document.getElementById("binaryStatusText");
+      grid.innerHTML = "";
+      const targetVal = binSortedArr[binTargetIdx];
+
+      binSortedArr.forEach((val, idx) => {
+        const btn = document.createElement("button");
+        const state = binRevealed[idx];
+        btn.className = `p-2.5 rounded-xl border text-xs font-bold mono transition ${state === 'hit' ? 'bg-emerald-600 border-emerald-300 text-white' : (state ? 'bg-slate-950 border-slate-800 text-amber-300' : 'bg-slate-900 border-cyan-500/40 text-cyan-200 hover:bg-cyan-500/20')}`;
+        btn.textContent = state === 'hit' ? `✓ ${val}` : (state === 'low' ? `${val} ↑` : (state === 'high' ? `${val} ↓` : `[idx ${idx}]`));
+        btn.addEventListener("click", () => {
+          if (binAttempts <= 0 || binRevealed[binTargetIdx] === 'hit') return;
+          binAttempts--;
+          if (idx === binTargetIdx) {
+            binRevealed[idx] = 'hit';
+            player.points += 250;
+            sfx.playBillboardDestroy();
+            updateHUD();
+            status.textContent = `🎉 ¡Frecuencia ${targetVal} MHz hallada en O(log n)! Ganaste +250 PTS.`;
+          } else if (idx < binTargetIdx) {
+            binRevealed[idx] = 'low';
+            status.textContent = `Índice ${idx} (${val} MHz) es MENOR que ${targetVal} MHz → Busca en la mitad derecha | Intentos: ${binAttempts}`;
+          } else {
+            binRevealed[idx] = 'high';
+            status.textContent = `Índice ${idx} (${val} MHz) es MAYOR que ${targetVal} MHz → Busca en la mitad izquierda | Intentos: ${binAttempts}`;
+          }
+          renderBinaryGame();
+        });
+        grid.appendChild(btn);
+      });
+    }
+    document.getElementById("btnResetBinaryGame").addEventListener("click", initBinaryGame);
+
+    function renderAIFactsCollection() {
+      const list = document.getElementById("aiFactsCollectionList");
+      if (player.collectedAIFacts.length === 0) {
+        list.innerHTML = `<div class="p-4 rounded-xl bg-slate-900 border border-slate-800 text-xs text-slate-400">Aún no has destruido letreros de IA. Camina por Medellín y dispárales con clic izquierdo o el botón "Disparar Letrero".</div>`;
+        return;
+      }
+      list.innerHTML = player.collectedAIFacts.map(f => `
+        <div class="p-3 rounded-xl bg-slate-900 border border-cyan-500/30">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-extrabold text-cyan-300 mono">${f.label}: ${f.title}</span>
+            <span class="text-[11px] font-bold text-emerald-400 mono">+${f.pts} PTS</span>
+          </div>
+          <p class="text-xs text-slate-300 mt-1">${f.fact}</p>
+        </div>
+      `).join("");
+    }
+
+    document.querySelectorAll(".cs-tab-btn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        document.querySelectorAll(".cs-tab-btn").forEach(b => {
+          b.className = "cs-tab-btn px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-800 text-slate-300";
+        });
+        btn.className = "cs-tab-btn px-3 py-1.5 rounded-lg text-xs font-bold bg-purple-600 text-white";
+        const tab = btn.getAttribute("data-cstab");
+        document.getElementById("csTabSorting").classList.toggle("hidden", tab !== "sorting");
+        document.getElementById("csTabBinary").classList.toggle("hidden", tab !== "binary");
+        document.getElementById("csTabAIFacts").classList.toggle("hidden", tab !== "aifacts");
+        if (tab === "aifacts") renderAIFactsCollection();
+      });
+    });
+
+    document.getElementById("btnOpenCSLab").addEventListener("click", () => {
+      renderSortGame();
+      initBinaryGame();
+      renderAIFactsCollection();
+      document.getElementById("modalCSLab").classList.remove("hidden");
+    });
+    document.getElementById("btnCloseCSLab").addEventListener("click", () => {
+      document.getElementById("modalCSLab").classList.add("hidden");
+    });
+
+    // --- MULTI-AGENT MODAL ---
+    document.getElementById("btnOpenAgents").addEventListener("click", () => {
+      multiAgent.updateUI();
+      document.getElementById("modalAgents").classList.remove("hidden");
+    });
+    document.getElementById("btnCloseAgents").addEventListener("click", () => {
+      document.getElementById("modalAgents").classList.add("hidden");
+    });
+    document.getElementById("btnSpawnWorkerAgent").addEventListener("click", () => {
+      const z = getZoneAt(player.x, player.y);
+      multiAgent.spawnWorker(z.shortName);
+      sfx.playBillboardDestroy();
+    });
+
+    // --- GITHUB / APK MODAL ---
+    document.getElementById("btnOpenGitHub").addEventListener("click", () => {
+      document.getElementById("modalGitHub").classList.remove("hidden");
+    });
+    document.getElementById("btnCloseGitHub").addEventListener("click", () => {
+      document.getElementById("modalGitHub").classList.add("hidden");
+    });
+
+    // --- AUDIO MUTE BUTTON ---
+    document.getElementById("btnToggleAudio").addEventListener("click", (e) => {
+      sfx.muted = !sfx.muted;
+      e.currentTarget.textContent = sfx.muted ? "🔇" : "🔊";
+    });
+
+    // ============================================================================
+    // 14. MAIN GAME LOOP
+    // ============================================================================
+    let animId = null;
+    function gameLoop() {
+      updatePhysics();
+      drawWorld();
+      drawRadar();
+      animId = requestAnimationFrame(gameLoop);
+    }
+
+    window.onload = () => {
+      updateHUD();
+      multiAgent.updateUI();
+      if (animId) cancelAnimationFrame(animId);
+      gameLoop();
+    };
+  </script>
+</body>
+</html>
