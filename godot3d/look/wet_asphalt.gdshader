@@ -28,6 +28,18 @@ uniform float tile_size = 0.0;
 uniform float groove_width = 0.025;
 uniform vec3 groove_color : source_color = vec3(0.08, 0.08, 0.085);
 uniform float tile_variation : hint_range(0.0, 1.0) = 0.12;
+// Texturas PBR opcionales (Fase 1, art/tex/*). Proyección por coordenadas de mundo:
+// XZ en caras horizontales (XY / ZY en caras verticales). use_tex = false → look procedural
+// original sin ningún cambio. Con texturas, la humedad, los charcos y las ondas de lluvia se
+// aplican ENCIMA: lo mojado y los charcos oscurecen el albedo y bajan la rugosidad del ORM.
+uniform bool use_tex = false;
+uniform sampler2D tex_albedo : source_color, hint_default_white, filter_linear_mipmap_anisotropic, repeat_enable;
+uniform sampler2D tex_normal : hint_normal, filter_linear_mipmap_anisotropic, repeat_enable;   // OpenGL (Y+)
+uniform sampler2D tex_orm : hint_default_white, filter_linear_mipmap_anisotropic, repeat_enable; // R=AO G=rugosidad B=metal
+uniform float tex_tile_m = 4.0;                                  // metros por repetición
+uniform vec3 tex_tint : source_color = vec3(1.0);                // multiplica el albedo de la textura
+uniform float tex_normal_strength : hint_range(0.0, 2.0) = 1.0;
+uniform float tex_ao_strength : hint_range(0.0, 1.0) = 1.0;
 
 varying vec3 wpos;
 varying vec3 wnrm;
@@ -71,6 +83,19 @@ void fragment() {
 	float g2 = vnoise(gp * 13.0 + 7.0);
 	float grain = g1 * 0.55 + g2 * 0.45;
 
+	// --- texturas opcionales (proyección mundo) ---
+	vec3 t_alb = vec3(1.0);
+	vec3 t_orm = vec3(1.0, dry_roughness, 0.0);
+	vec2 t_n = vec2(0.0);
+	if (use_tex) {
+		vec3 an = abs(wnrm);
+		vec2 tp = (an.y >= max(an.x, an.z)) ? wpos.xz : (an.x > an.z ? wpos.zy : wpos.xy);
+		vec2 tuv = tp / max(tex_tile_m, 0.001);
+		t_alb = texture(tex_albedo, tuv).rgb * tex_tint;
+		t_orm = texture(tex_orm, tuv).rgb;
+		t_n = texture(tex_normal, tuv).rg * 2.0 - 1.0;
+	}
+
 	// --- losas opcionales ---
 	float groove = 0.0;
 	float tile_tint = 1.0;
@@ -90,16 +115,19 @@ void fragment() {
 	float damp = clamp(w * (0.55 + 0.6 * big) + groove * w, 0.0, 1.0);
 
 	// --- color ---
-	vec3 alb = base_color * tile_tint * (1.0 + (grain - 0.5) * color_variation);
+	vec3 alb = use_tex ? t_alb * tile_tint
+		: base_color * tile_tint * (1.0 + (grain - 0.5) * color_variation);
 	alb = mix(alb, groove_color, groove);
 	alb *= mix(1.0, 0.55, damp);                       // lo mojado oscurece
-	alb = mix(alb, puddle_color, puddle);
+	alb = mix(alb, use_tex ? alb * 0.42 : puddle_color, puddle);   // con textura: el agua oscurece lo de abajo
 
 	// --- normal: grano (seco) + ondas de lluvia (charcos) ---
 	float eps = 0.02;
 	float gx = vnoise((gp + vec2(eps, 0.0)) * 4.0) - g1;
 	float gz = vnoise((gp + vec2(0.0, eps)) * 4.0) - g1;
-	vec3 n = wnrm + vec3(-gx, 0.0, -gz) * (normal_strength * 6.0) * (1.0 - puddle) * up;
+	vec3 n = use_tex
+		? wnrm + vec3(t_n.x, 0.0, -t_n.y) * tex_normal_strength * (1.0 - puddle) * up
+		: wnrm + vec3(-gx, 0.0, -gz) * (normal_strength * 6.0) * (1.0 - puddle) * up;
 	if (rain > 0.01) {
 		vec2 rp = p * 1.6;
 		vec2 cell = floor(rp);
@@ -118,7 +146,9 @@ void fragment() {
 	NORMAL = normalize((VIEW_MATRIX * vec4(n, 0.0)).xyz);
 
 	// --- respuesta especular ---
-	float rough = mix(dry_roughness, damp_roughness, damp) * (0.85 + 0.3 * grain);
+	float rough = use_tex
+		? mix(t_orm.g, min(t_orm.g, damp_roughness * (0.7 + 0.6 * t_orm.g)), damp)
+		: mix(dry_roughness, damp_roughness, damp) * (0.85 + 0.3 * grain);
 	rough = mix(rough, puddle_roughness, puddle);
 	rough = mix(rough, 0.9, groove * (1.0 - w));
 	float ndv = clamp(dot(NORMAL, VIEW), 0.0, 1.0);
@@ -127,6 +157,7 @@ void fragment() {
 	ALBEDO = alb;
 	ROUGHNESS = rough;
 	METALLIC = 0.0;
+	AO = use_tex ? mix(1.0, t_orm.r, tex_ao_strength) : 1.0;   // 1.0 = sin oclusión (look original intacto)
 	SPECULAR = mix(0.5, 1.0, max(puddle, damp * 0.5));
 	// reflejo de cielo falso (fresnel): da el brillo plateado del asfalto mojado
 	// incluso donde el radiance del cielo es pobre (Mobile, cubemap pequeño).
