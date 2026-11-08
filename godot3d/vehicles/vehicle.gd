@@ -349,14 +349,16 @@ func _apply_parked() -> void:
 		w.wheel_friction_slip = float(profile.get("grip_front", 1.0))
 	throttle = 0.0
 	# Estacionado en pendiente lateral (las carreras suben hacia el oriente), el
-	# raycast de ruedas de Godot deja "reptar" el auto de lado varios metros.
-	# Con velocidad muy baja anulamos ese deslizamiento lateral y el giro; un golpe
-	# fuerte (> 1 m/s) sí lo sigue moviendo, como un auto con freno de mano real.
+	# raycast de ruedas de Godot deja "reptar" el auto de lado. Lo frenamos con
+	# FUERZAS (no reescribiendo linear_velocity: eso borraba el empuje de la
+	# suspensión en cada frame y el auto quedaba apoyado en la carrocería).
+	# Un golpe fuerte (> 1 m/s) sí lo sigue moviendo.
 	if linear_velocity.length() < 1.0 and _any_wheel_contact():
 		var right := global_basis.x
-		linear_velocity -= right * linear_velocity.dot(right)
-		linear_velocity -= global_basis.z * linear_velocity.dot(global_basis.z) * 0.5
-		angular_velocity.y = 0.0
+		var fwd := global_basis.z
+		apply_central_force(-right * linear_velocity.dot(right) * mass * 25.0)
+		apply_central_force(-fwd * linear_velocity.dot(fwd) * mass * 6.0)
+		apply_torque(Vector3(0.0, -angular_velocity.y * mass * 4.0, 0.0))
 
 
 func _any_wheel_contact() -> bool:
