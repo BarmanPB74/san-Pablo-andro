@@ -843,7 +843,8 @@ func _pole_line(pts: Array, to_road: Vector3, street: Dictionary, sw: Node3D) ->
 		_col_cyl(p + Vector3(0, Poles.POLE_TOP * 0.5, 0), Poles.POLE_R0, Poles.POLE_TOP)
 		if i % 3 != 1:
 			place_mesh("p2poles_lum", Poles.luminaire(), xf, false)
-			if lums % 2 == 0 and sw.get_child_count() < 72:
+			# luz real en 1 de cada 2 luminarias, solo en la zona jugable central (reparto uniforme, ≤ 72)
+			if lums % 2 == 0 and absf(p.x) < 230.0 and absf(p.z) < 230.0 and sw.get_child_count() < 72:
 				sw.add_child(Poles.make_lamp_light())
 				(sw.get_child(sw.get_child_count() - 1) as Node3D).transform = Poles.lamp_light_xform(xf)
 			lums += 1

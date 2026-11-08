@@ -28,9 +28,13 @@ func _ready() -> void:
 	var rear := view.begins_with("rear") or view.begins_with("rclose")
 	var pos := {}
 	for i in 4:
-		var yaw := deg_to_rad(-35.0) if not rear else deg_to_rad(145.0)
+		var yaw := deg_to_rad(-35.0) if rear or true else 0.0
 		var xf := Transform3D(Basis(Vector3.UP, yaw), Vector3(xs[i], 0, 0))
 		var v := VehicleFactory.spawn(kinds[i], xf, self)
+		v.freeze = true   # solo estudio: muestra la altura de diseño (origen = piso)
+		v.global_position = xf.origin
+		for wi in v.wheel_visuals.size():
+			v.wheel_visuals[wi].position.y = v.all_wheels[wi].wheel_radius
 		v.set_lights(view == "night" or (args.size() > 4 and args[4] == "rainy_night"))
 		pos[kinds[i]] = xs[i]
 		var tris := 0

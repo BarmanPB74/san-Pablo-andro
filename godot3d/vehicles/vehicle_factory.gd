@@ -178,8 +178,8 @@ static func paint_mat() -> Material:
 	m.vertex_color_is_srgb = true
 	m.uv1_world_triplanar = false
 	m.cull_mode = BaseMaterial3D.CULL_DISABLED
-	m.metallic = 0.25
-	m.roughness = 0.3
+	m.metallic = 0.1
+	m.roughness = 0.36
 	m.clearcoat_enabled = true
 	m.clearcoat = 0.45
 	m.clearcoat_roughness = 0.12
@@ -390,7 +390,7 @@ class Shape:
 		var y5 := clampf(maxf(B + 0.14, (B + yc) * 0.5), y4, yc - 0.015)
 		var x1 := minf(xw, W - 0.1)
 		var p := PackedVector3Array([Vector3(0, F, z), Vector3(x1, F, z), Vector3(x1, B, z),
-			Vector3(W - 0.07, B, z), Vector3(W - 0.025, y4, z), Vector3(W - 0.004, y5, z), Vector3(W, yc, z)])
+			Vector3(W - 0.06, B, z), Vector3(W - 0.016, y4, z), Vector3(W - 0.002, y5, z), Vector3(W, yc, z)])
 		if mode == "b":
 			p.append_array([Vector3(W - 0.012, rail - 0.03, z), Vector3(W - 0.05, rail, z),
 				Vector3(W - 0.075, belt, z), Vector3(0, belt, z)])
@@ -573,9 +573,9 @@ static func _build_car(k: Kit, sh: Shape, paint: Array) -> void:
 			k.box(T, Vector3(sx * (hx + 0.002), hy, hz), Vector3(0.008, 0.05, 0.18))
 		# Espejo: brazo negro + carcasa en color + luna.
 		var mz := sh.cb0 + 0.13
-		var my := sh.deck + 0.09
-		var mx := sh.chw0 + 0.02
-		k.strut(T, Vector3(sx * mx, sh.deck + 0.01, mz), Vector3(sx * (mx + 0.08), my, mz + 0.01), 0.03)
+		var my := sh.deck + 0.05
+		var mx := sh.chw0 - 0.01
+		k.strut(T, Vector3(sx * mx, sh.deck - 0.02, mz), Vector3(sx * (mx + 0.08), my, mz + 0.01), 0.035)
 		k.col = col
 		var mb := Basis(Vector3.UP, sx * -0.12)
 		k.box(P, Vector3(sx * (mx + 0.13), my + 0.01, mz), Vector3(0.17, 0.1, 0.075), mb)
@@ -583,7 +583,7 @@ static func _build_car(k: Kit, sh: Shape, paint: Array) -> void:
 		k.box(G, Vector3(sx * (mx + 0.13), my + 0.01, mz + 0.04), Vector3(0.15, 0.08, 0.008), mb)
 		# Ceja negra del arco (pickup y taxi) o fina en el sedán.
 		for a: float in [sh.fa, sh.ra]:
-			_arch_lip(k, sh, T, sx, a, 0.05 if kind == "pickup" else 0.022)
+			_arch_lip(k, sh, T, sx, a, 0.045 if kind == "pickup" else 0.016)
 	# Franja negra del taxi (pintura, sigue la superficie).
 	if kind == "taxi":
 		for sx: float in [-1.0, 1.0]:
@@ -627,7 +627,7 @@ static func _build_car(k: Kit, sh: Shape, paint: Array) -> void:
 	# Emblema genérico (rombo cromado).
 	k.box(C, Vector3(0, (gy0 + gy1) * 0.5, fz - 0.018), Vector3(0.07, 0.07, 0.01), Basis(Vector3.BACK, PI * 0.25))
 	# Tapa de gasolina y escape.
-	k.cyl(T, Transform3D(Basis(Vector3.RIGHT, PI * 0.5), Vector3(sh.hw * 0.55, sh.clear - 0.02, sh.hl + 0.03)), 0.03, 0.2, 8)
+	k.cyl(T, Transform3D(Basis(Vector3.RIGHT, PI * 0.5), Vector3(sh.hw * 0.55, sh.clear - 0.02, sh.hl - 0.04)), 0.03, 0.2, 8)
 
 	# ---- bumper trasero (fijo)
 	_bumper(k, sh, false, P if kind != "pickup" else C, col, T)
@@ -670,8 +670,8 @@ static func _arch_lip(k: Kit, sh: Shape, mat: Material, sx: float, a: float, wdt
 	var n := 10
 	var R := sh.arch_r
 	for i in n:
-		var t0 := PI * float(i) / n
-		var t1 := PI * float(i + 1) / n
+		var t0 := PI * lerpf(0.1, 0.9, float(i) / n)
+		var t1 := PI * lerpf(0.1, 0.9, float(i + 1) / n)
 		var pts := []
 		for t: float in [t0, t1]:
 			var z := a - cos(t) * R
@@ -688,7 +688,7 @@ static func _bumper(k: Kit, sh: Shape, front: bool, mat: Material, col: Color, l
 	var y0 := sh.clear - 0.03
 	var y1 := sh.clear + 0.24
 	var ys := [y0 + 0.02, y0, y0 + 0.05, y0 + 0.15, y1 - 0.03, y1, y1 + 0.01]
-	var os := [-0.03, 0.015, 0.05, 0.06, 0.05, 0.012, -0.03]
+	var os := [-0.04, 0.0, 0.03, 0.04, 0.032, 0.005, -0.035]
 	var xo := sh.hw - 0.012
 	var n := 16
 	var secs: Array = []
@@ -908,11 +908,11 @@ static func _add_dynamic_parts(v: Vehicle, kind: String, s: Dictionary, paint: A
 	# Faros: tiras con UV del atlas MatActors.headlight (Vehicle cambia la emisión con set_lights).
 	var kh := Kit.new()
 	var hm := MatActors.headlight(0.0)
-	var hh := 0.15 if kind != "pickup" else 0.19
+	var hh := 0.17 if kind != "pickup" else 0.2
 	if is_bus:
 		hh = 0.2
 	for sx: float in [-1.0, 1.0]:
-		var xi: float = hw - (0.46 if not is_bus else 0.62)
+		var xi: float = hw - (0.5 if not is_bus else 0.62)
 		_lens_strip(kh, sh, hm, true, sx, xi, hw - 0.035, light_y, hh, Rect2(0, 0, 1, 1))
 	v.head_lens = MeshInstance3D.new()
 	v.head_lens.name = "HeadLens"
@@ -950,7 +950,11 @@ static func _add_dynamic_parts(v: Vehicle, kind: String, s: Dictionary, paint: A
 
 	# Placas del atlas (públicas = blancas en taxi y buseta).
 	var seed_text := _plate_text(rng)
-	var pidx := MatActors.plate_index(seed_text, kind == "taxi" or is_bus)
+	var pidx := MatActors.plate_index(seed_text)
+	if kind == "taxi":
+		pidx = MatActors.PLATE_PUBLIC[0]
+	elif is_bus:
+		pidx = MatActors.PLATE_PUBLIC[1]
 	var plate_text: String = MatActors.PLATE_TEXTS[pidx]
 
 	# Bumper delantero (pieza que se deforma) + placa delantera dentro del mismo pivote.
@@ -977,7 +981,7 @@ static func _add_dynamic_parts(v: Vehicle, kind: String, s: Dictionary, paint: A
 	pivot.add_child(bumper)
 	v.bumper_front = pivot
 	var front_plate_y: float = s.clear + 0.11
-	_add_plate(pivot, pidx, Vector3(0, front_plate_y, -hl - 0.075), true)
+	_add_plate(pivot, pidx, Vector3(0, front_plate_y, -hl - 0.052), true)
 	var rear_plate_y: float = s.clear + 0.4
 	var rear_plate_z := hl + 0.006
 	if kind == "pickup":

@@ -346,6 +346,14 @@ static func _rail_len(L: float) -> float:
 
 ## Coloca una baranda metálica/madera de largo L con centro local c, girada `yaw` (0 = a lo largo de X).
 static func _rail(b: Ctx, wood: bool, L: float, c: Vector3, yaw: float) -> void:
+	# Barandas largas = módulos de ~2 m (pocas keys de MultiMesh → pocas draw calls).
+	if L > 2.75:
+		var n := maxi(2, roundi(L / 2.0))
+		var seg := L / n
+		var dir := Basis(Vector3.UP, yaw) * Vector3.RIGHT
+		for i in n:
+			_rail(b, wood, seg, c + dir * (-L * 0.5 + seg * (i + 0.5)), yaw)
+		return
 	var Lb := _rail_len(L)
 	var m := rail_wood(Lb) if wood else rail_metal(Lb)
 	var t := Transform3D(Basis(Vector3.UP, yaw) * Basis.from_scale(Vector3(L / Lb, 1, 1)), c)

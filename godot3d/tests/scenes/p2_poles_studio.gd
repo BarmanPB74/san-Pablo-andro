@@ -70,9 +70,13 @@ func _tris(m: ArrayMesh) -> int:
 	return n
 
 func _mm(m: Mesh, xf: Transform3D) -> void:
-	var mi := MeshInstance3D.new()
-	mi.mesh = m
-	mi.transform = xf
+	var mm := MultiMesh.new()
+	mm.transform_format = MultiMesh.TRANSFORM_3D
+	mm.mesh = m
+	mm.instance_count = 1
+	mm.set_instance_transform(0, xf)
+	var mi := MultiMeshInstance3D.new()
+	mi.multimesh = mm
 	add_child(mi)
 
 func _box(mat: Material, p: Vector3, s: Vector3) -> void:

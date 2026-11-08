@@ -137,10 +137,18 @@ static func _unit(d, base: Transform3D, x0: float, x1: float, open: bool, awning
 	var tint := rng.randi_range(0, 2)
 	_put(d, "shopf_fascia_%d" % tint, _fascia(tint), base, cx, dyu, uw, false, false)
 	var sign_x := cx
+	var has_sign := uw >= SIGN_W + 0.3
 	if lattice:
-		var big: Array = segs[0] if (segs[0][1] - segs[0][0]) >= (segs[1][1] - segs[1][0]) else segs[1]
-		sign_x = (big[0] + big[1]) * 0.5
-	if uw >= SIGN_W + 0.3:
+		# el letrero no puede quedar detrás de la celosía (±1.17 m alrededor de la puerta)
+		var cl := door_x - 1.2 - SIGN_W * 0.5
+		var cr := door_x + 1.2 + SIGN_W * 0.5
+		if cl - SIGN_W * 0.5 >= x0 + 0.05:
+			sign_x = cl
+		elif cr + SIGN_W * 0.5 <= x1 - 0.05:
+			sign_x = cr
+		else:
+			has_sign = false
+	if has_sign:
 		_put(d, "shopf_sign_%d" % sc, _sign(sc), base, sign_x, dyu, 1.0, false, false)
 		if open and near and rng.randf() < 0.28:
 			var k := rng.randi_range(0, 2)
@@ -154,7 +162,7 @@ static func _unit(d, base: Transform3D, x0: float, x1: float, open: bool, awning
 		var v := rng.randi_range(0, 2)
 		_put(d, "shopf_awn_%d" % v, _awning(v), base, cx, dyu, uw - 0.1, true, false)
 	# --- aviso de bandera en el extremo
-	if rng.randf() < (0.5 if lattice else 0.3):
+	if rng.randf() < (0.5 if lattice else 0.3) or not has_sign:
 		var bc: int = [10, 11, 10, 11, 12, 13, 14][rng.randi_range(0, 6)]
 		var side := -1.0 if rng.randf() < 0.5 else 1.0
 		var bx := x0 - POST_W * 0.5 if side < 0.0 else x1 + POST_W * 0.5

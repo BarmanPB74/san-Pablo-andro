@@ -509,7 +509,7 @@ func _geo_pelvis() -> void:
 		_rr(0.06, 0.16, 0.1, 0.11, 0.0, 2.4),
 		_r(0.07, 0.0, 0.0, 0.0),
 	]
-	_loft(_twill(), rings, 24, Transform3D.IDENTITY, _c(C_PANTS))
+	_loft(_twill(), rings, 20, Transform3D.IDENTITY, _c(C_PANTS))
 	# Bolsillos traseros (parches con pespunte)
 	for sx in [-1.0, 1.0]:
 		var c := _on_surf(rings.slice(1, 6), 0.075 * sx, -0.07, false, 0.0)
@@ -576,7 +576,7 @@ func _geo_chest() -> void:
 	var cz := _c(C_ZIP)
 	var cs := _c(C_STRAP)
 	# Cuerpo: dobladillo y cuello oscuros, vivo ámbar en el borde del cuello
-	_loft(rip, rings, 28, Transform3D.IDENTITY, func(p: Vector3) -> Color:
+	_loft(rip, rings, 26, Transform3D.IDENTITY, func(p: Vector3) -> Color:
 		if p.y > 0.309:
 			return ca
 		if p.y < -0.166 or p.y > 0.258:
@@ -624,7 +624,7 @@ func _geo_chest() -> void:
 		var k := cos(ang * 0.5)
 		hra.append(0.022 + 0.022 * k)
 		hrb.append(0.02 + 0.03 * k)
-	_tube(rip, hood, hra, hrb, 10, Vector3(0, 1, 0), cj)
+	_tube(rip, hood, hra, hrb, 8, Vector3(0, 1, 0), cj)
 	# Vivo ámbar en el borde de la capucha
 	var edge := PackedVector3Array()
 	for i in 9:
@@ -650,7 +650,7 @@ func _geo_chest() -> void:
 		_rr(0.322, 0.068, 0.07, 0.066, -0.008, 2.0, 0.0, 0.0, 0.25),
 		_rr(0.31, 0.0, 0.0, 0.0, -0.008, 2.0, 0.0, 0.0, 0.25),
 	]
-	_loft(scarf, srings, 24, Transform3D.IDENTITY, Color.WHITE, func(p: Vector3, _uv: Vector2) -> Vector2:
+	_loft(scarf, srings, 20, Transform3D.IDENTITY, Color.WHITE, func(p: Vector3, _uv: Vector2) -> Vector2:
 		return Vector2(p.y / 0.16, atan2(p.x, p.z) / TAU * 0.62 / 0.3))
 	_ellip(scarf, Vector3(0.022, 0.278, -0.118), Vector3(0.03, 0.025, 0.02), Color.WHITE, Vector3(0.2, 0, 0.3), 12, 6)
 	for k in 2:
@@ -786,7 +786,7 @@ func _geo_head() -> void:
 			* clampf((0.03 - absf(p.z + 0.005)) / 0.02, 0.0, 1.0)
 		var c: Color = skin.lerp(stub, clampf(k, 0.0, 1.0) * 0.9)
 		return c.lerp(hairc, burn * 0.8)
-	_loft(skin_m, rings, 30, Transform3D.IDENTITY, head_col, Callable(), _head_deform)
+	_loft(skin_m, rings, 28, Transform3D.IDENTITY, head_col, Callable(), _head_deform)
 
 	# Ojos: esclerótica, iris y línea de pestañas; cejas
 	var up_f := Vector3(0, 0, -1)
@@ -864,8 +864,8 @@ func _geo_head() -> void:
 	var up := Vector3(0, 1, 0)
 	# Copete: mechones que nacen en la coronilla, suben y caen sobre la línea del pelo
 	var jit := [0.004, -0.006, 0.003, -0.002, 0.006, -0.004, 0.002, -0.005]
-	for i in 8:
-		var t := float(i) / 7.0
+	for i in 7:
+		var t := float(i) / 6.0
 		var x0 := lerpf(-0.056, 0.056, t) + float(jit[i])
 		var lift := 0.6 - absf(t - 0.4) * 0.9
 		var sw := 0.012 * (t - 0.4)
@@ -874,8 +874,8 @@ func _geo_head() -> void:
 			Vector3(x0 * 1.02 + sw * 2.5 + float(jit[7 - i]), 0.2 + 0.006 * lift, -0.104)])
 		_tube(hair_m, p, [0.022, 0.026, 0.024, 0.017, 0.007], [0.008, 0.01, 0.01, 0.007, 0.003], 5, up, hairc, true, 2.0)
 	# Coronilla hacia la nuca
-	for i in 4:
-		var x0 := lerpf(-0.045, 0.045, float(i) / 3.0)
+	for i in 3:
+		var x0 := lerpf(-0.04, 0.04, float(i) / 2.0)
 		var p := PackedVector3Array([Vector3(x0, 0.236, 0.01), Vector3(x0 * 1.1, 0.225, 0.07),
 			Vector3(x0 * 1.15, 0.19, 0.108), Vector3(x0 * 1.1, 0.15, 0.118)])
 		_tube(hair_m, p, [0.02, 0.022, 0.018, 0.005], [0.007, 0.009, 0.007, 0.002], 5, Vector3(0, 0.4, 1).normalized(), hairc)
@@ -899,7 +899,7 @@ func _geo_upper_arm(sx: float) -> void:
 		_r(-0.315, 0.05, 0.05),
 		_r(-0.32, 0.0, 0.0),
 	]
-	_loft(_rip(), rings, 16, Transform3D.IDENTITY, _c(C_JACKET))
+	_loft(_rip(), rings, 14, Transform3D.IDENTITY, _c(C_JACKET))
 	# Vivo ámbar por el costado exterior
 	var pp := PackedVector3Array()
 	for yy in [0.0, -0.06, -0.14, -0.21, -0.28]:
@@ -928,7 +928,7 @@ func _geo_forearm(_sx: float) -> void:
 	]
 	var cj := _c(C_JACKET)
 	var cd := _c(C_JACKET_DARK)
-	_loft(_rip(), rings, 18, Transform3D.IDENTITY, func(p: Vector3) -> Color:
+	_loft(_rip(), rings, 14, Transform3D.IDENTITY, func(p: Vector3) -> Color:
 		return cd if p.y < -0.189 else cj)
 
 
@@ -950,7 +950,7 @@ func _geo_hand(sx: float) -> void:
 		_r(-0.101, 0.009, 0.034, -0.002, 3.0),
 		_r(-0.103, 0.0, 0.0, -0.002),
 	]
-	_loft(rip, palm, 14, Transform3D.IDENTITY, func(p: Vector3) -> Color:
+	_loft(rip, palm, 12, Transform3D.IDENTITY, func(p: Vector3) -> Color:
 		return _c(C_STRAP * 1.6) if p.y > -0.012 else glove)
 	# Dedos (curvados hacia la palma, que mira al cuerpo)
 	var fz := [-0.03, -0.01, 0.01, 0.029]
@@ -961,7 +961,7 @@ func _geo_hand(sx: float) -> void:
 		var z: float = fz[i]
 		var p := PackedVector3Array([Vector3(0.0, -0.088, z), Vector3(-sx * 0.003, -0.088 - L * 0.42, z),
 			Vector3(-sx * 0.012, -0.088 - L * 0.78, z * 1.05), Vector3(-sx * 0.022, -0.088 - L, z * 1.08)])
-		_tube(skin_m, p, fr[i], float(fr[i]) * 0.95, 6, Vector3(0, 0, -1), skin)
+		_tube(skin_m, p, fr[i], float(fr[i]) * 0.95, 5, Vector3(0, 0, -1), skin)
 	# Pulgar: base con guante, punta de piel
 	var t0 := Vector3(-sx * 0.012, -0.018, -0.03)
 	var t1 := Vector3(-sx * 0.02, -0.045, -0.046)
@@ -993,7 +993,7 @@ static func _thigh_rings() -> Array:
 func _geo_thigh(sx: float) -> void:
 	var tw := _twill()
 	var keys := _thigh_rings()
-	_loft(tw, [_r(0.075, 0.0, 0.0)] + keys + [_r(-0.46, 0.0, 0.0)], 18, Transform3D.IDENTITY, _c(C_PANTS))
+	_loft(tw, [_r(0.075, 0.0, 0.0)] + keys + [_r(-0.46, 0.0, 0.0)], 16, Transform3D.IDENTITY, _c(C_PANTS))
 	# Bolsillo cargo con fuelle y solapa con broche
 	var pr: Array = []
 	for yy in [-0.34, -0.335, -0.3, -0.25, -0.21, -0.205]:
@@ -1037,7 +1037,7 @@ func _geo_shin(_sx: float) -> void:
 		_r(-0.366, 0.046, 0.05, -0.006),
 		_r(-0.35, 0.0, 0.0, -0.006),
 	]
-	_loft(tw, rings, 18, Transform3D.IDENTITY, _c(C_PANTS))
+	_loft(tw, rings, 16, Transform3D.IDENTITY, _c(C_PANTS))
 	# Rodillera articulada (sintética), cubre el frente de la rodilla
 	var pad := [
 		_r(0.062, 0.0, 0.0, -0.052),
@@ -1079,12 +1079,12 @@ func _geo_foot(sx: float) -> void:
 	var green := _c(C_SCARF_GREEN)
 	var shoe_col := func(p: Vector3) -> Color:
 		# talón verde (guiño a Antioquia)
-		if p.z > 0.068 and p.y > -0.035:
+		if p.z > 0.076 and p.y > -0.03 and absf(p.x) < 0.03:
 			return green
 		return cs
 	var shoe_uv := func(p: Vector3, _uv: Vector2) -> Vector2:
 		return Vector2(-p.z / 0.25 + (0.5 if p.x * sx > 0.0 else 0.0), clampf((0.052 - p.y) / 0.125, 0.0, 1.0) * 0.64)
-	_loft(_shoe(), rings, 18, xf, shoe_col, shoe_uv)
+	_loft(_shoe(), rings, 16, xf, shoe_col, shoe_uv)
 	# Suela gruesa: entresuela + suela de goma con perfil (escalón) y puntera levantada
 	var sole_rings := func(bot: float, top: float, grow: float, inset: float) -> Array:
 		var out: Array = [_r(-0.094 + inset, 0.0, 0.0, 0.5 * (bot + top))]
@@ -1095,9 +1095,9 @@ func _geo_foot(sx: float) -> void:
 			out.append(_rr(f, float(q[1]) + grow - inset, (top - bot) * 0.5, (top - bot) * 0.5, (top + bot) * 0.5 + lift, 5.0))
 		out.append(_r(0.217 - inset, 0.0, 0.0, 0.5 * (bot + top) + 0.012))
 		return out
-	_loft(_sole(), sole_rings.call(-0.09, -0.064, 0.006, 0.0), 16, xf, _c(C_SOLE), func(p: Vector3, _uv: Vector2) -> Vector2:
+	_loft(_sole(), sole_rings.call(-0.09, -0.064, 0.006, 0.0), 14, xf, _c(C_SOLE), func(p: Vector3, _uv: Vector2) -> Vector2:
 		return Vector2(-p.z / 0.25, clampf((-0.064 - p.y) / 0.026, 0.0, 1.0)))
-	_loft(_sole(), sole_rings.call(-0.1, -0.088, 0.004, 0.003), 16, xf, _c(C_GUM), func(p: Vector3, _uv: Vector2) -> Vector2:
+	_loft(_sole(), sole_rings.call(-0.1, -0.088, 0.004, 0.003), 12, xf, _c(C_GUM), func(p: Vector3, _uv: Vector2) -> Vector2:
 		return Vector2(-p.z / 0.25, 0.4 + clampf((-0.088 - p.y) / 0.012, 0.0, 1.0) * 0.6))
 	# Lengüeta y cordones (sobre el empeine, delante del bajo del pantalón)
 	var top_at := func(f: float) -> float:
