@@ -161,6 +161,70 @@ static func _plate_text(rng: RandomNumberGenerator) -> String:
 	return "%s %03d" % [s, rng.randi() % 1000]
 
 
+# ------------------------------------------------------------------ materiales propios
+
+static var _mat_cache := {}
+
+
+## Pintura con suciedad (MatActors.car_paint_dirty) que toma el color del VÉRTICE: así la pintura
+## principal, franjas y acentos comparten UNA superficie. Triplanar en espacio de OBJETO (la suciedad
+## no "nada" cuando el auto se mueve) y doble cara (el interior de la carrocería se ve por los vidrios).
+static func paint_mat() -> Material:
+	if _mat_cache.has("paint"):
+		return _mat_cache["paint"]
+	var m: StandardMaterial3D = (MatActors.car_paint_dirty(Color.WHITE, 0.55) as StandardMaterial3D).duplicate()
+	m.albedo_color = Color.WHITE
+	m.vertex_color_use_as_albedo = true
+	m.vertex_color_is_srgb = true
+	m.uv1_world_triplanar = false
+	m.cull_mode = BaseMaterial3D.CULL_DISABLED
+	m.metallic = 0.25
+	m.roughness = 0.3
+	m.clearcoat_enabled = true
+	m.clearcoat = 0.45
+	m.clearcoat_roughness = 0.12
+	_mat_cache["paint"] = m
+	return m
+
+
+## Vidrio tintado con reflejo: casi negro, translúcido, especular alto (refleja cielo/reflection probe).
+static func glass_mat() -> Material:
+	if _mat_cache.has("glass"):
+		return _mat_cache["glass"]
+	var m := StandardMaterial3D.new()
+	m.albedo_color = Color(0.05, 0.07, 0.08, 0.62)
+	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	m.metallic = 0.85
+	m.metallic_specular = 0.9
+	m.roughness = 0.04
+	m.cull_mode = BaseMaterial3D.CULL_DISABLED
+	m.rim_enabled = false
+	_mat_cache["glass"] = m
+	return m
+
+
+## Plástico negro texturizado (bumpers bajos, sellos, pasos de rueda, parrilla).
+static func trim_mat() -> Material:
+	if _mat_cache.has("trim"):
+		return _mat_cache["trim"]
+	var m := StandardMaterial3D.new()
+	m.albedo_color = Color(0.03, 0.032, 0.035)
+	m.roughness = 0.62
+	m.metallic = 0.0
+	m.cull_mode = BaseMaterial3D.CULL_DISABLED
+	_mat_cache["trim"] = m
+	return m
+
+
+## Tela gris oscura de cojinería/tablero (UV en metros; tile 0.15 m).
+static func interior_mat() -> Material:
+	return MatActors.hoodie_knit(Color(0.32, 0.32, 0.34), Vector3(6.6, 6.6, 1.0))
+
+
+static func chrome_mat() -> Material:
+	return Palette.chrome()
+
+
 # ------------------------------------------------------------------ malla de carrocería
 
 static func _body_mesh(kind: String, paint: Array) -> ArrayMesh:
@@ -169,247 +233,704 @@ static func _body_mesh(kind: String, paint: Array) -> ArrayMesh:
 		return _mesh_cache[key]
 	var kit := Kit.new()
 	if kind == "buseta":
-		_build_buseta(kit, SPECS[kind], paint)
+		_build_buseta(kit, Shape.new(kind, SPECS[kind]), paint)
 	else:
-		_build_car(kit, kind, SPECS[kind], paint)
+		_build_car(kit, Shape.new(kind, SPECS[kind]), paint)
 	var m := kit.commit()
 	_mesh_cache[key] = m
 	return m
 
 
-## Sedán / taxi (hatchback) / pickup: carrocería baja con arcos, capó, cabina de vidrio, techo.
-static func _build_car(k: Kit, kind: String, s: Dictionary, paint: Array) -> void:
-	var p := Palette.car_paint(paint[0])
-	var glass := Palette.window_glass()
-	var dark := Palette.tire()
-	var trim := Palette.metal_dark()
-	var chrome := Palette.chrome()
-	var hl: float = s.L * 0.5
-	var hw: float = s.hw
-	var r: float = s.r
-	var fa: float = s.fa
-	var ra: float = s.ra
-	var clear: float = s.clear
-	var belt: float = s.belt
-	var deck: float = s.deck
-	var ah := r + 0.1
-	var arch_top := r * 2.0 + 0.07
-	var cb: Array = s.cab_b
-	var ct: Array = s.cab_t
-	var chw: Array = s.cab_hw
-	var roof: float = s.roof
+## Forma de la carrocería: secciones transversales (mitad derecha, de la línea central del piso a la
+## línea central del techo/capó) en función de z. La malla se genera por "loft" de estas secciones.
+class Shape:
+	var kind: String
+	var s: Dictionary
+	var hl: float
+	var hw: float
+	var r: float
+	var fa: float
+	var ra: float
+	var clear: float
+	var belt: float
+	var deck: float
+	var roof: float
+	var hood_front: float
+	var cb0 := 0.0
+	var cb1 := 0.0
+	var ct0 := 0.0
+	var ct1 := 0.0
+	var chw0 := 0.0
+	var chw1 := 0.0
+	var ych: float        # línea de carácter
+	var xw: float         # pared interna del paso de rueda
+	var arch_r: float
+	var crown := 0.035
+	var rc_f := 0.34      # redondeo en planta (largo en z / entrada en x)
+	var rcx_f := 0.22
+	var rc_r := 0.26
+	var rcx_r := 0.18
+	var bed := false
+	var bed_z0 := 0.0
+	var rail := 0.0
 
-	# Carrocería inferior en segmentos, dejando los arcos de rueda abiertos.
-	var tuck := 0.04
-	k.prism(p, hw - tuck, hw, clear, belt, -hl + 0.06, fa - ah, -hl, fa - ah)
-	k.prism(p, hw - tuck, hw, clear, belt, fa + ah, ra - ah, fa + ah, ra - ah)
-	k.prism(p, hw - tuck, hw, clear, belt, ra + ah, hl - 0.05, ra + ah, hl)
-	k.prism(p, hw - 0.01, hw, arch_top, belt, fa - ah, fa + ah, fa - ah, fa + ah)
-	k.prism(p, hw - 0.01, hw, arch_top, belt, ra - ah, ra + ah, ra - ah, ra + ah)
-	# Pasos de rueda oscuros (se ven a través del arco).
-	for az: float in [fa, ra]:
-		k.prism(dark, hw - 0.16, hw - 0.16, clear - 0.02, arch_top, az - ah, az + ah, az - ah, az + ah)
-	# Bajos.
-	k.box(dark, Vector3(0, clear - 0.04, 0), Vector3(hw * 2.0 - 0.3, 0.08, s.L - 0.7))
-	# Molduras de puerta (umbral negro).
-	for sx: float in [-1.0, 1.0]:
-		k.box(dark, Vector3(sx * (hw - 0.005), clear + 0.03, (fa + ra) * 0.5), Vector3(0.03, 0.06, ra - fa - ah * 2.0))
+	func _init(k: String, spec: Dictionary) -> void:
+		kind = k
+		s = spec
+		hl = spec.L * 0.5
+		hw = spec.hw
+		r = spec.r
+		fa = spec.fa
+		ra = spec.ra
+		clear = spec.clear
+		belt = spec.belt
+		roof = spec.roof
+		deck = spec.get("deck", belt)
+		hood_front = spec.get("hood_front", belt)
+		xw = spec.track * 0.5 - spec.tw * 0.5 - 0.06
+		arch_r = r + 0.075
+		ych = belt - 0.06
+		if k != "buseta":
+			cb0 = spec.cab_b[0]
+			cb1 = spec.cab_b[1]
+			ct0 = spec.cab_t[0]
+			ct1 = spec.cab_t[1]
+			chw0 = spec.cab_hw[0]
+			chw1 = spec.cab_hw[1]
+		else:
+			arch_r = r + 0.09
+			rc_f = 0.30
+			rcx_f = 0.16
+			rc_r = 0.22
+			rcx_r = 0.12
+			crown = 0.03
+		if k == "pickup":
+			bed = true
+			bed_z0 = cb1 + 0.04
+			rail = belt + 0.32
+			rc_f = 0.30
+			rcx_f = 0.16
+			rc_r = 0.10
+			rcx_r = 0.06
+		if k == "taxi":
+			rc_r = 0.2
+			rcx_r = 0.14
 
-	# Capó (inclinado hacia el frente).
-	k.prism(p, hw, hw - 0.06, belt, -1.0, -hl, cb[0], -hl + 0.04, cb[0], s.hood_front, deck)
-	# Cabina: vidrio + techo + parales.
-	k.prism(glass, chw[0], chw[1], deck, roof, cb[0], cb[1], ct[0], ct[1])
-	k.prism(p, chw[1] + 0.02, chw[1] - 0.04, roof - 0.02, roof + 0.05, ct[0] - 0.04, ct[1] + 0.04, ct[0] + 0.04, ct[1] - 0.03)
-	for sx: float in [-1.0, 1.0]:
-		var a0 := Vector3(sx * chw[0], deck, cb[0])
-		var a1 := Vector3(sx * chw[1], roof, ct[0])
-		k.strut(p, a0, a1, 0.065)
-		var bz: float = lerpf(cb[0], cb[1], 0.45) if kind != "pickup" else lerpf(cb[0], cb[1], 0.5)
-		var btz: float = clampf(bz, ct[0] + 0.1, ct[1] - 0.1)
-		k.strut(p, Vector3(sx * (chw[0] + 0.005), deck, bz), Vector3(sx * (chw[1] + 0.005), roof, btz), 0.075)
-		k.strut(p, Vector3(sx * chw[0], deck, cb[1]), Vector3(sx * chw[1], roof, ct[1]), 0.14 if kind == "sedan" else 0.09)
-		# Línea de cintura bajo los vidrios.
-		k.box(p, Vector3(sx * (chw[0] + 0.01), deck + 0.012, (cb[0] + cb[1]) * 0.5), Vector3(0.05, 0.03, cb[1] - cb[0]))
-		# Espejos.
-		var mz: float = cb[0] + 0.18
-		k.box(p, Vector3(sx * (hw + 0.07), deck + 0.07, mz), Vector3(0.14, 0.1, 0.07))
-		k.box(glass, Vector3(sx * (hw + 0.07), deck + 0.07, mz + 0.037), Vector3(0.11, 0.075, 0.01))
-		k.box(dark, Vector3(sx * (hw + 0.01), deck + 0.05, mz), Vector3(0.05, 0.04, 0.05))
-		# Juntas de puertas y manijas.
-		var doors: Array = [cb[0] + 0.05, bz, cb[1] - (0.05 if kind != "taxi" else 0.35)]
-		for dz: float in doors:
-			k.box(trim, Vector3(sx * (hw + 0.002), (clear + belt) * 0.5 + 0.03, dz), Vector3(0.006, belt - clear - 0.08, 0.012))
-		for i in 2:
-			var hz: float = lerpf(doors[i], doors[i + 1], 0.75)
-			k.box(chrome, Vector3(sx * (hw + 0.008), belt - 0.07, hz), Vector3(0.02, 0.03, 0.13))
-		# Cejas de los arcos.
-		for az: float in [fa, ra]:
-			k.prism(dark if kind == "pickup" else p, hw - 0.02, hw + (0.04 if kind == "pickup" else 0.0), arch_top - 0.03, arch_top + 0.04,
-				az - ah - 0.04, az + ah + 0.04, az - ah - 0.02, az + ah + 0.02)
+	## Media anchura en planta (esquinas redondeadas adelante y atrás).
+	func w(z: float) -> float:
+		var x := hw
+		var df := z + hl
+		var dr := hl - z
+		if df < rc_f:
+			var t := 1.0 - df / rc_f
+			x -= rcx_f * (1.0 - sqrt(maxf(0.0, 1.0 - t * t)))
+		if dr < rc_r:
+			var t := 1.0 - dr / rc_r
+			x -= rcx_r * (1.0 - sqrt(maxf(0.0, 1.0 - t * t)))
+		# Guardabarros ensanchados sobre las ruedas.
+		for a: float in [fa, ra]:
+			var q := (z - a) / (arch_r + 0.3)
+			if absf(q) < 1.0:
+				x += 0.018 * (1.0 - q * q)
+		return x
 
-	# Maletero / platón.
-	if s.trunk:
-		k.prism(p, hw, hw - 0.05, belt, -1.0, cb[1], hl, cb[1], hl - 0.07, deck, deck - 0.02)
-	elif s.bed:
-		var bz0: float = cb[1] + 0.04
-		var top := belt + 0.32
-		k.box(dark, Vector3(0, belt + 0.004, (bz0 + hl) * 0.5), Vector3(hw * 2.0 - 0.14, 0.01, hl - bz0 - 0.08))
-		for sx: float in [-1.0, 1.0]:
-			k.box(p, Vector3(sx * (hw - 0.035), (belt + top) * 0.5, (bz0 + hl) * 0.5), Vector3(0.07, top - belt, hl - bz0))
-			k.box(dark, Vector3(sx * (hw - 0.035), top + 0.01, (bz0 + hl) * 0.5), Vector3(0.08, 0.02, hl - bz0))
-		k.box(p, Vector3(0, (belt + top) * 0.5 + 0.06, bz0 + 0.035), Vector3(hw * 2.0, top - belt + 0.12, 0.07))
-		k.box(p, Vector3(0, (belt + top) * 0.5, hl - 0.035), Vector3(hw * 2.0 - 0.02, top - belt, 0.07))
-		k.box(chrome, Vector3(0, top - 0.06, hl + 0.001), Vector3(0.25, 0.04, 0.01))
-		# Estribos laterales.
-		for sx: float in [-1.0, 1.0]:
-			k.box(trim, Vector3(sx * (hw + 0.06), clear - 0.02, (fa + ra) * 0.5 - 0.15), Vector3(0.14, 0.04, ra - fa - ah * 2.0 - 0.1))
-	else:
-		# Hatchback: portón trasero casi vertical con spoiler.
-		k.box(p, Vector3(0, roof - 0.02, ct[1] + 0.02), Vector3(chw[1] * 2.0 - 0.02, 0.05, 0.16))
+	## z de la superficie frontal (front) o trasera en planta para una x dada (para piezas que envuelven).
+	func end_z(x: float, front: bool) -> float:
+		var rc := rc_f if front else rc_r
+		var rcx := rcx_f if front else rcx_r
+		var q := clampf(1.0 - (hw - absf(x)) / rcx, 0.0, 0.999)
+		var d := rc * (1.0 - sqrt(1.0 - q * q))
+		return -hl + d if front else hl - d
 
-	# Frente: parrilla, faros apagados de respaldo y exploradoras.
-	var grille_w := hw * (1.05 if kind == "pickup" else 0.95)
-	var gy: float = (belt + s.hood_front) * 0.5 - (0.05 if kind != "pickup" else 0.12)
-	var gh := 0.13 if kind != "pickup" else 0.28
-	k.box(trim, Vector3(0, gy, -hl - 0.012), Vector3(grille_w, gh, 0.03))
-	if kind == "pickup":
-		for i in 3:
-			k.box(chrome, Vector3(0, gy - gh * 0.5 + 0.05 + i * 0.09, -hl - 0.03), Vector3(grille_w, 0.025, 0.02))
-	else:
-		k.box(chrome, Vector3(0, gy + gh * 0.5 + 0.01, -hl - 0.03), Vector3(grille_w, 0.02, 0.02))
-	# Bumper trasero (el delantero es pieza aparte para daño).
-	k.prism(chrome if kind == "pickup" else p, hw - 0.02, hw - 0.03, clear - 0.04, clear + 0.22, hl - 0.05, hl + 0.09, hl - 0.05, hl + 0.07)
-	k.box(dark, Vector3(0, clear - 0.02, hl + 0.095), Vector3(hw * 1.6, 0.06, 0.03))
-	# Escape.
-	k.cyl(trim, Transform3D(Basis(Vector3.RIGHT, PI * 0.5), Vector3(hw * 0.55, clear - 0.04, hl + 0.06)), 0.035, 0.18, 8)
+	func top(z: float) -> float:
+		var y: float
+		if kind == "buseta":
+			y = roof
+		elif z < cb0:
+			var t := clampf((z + hl) / (cb0 + hl), 0.0, 1.0)
+			y = lerpf(hood_front, deck, 1.0 - pow(1.0 - t, 1.6))
+		elif z <= cb1 or not bed:
+			y = deck - (0.02 * clampf((z - cb1) / maxf(0.01, hl - cb1), 0.0, 1.0) if z > cb1 else 0.0)
+		else:
+			y = rail
+		if bed and z > bed_z0:
+			y = rail
+		var df := z + hl
+		var dr := hl - z
+		if df < 0.12:
+			y -= 0.06 * pow(1.0 - df / 0.12, 2.0)
+		if dr < 0.10 and kind != "buseta":
+			y -= 0.045 * pow(1.0 - dr / 0.10, 2.0)
+		return y
+
+	func bot(z: float) -> float:
+		var y := clear + 0.01
+		var df := z + hl
+		var dr := hl - z
+		if df < 0.45:
+			y += 0.10 * pow(1.0 - df / 0.45, 2.0)
+		if dr < 0.40:
+			y += 0.08 * pow(1.0 - dr / 0.40, 2.0)
+		for a: float in [fa, ra]:
+			var dz := z - a
+			if absf(dz) < arch_r:
+				y = maxf(y, r + sqrt(arch_r * arch_r - dz * dz))
+		return y
+
+	## Sección de auto: 11 puntos. mode "b" = platón abierto (pickup).
+	func section(z: float, mode := "n") -> PackedVector3Array:
+		var W := w(z)
+		var T := top(z)
+		var B := bot(z)
+		var F := minf(clear + 0.04, B)
+		var cr := crown if not (bed and z > bed_z0) else 0.0
+		var ysh := maxf(T - 0.07, ych + 0.03)
+		var yc := minf(ych, ysh - 0.02)
+		var y4 := clampf(B + 0.05, B, yc - 0.03)
+		var y5 := clampf(maxf(B + 0.14, (B + yc) * 0.5), y4, yc - 0.015)
+		var x1 := minf(xw, W - 0.1)
+		var p := PackedVector3Array([Vector3(0, F, z), Vector3(x1, F, z), Vector3(x1, B, z),
+			Vector3(W - 0.07, B, z), Vector3(W - 0.025, y4, z), Vector3(W - 0.004, y5, z), Vector3(W, yc, z)])
+		if mode == "b":
+			p.append_array([Vector3(W - 0.012, rail - 0.03, z), Vector3(W - 0.05, rail, z),
+				Vector3(W - 0.075, belt, z), Vector3(0, belt, z)])
+		else:
+			p.append_array([Vector3(W - 0.025, ysh, z), Vector3(W - 0.085, T - 0.012, z),
+				Vector3(W * 0.55, T + cr * 0.75, z), Vector3(0, T + cr, z)])
+		return p
+
+	## x de la superficie lateral a la altura y (para pegar molduras, franjas y manijas).
+	func side_x(z: float, y: float) -> float:
+		var p := section(z)
+		for j in range(3, 7):
+			if y >= p[j].y and y <= p[j + 1].y:
+				return lerpf(p[j].x, p[j + 1].x, (y - p[j].y) / maxf(0.001, p[j + 1].y - p[j].y))
+		return p[6].x
+
+	# ---------- cabina (greenhouse)
+	func gh_top(z: float) -> float:
+		if z < ct0:
+			var t := clampf((z - cb0) / (ct0 - cb0), 0.0, 1.0)
+			return lerpf(deck, roof, t) + 0.025 * sin(PI * t)
+		if z <= ct1:
+			var t := (z - ct0) / maxf(0.01, ct1 - ct0)
+			return roof + 0.02 * sin(PI * t)
+		var t := clampf((z - ct1) / maxf(0.01, cb1 - ct1), 0.0, 1.0)
+		return lerpf(roof, deck, t) + 0.02 * sin(PI * t)
+
+	func gh_x(y: float) -> float:
+		return lerpf(chw0, chw1, clampf((y - deck) / (roof - deck), 0.0, 1.0))
+
+	func gh_section(z: float) -> PackedVector3Array:
+		var yt := gh_top(z)
+		var yb := deck - 0.04
+		var y1 := deck + 0.03
+		var y2 := maxf(y1, yt - 0.075)
+		var y3 := maxf(y2, yt - 0.02)
+		var cr := 0.04 * clampf((yt - deck) / (roof - deck), 0.0, 1.0)
+		return PackedVector3Array([Vector3(gh_x(deck) + 0.01, yb, z), Vector3(gh_x(y1), y1, z),
+			Vector3(gh_x(y2), y2, z), Vector3(gh_x(y3) - 0.018, y3, z),
+			Vector3(maxf(0.0, gh_x(yt) - 0.075), yt, z), Vector3(0, yt + cr, z)])
+
+	func b_pillar() -> float:
+		return lerpf(cb0, cb1, 0.45) if kind != "pickup" else lerpf(cb0, cb1, 0.5)
 
 
-static func _build_buseta(k: Kit, s: Dictionary, paint: Array) -> void:
-	var p := Palette.car_paint(paint[0])
-	var p2 := Palette.car_paint(paint[1])
-	var white := Palette.car_paint(Color(0.95, 0.95, 0.93))
-	var red := Palette.car_paint(Color(0.85, 0.1, 0.08))
-	var yel := Palette.car_paint(Color(0.98, 0.8, 0.1))
-	var grn := Palette.car_paint(Color(0.1, 0.6, 0.25))
-	var glass := Palette.window_glass()
-	var dark := Palette.tire()
-	var trim := Palette.metal_dark()
-	var chrome := Palette.chrome()
-	var hl: float = s.L * 0.5
-	var hw: float = s.hw
-	var r: float = s.r
-	var fa: float = s.fa
-	var ra: float = s.ra
-	var clear: float = s.clear
-	var belt: float = s.belt
-	var roof: float = s.roof
-	var ah := r + 0.12
-	var arch_top := r * 2.0 + 0.1
-	var win_top := 2.28
+## Estaciones a lo largo de z: base uniforme + densas en extremos y arcos + las que se pidan exactas.
+static func _stations(sh: Shape, step: float, arch_n: int, exact: Array) -> Array:
+	var zs: Array = []
+	var z := -sh.hl
+	while z < sh.hl:
+		zs.append(z)
+		z += step
+	for d: float in [0.0, 0.015, 0.04, 0.075, 0.12, 0.18, 0.26]:
+		zs.append(-sh.hl + d)
+		zs.append(sh.hl - d)
+	for a: float in [sh.fa, sh.ra]:
+		for k in range(-arch_n, arch_n + 1):
+			zs.append(a + sh.arch_r * float(k) / arch_n)
+	zs.sort()
+	var out: Array = []
+	for q: float in zs:
+		var keep := true
+		for e: float in exact:
+			if absf(q - e) < 0.03:
+				keep = false
+		if out.size() > 0 and q - (out[-1] as float) < 0.03:
+			keep = false
+		if keep and q >= -sh.hl - 0.001 and q <= sh.hl + 0.001:
+			out.append(q)
+	for e: float in exact:
+		out.append(e)
+	out.sort()
+	return out
 
-	# Paneles bajos con arcos.
-	k.prism(p, hw - 0.02, hw, clear, belt, -hl + 0.03, fa - ah, -hl, fa - ah)
-	k.prism(p, hw - 0.02, hw, clear, belt, fa + ah, ra - ah, fa + ah, ra - ah)
-	k.prism(p, hw - 0.02, hw, clear, belt, ra + ah, hl, ra + ah, hl)
-	for az: float in [fa, ra]:
-		k.prism(p, hw, hw, arch_top, belt, az - ah, az + ah, az - ah, az + ah)
-		k.prism(dark, hw - 0.2, hw - 0.2, clear - 0.02, arch_top, az - ah, az + ah, az - ah, az + ah)
-	k.box(dark, Vector3(0, clear - 0.05, 0), Vector3(hw * 2.0 - 0.4, 0.1, s.L - 0.8))
-	# Banda de ventanas: vidrio continuo; parabrisas inclinado.
-	k.prism(glass, hw - 0.015, hw - 0.015, belt, win_top, -hl, hl - 0.02, -hl + 0.2, hl - 0.02)
-	# Franja superior y techo.
-	k.prism(p2, hw, hw, win_top, roof - 0.1, -hl + 0.2, hl, -hl + 0.3, hl)
-	k.prism(white, hw - 0.02, hw - 0.14, roof - 0.1, roof, -hl + 0.3, hl, -hl + 0.42, hl - 0.1)
-	k.box(trim, Vector3(0, roof + 0.06, 0.6), Vector3(1.0, 0.12, 1.0))  # escotilla/ventilación
-	# Parales entre ventanas y panel trasero.
-	var z := -hl + 1.4
-	while z < hl - 0.3:
-		for sx: float in [-1.0, 1.0]:
-			k.box(p2, Vector3(sx * (hw - 0.005), (belt + win_top) * 0.5, z), Vector3(0.03, win_top - belt, 0.09))
-		z += 0.95
-	for sx: float in [-1.0, 1.0]:
-		k.strut(p2, Vector3(sx * (hw - 0.04), belt, -hl + 0.02), Vector3(sx * (hw - 0.04), win_top, -hl + 0.2), 0.1)
-	k.box(p, Vector3(0, (belt + 1.95) * 0.5, hl - 0.01), Vector3(hw * 2.0 - 0.02, 1.95 - belt, 0.04))
-	k.box(trim, Vector3(0, (win_top + belt) * 0.5, -hl + 0.1), Vector3(0.05, win_top - belt, 0.22))
-	# Franjas de colores (buseta paisa).
-	for sx: float in [-1.0, 1.0]:
-		var x := sx * (hw + 0.004)
-		k.box(red, Vector3(x, 1.11, 0), Vector3(0.01, 0.07, s.L - 0.1))
-		k.box(yel, Vector3(x, 1.19, 0), Vector3(0.01, 0.05, s.L - 0.1))
-		k.box(grn, Vector3(x, 1.27, 0), Vector3(0.01, 0.07, s.L - 0.1))
-		k.box(p2, Vector3(x, win_top + 0.06, 0), Vector3(0.01, 0.05, s.L - 0.4))
-		# "Swoosh" diagonal trasero.
-		k.box(red, Vector3(x, 0.78, hl - 0.75), Vector3(0.01, 0.08, 0.9), Basis(Vector3.RIGHT, 0.45))
-		k.box(yel, Vector3(x, 0.66, hl - 0.75), Vector3(0.01, 0.06, 0.9), Basis(Vector3.RIGHT, 0.45))
-	for zz: float in [-hl - 0.004, hl + 0.004]:
-		k.box(red, Vector3(0, 1.11, zz), Vector3(hw * 2.0, 0.07, 0.01))
-		k.box(yel, Vector3(0, 1.19, zz), Vector3(hw * 2.0, 0.05, 0.01))
-		k.box(grn, Vector3(0, 1.27, zz), Vector3(hw * 2.0, 0.07, 0.01))
-	# Puerta de pasajeros (derecha, adelante).
-	var dz0 := fa + ah + 0.05
-	k.box(glass, Vector3(hw + 0.006, 1.35, dz0 + 0.45), Vector3(0.01, 1.7, 0.86))
-	k.box(trim, Vector3(hw + 0.008, 1.35, dz0 + 0.45), Vector3(0.01, 1.74, 0.03))
-	k.box(trim, Vector3(hw + 0.004, 1.35, dz0 + 0.02), Vector3(0.01, 1.76, 0.04))
-	k.box(trim, Vector3(hw + 0.004, 1.35, dz0 + 0.88), Vector3(0.01, 1.76, 0.04))
-	k.box(trim, Vector3(hw + 0.15, clear + 0.02, dz0 + 0.45), Vector3(0.3, 0.05, 0.86))  # estribo
-	# Frente: parrilla, letrero de ruta, espejos de brazo.
-	k.box(trim, Vector3(0, 0.82, -hl - 0.012), Vector3(1.1, 0.32, 0.03))
-	for i in 4:
-		k.box(chrome, Vector3(0, 0.7 + i * 0.08, -hl - 0.03), Vector3(1.1, 0.025, 0.02))
-	k.box(dark, Vector3(0, 0.5, -hl - 0.1), Vector3(hw * 2.0 + 0.04, 0.22, 0.18))
-	k.box(trim, Vector3(0, win_top + 0.16, -hl + 0.24), Vector3(1.5, 0.24, 0.05))
-	for sx: float in [-1.0, 1.0]:
-		k.strut(trim, Vector3(sx * (hw - 0.05), 2.0, -hl + 0.05), Vector3(sx * (hw + 0.28), 2.05, -hl - 0.25), 0.035)
-		k.box(trim, Vector3(sx * (hw + 0.3), 1.8, -hl - 0.26), Vector3(0.1, 0.42, 0.05))
-		k.box(glass, Vector3(sx * (hw + 0.3), 1.8, -hl - 0.23), Vector3(0.08, 0.38, 0.01))
-	# Atrás: bumper y escalera al techo.
-	k.box(dark, Vector3(0, 0.5, hl + 0.08), Vector3(hw * 2.0, 0.2, 0.14))
+
+## Sedán / taxi (hatchback) / pickup.
+static func _build_car(k: Kit, sh: Shape, paint: Array) -> void:
+	var P := paint_mat()
+	var G := glass_mat()
+	var T := trim_mat()
+	var C := chrome_mat()
+	var I := interior_mat()
+	var col: Color = paint[0]
+	var kind := sh.kind
+	var bz := sh.b_pillar()
+
+	# ---- carrocería inferior
+	var exact: Array = [sh.cb0, sh.cb1]
+	if sh.bed:
+		exact = [sh.cb0, sh.bed_z0, sh.hl - 0.07]
+	var zs := _stations(sh, 0.13, 5, exact)
+	var secs: Array = []
+	var modes: Array = []
+	for z: float in zs:
+		if sh.bed and absf(z - sh.bed_z0) < 0.001:
+			secs.append(sh.section(z, "n"))
+			modes.append("n")
+			secs.append(sh.section(z, "b"))
+			modes.append("b")
+		elif sh.bed and absf(z - (sh.hl - 0.07)) < 0.001:
+			secs.append(sh.section(z, "b"))
+			modes.append("b")
+			secs.append(sh.section(z, "n"))
+			modes.append("n")
+		elif sh.bed and z > sh.bed_z0 and z < sh.hl - 0.07:
+			secs.append(sh.section(z, "b"))
+			modes.append("b")
+		else:
+			secs.append(sh.section(z))
+			modes.append("n")
+	var rocker_trim := kind == "pickup"
+	var body_fn := func(i: int, j: int, _side: float) -> Array:
+		var zm: float = ((secs[i] as PackedVector3Array)[0].z + (secs[i + 1] as PackedVector3Array)[0].z) * 0.5
+		if j <= 2:
+			return [T, Color.WHITE, 0]
+		if j == 3 and rocker_trim:
+			return [T, Color.WHITE, 0]
+		if j >= 8 and zm > sh.cb0 and zm < sh.cb1:
+			return []   # abertura de la cabina (se ve el interior por los vidrios)
+		if j == 9 and modes[i] == "b" and modes[i + 1] == "b":
+			return [T, Color.WHITE, 3]
+		return [P, col, 1 if j <= 5 else 2]
+	k.loft(secs, body_fn, 1.0, true)
+	var cap_fn := func(j: int) -> Array:
+		return [T, Color.WHITE] if j <= 2 else [P, col]
+	k.ladder(secs[0], cap_fn, Vector3.FORWARD)
+	k.ladder(secs[-1], cap_fn, Vector3.BACK)
+
+	# ---- cabina
+	var gz: Array = []
+	for i in 6:
+		gz.append(lerpf(sh.cb0, sh.ct0, i / 6.0))
+	var n_roof := maxi(2, int((sh.ct1 - sh.ct0) / 0.16))
+	for i in n_roof:
+		gz.append(lerpf(sh.ct0, sh.ct1, float(i) / n_roof))
 	for i in 5:
-		k.box(chrome, Vector3(-hw + 0.3, 1.9 + i * 0.18, hl + 0.06), Vector3(0.3, 0.025, 0.025))
+		gz.append(lerpf(sh.ct1, sh.cb1, i / 5.0))
+	gz.append(sh.cb1)
+	var side_end := sh.ct1 + (0.02 if kind == "sedan" else (-0.06 if kind == "taxi" else -0.07))
+	for e: float in [bz - 0.045, bz + 0.045, side_end]:
+		gz.append(e)
+	gz.sort()
+	var gsecs: Array = []
+	var last := -INF
+	for z: float in gz:
+		if z - last > 0.01:
+			gsecs.append(sh.gh_section(z))
+			last = z
+	var gh_fn := func(i: int, j: int, _side: float) -> Array:
+		var zm: float = ((gsecs[i] as PackedVector3Array)[0].z + (gsecs[i + 1] as PackedVector3Array)[0].z) * 0.5
+		var zone := 0 if zm < sh.ct0 else (1 if zm <= sh.ct1 else 2)
+		match j:
+			0:
+				return [T, Color.WHITE, 0]
+			1:
+				if absf(zm - bz) < 0.045:
+					return [T, Color.WHITE, 1]
+				if zm > side_end:
+					return [P, col, 1]
+				return [G, Color.WHITE, 1]
+			2, 3:
+				return [P, col, 2]
+		return [G if zone != 1 else P, Color.WHITE if zone != 1 else col, 3 + zone]
+	k.loft(gsecs, gh_fn, 1.0, true)
+
+	# ---- molduras laterales: juntas de puertas, manijas, espejos
+	var door_edges: Array = [sh.cb0 + 0.06, bz, minf(sh.ct1 + 0.05, sh.ra - sh.arch_r - 0.02)]
+	if kind == "taxi":
+		door_edges[2] = minf(door_edges[2], sh.ra - sh.arch_r - 0.03)
+	for sx: float in [-1.0, 1.0]:
+		for dz: float in door_edges:
+			_side_strip(k, sh, T, Color.WHITE, sx, dz - 0.006, dz + 0.006, sh.bot(dz) + 0.06, sh.ych + 0.1, 0.0025)
+		for i in 2:
+			var hz: float = door_edges[i + 1] - 0.16
+			var hy := sh.ych - 0.035
+			var hx := sh.side_x(hz, hy)
+			k.col = col
+			k.box(C if kind == "pickup" else P, Vector3(sx * (hx + 0.012), hy, hz), Vector3(0.022, 0.032, 0.15))
+			k.col = Color.WHITE
+			k.box(T, Vector3(sx * (hx + 0.002), hy, hz), Vector3(0.008, 0.05, 0.18))
+		# Espejo: brazo negro + carcasa en color + luna.
+		var mz := sh.cb0 + 0.13
+		var my := sh.deck + 0.09
+		var mx := sh.chw0 + 0.02
+		k.strut(T, Vector3(sx * mx, sh.deck + 0.01, mz), Vector3(sx * (mx + 0.08), my, mz + 0.01), 0.03)
+		k.col = col
+		var mb := Basis(Vector3.UP, sx * -0.12)
+		k.box(P, Vector3(sx * (mx + 0.13), my + 0.01, mz), Vector3(0.17, 0.1, 0.075), mb)
+		k.col = Color.WHITE
+		k.box(G, Vector3(sx * (mx + 0.13), my + 0.01, mz + 0.04), Vector3(0.15, 0.08, 0.008), mb)
+		# Ceja negra del arco (pickup y taxi) o fina en el sedán.
+		for a: float in [sh.fa, sh.ra]:
+			_arch_lip(k, sh, T, sx, a, 0.05 if kind == "pickup" else 0.022)
+	# Franja negra del taxi (pintura, sigue la superficie).
+	if kind == "taxi":
+		for sx: float in [-1.0, 1.0]:
+			_side_strip(k, sh, P, Color(0.04, 0.04, 0.04), sx, sh.fa + sh.arch_r + 0.12, sh.ra - sh.arch_r - 0.12,
+				sh.ych - 0.13, sh.ych - 0.08, 0.003, 12)
+	# Estribos del pickup.
+	if kind == "pickup":
+		for sx: float in [-1.0, 1.0]:
+			var x0 := sh.hw - 0.05
+			k.box(T, Vector3(sx * (x0 + 0.07), sh.clear - 0.02, (sh.cb0 + sh.cb1) * 0.5),
+				Vector3(0.15, 0.035, sh.cb1 - sh.cb0 - 0.2))
+			for zz: float in [sh.cb0 + 0.25, sh.cb1 - 0.25]:
+				k.box(T, Vector3(sx * (x0 + 0.03), sh.clear + 0.02, zz), Vector3(0.06, 0.06, 0.05))
+		# Barras del platón y tapa del portón.
+		k.box(C, Vector3(0, sh.rail - 0.18, sh.hl + 0.003), Vector3(0.22, 0.03, 0.01))
+
+	# ---- limpiaparabrisas
+	var wz := sh.cb0 + 0.07
+	var wy := sh.gh_top(wz) + 0.012
+	k.strut(T, Vector3(-sh.chw0 + 0.15, wy, wz), Vector3(-0.06, wy + 0.025, wz - 0.01 + 0.035), 0.016)
+	k.strut(T, Vector3(0.0, wy, wz), Vector3(sh.chw0 - 0.2, wy + 0.025, wz + 0.035), 0.016)
+	# Antena de techo (aleta).
+	if kind != "taxi":
+		var az := sh.ct1 - 0.12
+		k.col = col
+		k.prism(P, 0.02, 0.006, sh.gh_top(az) + 0.02, sh.gh_top(az) + 0.07, az - 0.09, az + 0.06, az - 0.02, az + 0.05)
+		k.col = Color.WHITE
+
+	# ---- frente: parrilla (las luces van en HeadLens, el bumper en BumperFront)
+	var fz := -sh.hl - 0.004
+	var ly := _head_y(sh)
+	var gw: float = sh.hw - (0.5 if kind != "pickup" else 0.42)
+	var gy0: float = sh.clear + 0.24
+	var gy1: float = ly + (0.05 if kind != "pickup" else 0.09)
+	k.quad(T, Vector3(-gw, gy0, fz), Vector3(gw, gy0, fz), Vector3(gw + 0.04, gy1, fz), Vector3(-gw - 0.04, gy1, fz), Vector3(0, gy0, 0))
+	var bars := 2 if kind != "pickup" else 4
+	for i in bars:
+		var by := lerpf(gy0 + 0.03, gy1 - 0.03, (i + 0.5) / bars)
+		k.box(C if kind == "pickup" else T, Vector3(0, by, fz - 0.008), Vector3(gw * 2.0, 0.018 if kind != "pickup" else 0.03, 0.012))
+	k.box(C, Vector3(0, gy1 + 0.005, fz - 0.006), Vector3(gw * 2.0 + 0.1, 0.012, 0.012))
+	# Emblema genérico (rombo cromado).
+	k.box(C, Vector3(0, (gy0 + gy1) * 0.5, fz - 0.018), Vector3(0.07, 0.07, 0.01), Basis(Vector3.BACK, PI * 0.25))
+	# Tapa de gasolina y escape.
+	k.cyl(T, Transform3D(Basis(Vector3.RIGHT, PI * 0.5), Vector3(sh.hw * 0.55, sh.clear - 0.02, sh.hl + 0.03)), 0.03, 0.2, 8)
+
+	# ---- bumper trasero (fijo)
+	_bumper(k, sh, false, P if kind != "pickup" else C, col, T)
+
+	# ---- interior
+	_car_interior(k, sh, I, T)
+
+
+static func _head_y(sh: Shape) -> float:
+	return sh.top(-sh.hl + 0.02) - 0.11
+
+
+static func _tail_y(sh: Shape) -> float:
+	if sh.kind == "pickup":
+		return sh.rail - 0.22
+	return sh.top(sh.hl - 0.02) - 0.09
+
+
+## Franja delgada pegada al costado (z0..z1, y0..y1), sigue la tumblehome.
+static func _side_strip(k: Kit, sh: Shape, mat: Material, col: Color, sx: float, z0: float, z1: float,
+		y0: float, y1: float, off: float, nz := 1) -> void:
+	k.col = col
+	var ny := 3
+	for iz in nz:
+		var za := lerpf(z0, z1, float(iz) / nz)
+		var zb := lerpf(z0, z1, float(iz + 1) / nz)
+		for iy in ny:
+			var ya := lerpf(y0, y1, float(iy) / ny)
+			var yb := lerpf(y0, y1, float(iy + 1) / ny)
+			var a := Vector3(sx * (sh.side_x(za, ya) + off), ya, za)
+			var b := Vector3(sx * (sh.side_x(zb, ya) + off), ya, zb)
+			var c := Vector3(sx * (sh.side_x(zb, yb) + off), yb, zb)
+			var d := Vector3(sx * (sh.side_x(za, yb) + off), yb, za)
+			k.quad(mat, a, b, c, d, Vector3(0, (ya + yb) * 0.5, (za + zb) * 0.5))
+	k.col = Color.WHITE
+
+
+## Ceja del arco de rueda: banda que sigue el semicírculo, saliendo un poco del costado.
+static func _arch_lip(k: Kit, sh: Shape, mat: Material, sx: float, a: float, wdt: float) -> void:
+	var n := 10
+	var R := sh.arch_r
+	for i in n:
+		var t0 := PI * float(i) / n
+		var t1 := PI * float(i + 1) / n
+		var pts := []
+		for t: float in [t0, t1]:
+			var z := a - cos(t) * R
+			var y := sh.r + sin(t) * R
+			var dir := Vector3(0, sin(t), -cos(t))
+			var x := sh.w(z) + 0.004
+			pts.append([Vector3(sx * x, y, z) + dir * -0.005, Vector3(sx * (x + 0.012), y, z) + dir * wdt])
+		var c := Vector3(0, sh.r, a)
+		k.quad(mat, pts[0][0], pts[0][1], pts[1][1], pts[1][0], c + Vector3(sx * 5.0, 0, 0))
+
+
+## Bumper envolvente (loft a lo largo de x siguiendo la planta). front = true adelante.
+static func _bumper(k: Kit, sh: Shape, front: bool, mat: Material, col: Color, lower: Material) -> void:
+	var y0 := sh.clear - 0.03
+	var y1 := sh.clear + 0.24
+	var ys := [y0 + 0.02, y0, y0 + 0.05, y0 + 0.15, y1 - 0.03, y1, y1 + 0.01]
+	var os := [-0.03, 0.015, 0.05, 0.06, 0.05, 0.012, -0.03]
+	var xo := sh.hw - 0.012
+	var n := 16
+	var secs: Array = []
+	for i in n + 1:
+		var t := -1.0 + 2.0 * float(i) / n
+		var x := signf(t) * xo * pow(absf(t), 0.7)
+		var z := sh.end_z(x, front)
+		var dx := 0.01
+		var dzdx := (sh.end_z(x + dx, front) - sh.end_z(x - dx, front)) / (2.0 * dx)
+		var nrm := Vector2(dzdx, -1.0).normalized() if front else Vector2(-dzdx, 1.0).normalized()
+		var sec := PackedVector3Array()
+		for j in ys.size():
+			sec.append(Vector3(x + nrm.x * os[j], ys[j], z + nrm.y * os[j]))
+		secs.append(sec)
+	var fn := func(_i: int, j: int, _side: float) -> Array:
+		if j <= 1:
+			return [lower, Color.WHITE, 0]
+		return [mat, col, 1]
+	k.loft(secs, fn, 1.0 if front else -1.0, false)
+
+
+static func _car_interior(k: Kit, sh: Shape, I: Material, T: Material) -> void:
+	var fy := sh.clear + 0.1
+	var ix := sh.chw0 - 0.04
+	k.quad(I, Vector3(-ix, fy, sh.cb0), Vector3(ix, fy, sh.cb0), Vector3(ix, fy, sh.cb1), Vector3(-ix, fy, sh.cb1), Vector3(0, fy - 1.0, 0))
+	# Tablero.
+	var dz := sh.cb0 + 0.2
+	k.prism(I, ix, ix - 0.02, sh.deck - 0.3, sh.deck - 0.01, dz - 0.2, dz + 0.22, dz - 0.18, dz + 0.1)
+	k.box(T, Vector3(-0.36, sh.deck + 0.0, dz + 0.1), Vector3(0.36, 0.05, 0.14))
+	# Volante (aro) y columna.
+	var sw := Transform3D(Basis(Vector3.RIGHT, -PI * 0.5 + 0.45), Vector3(-0.37, sh.deck - 0.02, dz + 0.32))
+	k.cyl(T, sw, 0.18, 0.03, 14, true)
+	k.cyl(T, sw.translated_local(Vector3(0, 0.0, 0)), 0.05, 0.05, 8)
+	k.strut(T, sw.origin, Vector3(-0.37, sh.deck - 0.1, dz + 0.1), 0.05)
+	# Asientos delanteros.
+	var sy := sh.clear + 0.25
+	var sz := -0.1 if sh.kind != "pickup" else -0.2
+	for sx: float in [-0.37, 0.37]:
+		_seat(k, I, Vector3(sx, sy, sz), 0.48)
+	# Banca trasera.
+	var rz := minf(sz + 0.92, sh.cb1 - 0.32)
+	if sh.kind == "pickup":
+		rz = minf(rz, sh.cb1 - 0.36)
+	_seat(k, I, Vector3(0, sy, rz), ix * 2.0 - 0.1)
+
+
+static func _seat(k: Kit, I: Material, at: Vector3, wdt: float) -> void:
+	k.box(I, at + Vector3(0, -0.06, 0), Vector3(wdt, 0.14, 0.5))
+	var bb := Basis(Vector3.RIGHT, 0.22)
+	k.box(I, at + Vector3(0, 0.3, 0.27), Vector3(wdt, 0.58, 0.12), bb)
+	if wdt < 0.6:
+		k.box(I, at + Vector3(0, 0.67, 0.35), Vector3(0.26, 0.16, 0.1), bb)
+
+
+# ------------------------------------------------------------------ buseta
+
+static func _bus_section(sh: Shape, z: float) -> PackedVector3Array:
+	var W := sh.w(z)
+	var B := sh.bot(z)
+	var F := minf(sh.clear + 0.04, B)
+	var x1 := minf(sh.xw, W - 0.1)
+	var belt := sh.belt
+	var wt := 2.28
+	var R := sh.roof
+	var ys := [1.07, 1.145, 1.215, 1.305]
+	var p := PackedVector3Array([Vector3(0, F, z), Vector3(x1, F, z), Vector3(x1, B, z), Vector3(W - 0.06, B, z),
+		Vector3(W - 0.01, minf(B + 0.06, 1.0), z)])
+	for y: float in ys:
+		p.append(Vector3(W, maxf(y, B + 0.07), z))
+	p.append_array([Vector3(W, belt, z), Vector3(W - 0.035, belt + 0.03, z), Vector3(W - 0.035, wt - 0.02, z),
+		Vector3(W, wt + 0.02, z), Vector3(W - 0.01, R - 0.16, z), Vector3(W - 0.09, R - 0.02, z),
+		Vector3(W - 0.2, R, z), Vector3(0, R + 0.03, z)])
+	# Frente inclinado: el parabrisas y la parte alta se recuestan hacia atrás.
+	var f := clampf(1.0 - (z + sh.hl) / 0.6, 0.0, 1.0)
+	for i in p.size():
+		var q := p[i]
+		if q.y > belt:
+			q.z += 0.22 * (q.y - belt) / (R - belt) * f
+			p[i] = q
+	return p
+
+
+static func _build_buseta(k: Kit, sh: Shape, paint: Array) -> void:
+	var P := paint_mat()
+	var G := glass_mat()
+	var T := trim_mat()
+	var C := chrome_mat()
+	var I := interior_mat()
+	var c1: Color = paint[0]
+	var c2: Color = paint[1]
+	var white := Color(0.95, 0.95, 0.93)
+	var stripes := [Color(0.85, 0.1, 0.08), Color(0.98, 0.8, 0.1), Color(0.1, 0.6, 0.25)]
+	var hl := sh.hl
+	var hw := sh.hw
+	var door0 := sh.fa + sh.r + 0.12 + 0.05
+	var door1 := door0 + 0.86
+	var pillars: Array = []
+	var pz := -hl + 1.4
+	while pz < hl - 0.3:
+		pillars.append(pz)
+		pz += 0.95
+	var exact: Array = [door0, door1]
+	for q: float in pillars:
+		exact.append(q - 0.05)
+		exact.append(q + 0.05)
+	var zs := _stations(sh, 0.4, 4, exact)
+	var secs: Array = []
+	for z: float in zs:
+		secs.append(_bus_section(sh, z))
+	var in_pillar := func(zm: float) -> bool:
+		for q: float in pillars:
+			if absf(zm - q) < 0.05:
+				return true
+		return false
+	var fn := func(i: int, j: int, side: float) -> Array:
+		var zm: float = ((secs[i] as PackedVector3Array)[0].z + (secs[i + 1] as PackedVector3Array)[0].z) * 0.5
+		var door := side > 0.0 and zm > door0 and zm < door1
+		if j <= 2:
+			return [T, Color.WHITE, 0]
+		if door and j >= 3 and j <= 9:
+			return [G, Color.WHITE, 4] if j >= 4 else [T, Color.WHITE, 0]
+		match j:
+			3, 4, 8:
+				return [P, c1, 1]
+			5, 6, 7:
+				return [P, stripes[j - 5], 1]
+			9, 11:
+				return [T, Color.WHITE, 2]
+			10:
+				return [T, Color.WHITE, 2] if in_pillar.call(zm) or door else [G, Color.WHITE, 3]
+			12:
+				return [P, c2, 5]
+		return [P, white, 6]
+	k.loft(secs, fn, 1.0, true)
+	var cap_fn := func(j: int) -> Array:
+		if j <= 2:
+			return [T, Color.WHITE]
+		match j:
+			3, 4, 8:
+				return [P, c1]
+			5, 6, 7:
+				return [P, stripes[j - 5]]
+			9, 11:
+				return [T, Color.WHITE]
+			10:
+				return [G, Color.WHITE]
+			12:
+				return [P, c2]
+		return [P, white]
+	k.ladder(secs[0], cap_fn, Vector3.FORWARD)
+	var rear_fn := func(j: int) -> Array:
+		if j == 10:
+			return [G, Color.WHITE]
+		return cap_fn.call(j)
+	k.ladder(secs[-1], rear_fn, Vector3.BACK)
+
+	# Marco de puerta, estribo, parante central del parabrisas.
+	var dx := sh.w((door0 + door1) * 0.5) + 0.006
+	for zz: float in [door0, (door0 + door1) * 0.5, door1]:
+		k.box(T, Vector3(dx, 1.35, zz), Vector3(0.012, 1.75, 0.04))
+	k.box(T, Vector3(dx, 1.35, (door0 + door1) * 0.5), Vector3(0.012, 0.04, 0.86))
+	k.box(T, Vector3(hw + 0.12, sh.clear + 0.02, (door0 + door1) * 0.5), Vector3(0.26, 0.05, 0.86))
+	var fz0 := -hl - 0.01
+	k.strut(T, Vector3(0, sh.belt + 0.03, fz0), Vector3(0, 2.26, fz0 + 0.22 * (2.26 - sh.belt) / (sh.roof - sh.belt)), 0.05)
+	# Letrero de ruta (caja) y parrilla.
+	k.box(T, Vector3(0, 2.46, -hl + 0.14), Vector3(1.5, 0.24, 0.06))
+	k.box(T, Vector3(0, 0.84, -hl - 0.008), Vector3(1.1, 0.3, 0.02))
+	for i in 4:
+		k.box(C, Vector3(0, 0.73 + i * 0.075, -hl - 0.02), Vector3(1.1, 0.022, 0.012))
+	# Escotilla de techo y A/C.
+	k.prism(T, 0.5, 0.42, sh.roof + 0.02, sh.roof + 0.12, 0.1, 1.1, 0.18, 1.0)
+	k.prism(P, 0.45, 0.4, sh.roof + 0.02, sh.roof + 0.09, -2.4, -1.6, -2.35, -1.65)
+	# Espejos de brazo.
+	for sx: float in [-1.0, 1.0]:
+		k.strut(T, Vector3(sx * (hw - 0.05), 2.0, -hl + 0.12), Vector3(sx * (hw + 0.28), 2.05, -hl - 0.22), 0.035)
+		k.strut(T, Vector3(sx * (hw + 0.28), 2.05, -hl - 0.22), Vector3(sx * (hw + 0.3), 1.62, -hl - 0.24), 0.03)
+		k.box(T, Vector3(sx * (hw + 0.3), 1.8, -hl - 0.26), Vector3(0.12, 0.42, 0.06))
+		k.box(G, Vector3(sx * (hw + 0.3), 1.8, -hl - 0.225), Vector3(0.1, 0.38, 0.01))
+		for a: float in [sh.fa, sh.ra]:
+			_arch_lip(k, sh, T, sx, a, 0.04)
+	# Atrás: bumper, escalera.
+	k.box(T, Vector3(0, 0.52, hl + 0.06), Vector3(hw * 2.0, 0.2, 0.14))
+	for i in 5:
+		k.box(C, Vector3(-hw + 0.3, 1.9 + i * 0.18, hl + 0.05), Vector3(0.3, 0.025, 0.025))
+	for sx: float in [-1.0, 1.0]:
+		k.box(C, Vector3(-hw + 0.3 + sx * 0.15, 2.25, hl + 0.04), Vector3(0.025, 0.85, 0.025))
+	# Interior: piso, paredes bajas, techo, sillas, puesto del conductor.
+	var fy := 0.92
+	var ix := hw - 0.06
+	k.quad(I, Vector3(-ix, fy, -hl + 0.2), Vector3(ix, fy, -hl + 0.2), Vector3(ix, fy, hl - 0.1), Vector3(-ix, fy, hl - 0.1), Vector3(0, -5, 0))
+	k.quad(I, Vector3(-ix, sh.roof - 0.06, -hl + 0.3), Vector3(ix, sh.roof - 0.06, -hl + 0.3), Vector3(ix, sh.roof - 0.06, hl - 0.1),
+		Vector3(-ix, sh.roof - 0.06, hl - 0.1), Vector3(0, 10, 0))
+	for sx: float in [-1.0, 1.0]:
+		k.quad(I, Vector3(sx * ix, fy, -hl + 0.2), Vector3(sx * ix, sh.belt + 0.03, -hl + 0.2), Vector3(sx * ix, sh.belt + 0.03, hl - 0.1),
+			Vector3(sx * ix, fy, hl - 0.1), Vector3(sx * 10.0, 1, 0))
+	var z := door1 + 0.25
+	while z < hl - 0.5:
+		for sx: float in [-1.0, 1.0]:
+			_seat(k, I, Vector3(sx * 0.62, fy + 0.45, z), 0.85)
+		z += 0.78
+	_seat(k, I, Vector3(-0.6, fy + 0.4, -hl + 1.05), 0.48)
+	var sw := Transform3D(Basis(Vector3.RIGHT, -0.5), Vector3(-0.6, 1.75, -hl + 0.62))
+	k.cyl(T, sw, 0.22, 0.03, 14, true)
+	k.prism(I, hw - 0.1, hw - 0.12, 1.2, 1.55, -hl + 0.15, -hl + 0.5, -hl + 0.22, -hl + 0.45)
 
 
 # ------------------------------------------------------------------ piezas dinámicas
 
 static func _add_dynamic_parts(v: Vehicle, kind: String, s: Dictionary, paint: Array, rng: RandomNumberGenerator) -> void:
+	var sh := Shape.new(kind, s)
 	var hl: float = s.L * 0.5
 	var hw: float = s.hw
 	var is_bus := kind == "buseta"
-	var light_y: float = 0.72 if kind != "pickup" else 0.9
-	if is_bus:
-		light_y = 0.78
-	var tail_y: float = light_y + 0.04 if kind != "taxi" else 0.95
-	if is_bus:
-		tail_y = 1.0
-	if kind == "pickup":
-		tail_y = 1.1
+	var light_y: float = _head_y(sh) if not is_bus else 0.8
+	var tail_y: float = _tail_y(sh) if not is_bus else 1.0
 
-	# Faros (una malla para los dos, material intercambiable).
+	# Faros: tiras con UV del atlas MatActors.headlight (Vehicle cambia la emisión con set_lights).
 	var kh := Kit.new()
-	var tmp := Palette.chrome()
+	var hm := MatActors.headlight(0.0)
+	var hh := 0.15 if kind != "pickup" else 0.19
+	if is_bus:
+		hh = 0.2
 	for sx: float in [-1.0, 1.0]:
-		if is_bus:
-			kh.box(tmp, Vector3(sx * (hw - 0.3), light_y, -hl - 0.02), Vector3(0.38, 0.16, 0.04))
-		elif kind == "taxi":
-			kh.box(tmp, Vector3(sx * (hw - 0.22), light_y, -hl - 0.012), Vector3(0.3, 0.12, 0.05))
-		else:
-			kh.box(tmp, Vector3(sx * (hw - 0.24), light_y + (0.05 if kind == "pickup" else 0.0), -hl - 0.012), Vector3(0.34, 0.11, 0.05))
+		var xi: float = hw - (0.46 if not is_bus else 0.62)
+		_lens_strip(kh, sh, hm, true, sx, xi, hw - 0.035, light_y, hh, Rect2(0, 0, 1, 1))
 	v.head_lens = MeshInstance3D.new()
 	v.head_lens.name = "HeadLens"
 	v.head_lens.mesh = _cached_mesh("head_" + kind, kh)
 	v.add_child(v.head_lens)
 
+	# Stops: esquinas + barra LED horizontal (sedán/taxi), como los SUV modernos.
 	var kt := Kit.new()
+	var tm := MatActors.taillight(0.0)
 	for sx: float in [-1.0, 1.0]:
-		if kind == "taxi":
-			kt.box(tmp, Vector3(sx * (hw - 0.08), tail_y, hl + 0.01), Vector3(0.14, 0.3, 0.04))
-		elif kind == "pickup":
-			kt.box(tmp, Vector3(sx * (hw - 0.04), tail_y + 0.05, hl + 0.01), Vector3(0.1, 0.32, 0.04))
+		if kind == "pickup":
+			_lens_vertical(kt, sh, tm, sx, tail_y, 0.42, 0.13)
 		elif is_bus:
-			kt.box(tmp, Vector3(sx * (hw - 0.15), tail_y, hl + 0.03), Vector3(0.2, 0.36, 0.04))
+			_lens_strip(kt, sh, tm, false, sx, hw - 0.5, hw - 0.01, tail_y, 0.2, Rect2(0, 0, 1, 1))
 		else:
-			kt.box(tmp, Vector3(sx * (hw - 0.2), tail_y, hl + 0.01), Vector3(0.36, 0.12, 0.04))
-	if kind == "sedan":
-		kt.box(tmp, Vector3(0, s.deck + 0.02, s.cab_b[1] - 0.05), Vector3(0.4, 0.03, 0.03))  # tercer stop
+			_lens_strip(kt, sh, tm, false, sx, hw - 0.42, hw - 0.02, tail_y, 0.12, Rect2(0, 0, 1, 1))
+	if kind == "sedan" or kind == "taxi":
+		_lens_strip(kt, sh, tm, false, 1.0, -(hw - 0.42), hw - 0.42, tail_y + 0.035, 0.024, Rect2(0.3, 0.25, 0.4, 0.03), 2)
 	v.tail_lens = MeshInstance3D.new()
 	v.tail_lens.name = "TailLens"
 	v.tail_lens.mesh = _cached_mesh("tail_" + kind, kt)
@@ -427,19 +948,26 @@ static func _add_dynamic_parts(v: Vehicle, kind: String, s: Dictionary, paint: A
 	v.add_child(spot)
 	v.head_spots.append(spot)
 
-	# Bumper delantero (pieza que se deforma).
+	# Placas del atlas (públicas = blancas en taxi y buseta).
+	var seed_text := _plate_text(rng)
+	var pidx := MatActors.plate_index(seed_text, kind == "taxi" or is_bus)
+	var plate_text: String = MatActors.PLATE_TEXTS[pidx]
+
+	# Bumper delantero (pieza que se deforma) + placa delantera dentro del mismo pivote.
 	var bk := Kit.new()
-	var bp := Palette.car_paint(paint[0]) if not is_bus else Palette.tire()
+	var bmat := paint_mat()
 	if kind == "pickup":
-		bp = Palette.chrome()
-	var by: float = s.clear
+		bmat = chrome_mat()
+	elif is_bus:
+		bmat = trim_mat()
+	_bumper(bk, sh, true, bmat, paint[0], trim_mat())
 	if not is_bus:
-		bk.prism(bp, hw - 0.02, hw - 0.03, by - 0.05, by + 0.22, -hl - 0.09, -hl + 0.05, -hl - 0.07, -hl + 0.05)
-		bk.box(Palette.tire(), Vector3(0, by - 0.03, -hl - 0.095), Vector3(hw * 1.5, 0.06, 0.03))
+		# Exploradoras y toma de aire.
 		for sx: float in [-1.0, 1.0]:
-			bk.box(Palette.metal_dark(), Vector3(sx * (hw - 0.25), by + 0.06, -hl - 0.1), Vector3(0.16, 0.06, 0.02))
-	else:
-		bk.box(Palette.metal_dark(), Vector3(0, 0.62, -hl - 0.03), Vector3(hw * 1.9, 0.05, 0.04))
+			var fx: float = sx * (hw - 0.22)
+			var fz := sh.end_z(fx, true) - 0.06
+			bk.box(trim_mat(), Vector3(fx, s.clear + 0.06, fz), Vector3(0.2, 0.07, 0.02))
+			bk.box(chrome_mat(), Vector3(fx, s.clear + 0.06, fz - 0.011), Vector3(0.09, 0.035, 0.004))
 	var bumper := MeshInstance3D.new()
 	bumper.name = "BumperFront"
 	bumper.mesh = _cached_mesh("bumper_%s_%s" % [kind, (paint[0] as Color).to_html()], bk)
@@ -448,42 +976,41 @@ static func _add_dynamic_parts(v: Vehicle, kind: String, s: Dictionary, paint: A
 	v.add_child(pivot)
 	pivot.add_child(bumper)
 	v.bumper_front = pivot
-
-	# Placas amarillas (Colombia, texto inventado).
-	var plate := _plate_text(rng)
-	var plate_y_f: float = by + 0.08 if not is_bus else 0.5
-	var plate_y_r: float = by + 0.38 if not is_bus else 0.85
+	var front_plate_y: float = s.clear + 0.11
+	_add_plate(pivot, pidx, Vector3(0, front_plate_y, -hl - 0.075), true)
+	var rear_plate_y: float = s.clear + 0.4
+	var rear_plate_z := hl + 0.006
 	if kind == "pickup":
-		plate_y_r = s.belt - 0.15
-	_add_plate(v, plate, Vector3(0, plate_y_f, -hl - 0.11 if not is_bus else -hl - 0.2), true)
-	_add_plate(v, plate, Vector3(0, plate_y_r, hl + 0.03 if not is_bus else hl + 0.03), false)
+		rear_plate_y = s.clear + 0.45
+	elif is_bus:
+		rear_plate_y = 0.86
+	_add_plate(v, pidx, Vector3(0, rear_plate_y, rear_plate_z), false)
 
 	if kind == "taxi":
 		var sign_k := Kit.new()
 		var cz: float = (s.cab_t[0] + s.cab_t[1]) * 0.5 - 0.15
-		sign_k.prism(Palette.car_paint(Color(0.97, 0.97, 0.95)), 0.26, 0.24, s.roof + 0.05, s.roof + 0.2, cz - 0.1, cz + 0.1, cz - 0.08, cz + 0.08)
-		sign_k.box(Palette.tire(), Vector3(0, s.roof + 0.06, cz), Vector3(0.2, 0.03, 0.12))
+		var ry := sh.gh_top(cz) + 0.03
+		sign_k.col = Color(0.97, 0.97, 0.95)
+		sign_k.prism(paint_mat(), 0.27, 0.25, ry + 0.03, ry + 0.19, cz - 0.1, cz + 0.1, cz - 0.075, cz + 0.075)
+		sign_k.col = Color.WHITE
+		sign_k.box(trim_mat(), Vector3(0, ry + 0.015, cz), Vector3(0.5, 0.03, 0.16))
 		var sign_mi := MeshInstance3D.new()
 		sign_mi.name = "TaxiSign"
 		sign_mi.mesh = _cached_mesh("taxi_sign", sign_k)
 		v.add_child(sign_mi)
 		for dir: float in [-1.0, 1.0]:
-			_add_label(v, "TAXI", Vector3(0, s.roof + 0.125, cz + dir * 0.102), PI if dir < 0 else 0.0, 40, 0.0028, Color.BLACK)
-		# Franja negra lateral y número de flota.
+			_add_label(v, "TAXI", Vector3(0, ry + 0.11, cz + dir * 0.092), PI if dir < 0 else 0.0, 40, 0.0028, Color.BLACK)
 		var num := "%04d" % (rng.randi() % 10000)
-		var stripe := Kit.new()
 		for sx: float in [-1.0, 1.0]:
-			stripe.box(Palette.tire(), Vector3(sx * (hw + 0.004), s.belt - 0.14, (s.fa + s.ra) * 0.5), Vector3(0.006, 0.05, s.ra - s.fa - 0.8))
-			_add_label(v, num, Vector3(sx * (hw + 0.01), s.belt - 0.06, s.ra - 0.62), sx * PI * 0.5, 44, 0.0026, Color.BLACK)
-			_add_label(v, "SPA " + plate.right(3), Vector3(sx * (hw + 0.01), s.belt - 0.06, -0.15), sx * PI * 0.5, 30, 0.0026, Color.BLACK)
-		var smi := MeshInstance3D.new()
-		smi.mesh = _cached_mesh("taxi_stripe", stripe)
-		v.add_child(smi)
-	elif kind == "buseta":
-		_add_label(v, "BOSTON · CENTRO", Vector3(0, 2.44, -hl + 0.21), PI, 40, 0.0028, Color(1.0, 0.62, 0.1))
+			var ly := sh.ych - 0.2
+			_add_label(v, num, Vector3(sx * (sh.side_x(s.ra - 0.75, ly) + 0.008), ly, s.ra - 0.75), sx * PI * 0.5, 44, 0.0026, Color.BLACK)
+			_add_label(v, plate_text, Vector3(sx * (sh.side_x(-0.15, ly) + 0.008), ly, -0.15), sx * PI * 0.5, 30, 0.0026, Color.BLACK)
+	elif is_bus:
+		_add_label(v, "BOSTON · CENTRO", Vector3(0, 2.46, -hl + 0.105), PI, 40, 0.0028, Color(1.0, 0.62, 0.1))
 		for sx: float in [-1.0, 1.0]:
-			_add_label(v, "TRANSPORTES SAN PABLO", Vector3(sx * (hw + 0.012), 0.9, 0.4), sx * PI * 0.5, 40, 0.0035, Color(0.08, 0.1, 0.2))
-			_add_label(v, "%03d" % (rng.randi() % 1000), Vector3(sx * (hw + 0.012), 2.66, -hl + 0.8), sx * PI * 0.5, 48, 0.004, Color(0.1, 0.1, 0.1))
+			_add_label(v, "TRANSPORTES SAN PABLO", Vector3(sx * (hw + 0.03), 0.86, 0.4), sx * PI * 0.5, 40, 0.0035, Color(0.08, 0.1, 0.2))
+			_add_label(v, "%03d" % (rng.randi() % 1000), Vector3(sx * (hw + 0.03), 2.5, -hl + 1.0), sx * PI * 0.5, 48, 0.004, Color(0.1, 0.1, 0.1))
+		_add_label(v, "%03d" % (rng.randi() % 1000), Vector3(0, 2.0, hl + 0.01), 0.0, 64, 0.004, Color(0.95, 0.95, 0.9))
 
 	# Humo de motor dañado.
 	var sm := CPUParticles3D.new()
@@ -525,6 +1052,45 @@ static func _add_dynamic_parts(v: Vehicle, kind: String, s: Dictionary, paint: A
 	v.horn_player = hp
 
 
+## Tira de lente que envuelve la esquina en planta (x de xi a xo del lado sx), centrada en y, alto h.
+## uv: sub-rectángulo de la mitad de atlas (u crece hacia afuera: el ámbar queda en la esquina).
+static func _lens_strip(k: Kit, sh: Shape, mat: Material, front: bool, sx: float, xi: float, xo: float,
+		y: float, h: float, uv: Rect2, segs := 5) -> void:
+	var off := 0.006
+	var prev := []
+	for i in segs + 1:
+		var t := float(i) / segs
+		var x := lerpf(xi, xo, t)
+		var dx := 0.01
+		var dzdx := (sh.end_z(x + dx, front) - sh.end_z(x - dx, front)) / (2.0 * dx)
+		var n := Vector2(dzdx, -1.0).normalized() if front else Vector2(-dzdx, 1.0).normalized()
+		var z := sh.end_z(x, front)
+		var px := (x + n.x * off) * sx
+		var pz := z + n.y * off
+		var u := uv.position.x + uv.size.x * t
+		var cur := [Vector3(px, y + h * 0.5, pz), Vector3(px, y - h * 0.5, pz), u]
+		if i > 0:
+			var out := Vector3(0, 0, -1.0 if front else 1.0)
+			k.quad_uv(mat, prev[0], cur[0], cur[1], prev[1],
+				Vector2(prev[2], uv.position.y), Vector2(cur[2], uv.position.y),
+				Vector2(cur[2], uv.end.y), Vector2(prev[2], uv.end.y), out)
+		prev = cur
+
+
+## Stop vertical (pickup): lente girada 90° en la esquina trasera.
+static func _lens_vertical(k: Kit, sh: Shape, mat: Material, sx: float, y: float, h: float, wdt: float) -> void:
+	var x0 := sh.hw - wdt - 0.01
+	var x1 := sh.hw - 0.01
+	var z0 := sh.end_z(x0, false) + 0.006
+	var z1 := sh.end_z(x1, false) + 0.006
+	var a := Vector3(sx * x0, y + h * 0.5, z0)
+	var b := Vector3(sx * x1, y + h * 0.5, z1)
+	var c := Vector3(sx * x1, y - h * 0.5, z1)
+	var d := Vector3(sx * x0, y - h * 0.5, z0)
+	# u del atlas a lo largo de la altura, v a lo ancho.
+	k.quad_uv(mat, a, b, c, d, Vector2(0, 1), Vector2(0, 0), Vector2(1, 0), Vector2(1, 1), Vector3(0, 0, 1))
+
+
 ## Las mallas se cachean (y se comparten entre autos del mismo tipo).
 static func _cached_mesh(key: String, kit: Kit) -> ArrayMesh:
 	if not _mesh_cache.has(key):
@@ -532,17 +1098,34 @@ static func _cached_mesh(key: String, kit: Kit) -> ArrayMesh:
 	return _mesh_cache[key]
 
 
-static func _add_plate(v: Vehicle, text: String, pos: Vector3, front: bool) -> void:
+## Placa del atlas MatActors.plate (0.33 x 0.16 m) con marco negro.
+static func _add_plate(parent: Node3D, idx: int, pos: Vector3, front: bool) -> void:
+	var key := "plate_%d_%s" % [idx, front]
+	if not _mesh_cache.has(key):
+		var k := Kit.new()
+		var dz := -1.0 if front else 1.0
+		var hw := 0.165
+		var hh := 0.08
+		k.box(trim_mat(), Vector3(0, 0, -dz * 0.004), Vector3(0.35, 0.18, 0.008))
+		var z := dz * 0.001
+		var a := Vector3(-hw * dz * -1.0, hh, z)
+		var b := Vector3(hw * dz * -1.0, hh, z)
+		# Visto de frente (desde -Z) la izquierda del observador es +X.
+		if front:
+			a = Vector3(hw, hh, z)
+			b = Vector3(-hw, hh, z)
+		else:
+			a = Vector3(-hw, hh, z)
+			b = Vector3(hw, hh, z)
+		var c := Vector3(b.x, -hh, z)
+		var d := Vector3(a.x, -hh, z)
+		k.quad_uv(MatActors.plate(idx), a, b, c, d, Vector2(0, 0), Vector2(1, 0), Vector2(1, 1), Vector2(0, 1), Vector3(0, 0, dz))
+		_mesh_cache[key] = k.commit()
 	var mi := MeshInstance3D.new()
-	var bm := BoxMesh.new()
-	bm.size = Vector3(0.48, 0.15, 0.015)
-	bm.material = Palette.car_paint(PLATE_YELLOW)
-	mi.mesh = bm
+	mi.name = "PlateFront" if front else "PlateRear"
+	mi.mesh = _mesh_cache[key]
 	mi.position = pos
-	v.add_child(mi)
-	var dz := -0.009 if front else 0.009
-	_add_label(v, text, pos + Vector3(0, 0.015, dz), PI if front else 0.0, 48, 0.0017, Color(0.05, 0.05, 0.05))
-	_add_label(v, "MEDELLÍN", pos + Vector3(0, -0.05, dz), PI if front else 0.0, 18, 0.0017, Color(0.05, 0.05, 0.05))
+	parent.add_child(mi)
 
 
 static func _add_label(v: Node3D, text: String, pos: Vector3, rot_y: float, size: int, px: float, col: Color) -> Label3D:
@@ -641,27 +1224,61 @@ static func _add_wheels(v: Vehicle, s: Dictionary, prof: Dictionary) -> void:
 				v.rear_wheels.append(w)
 
 
-## Llanta + rin con radios. Eje = X local, rin hacia +X.
+
+## Rueda: neumático torneado con perfil redondeado y UV para MatActors.tire() (banda de rodamiento en
+## v 0..0.5, flancos con los discos del atlas), rin = quad con MatActors.rim() y fondo oscuro detrás.
+## Eje = X local, rin hacia +X.
 static func _wheel_mesh(r: float, tw: float, heavy: bool) -> ArrayMesh:
 	var key := "wheel_%.2f_%.2f_%s" % [r, tw, heavy]
 	if _mesh_cache.has(key):
 		return _mesh_cache[key]
 	var k := Kit.new()
-	var tire := Palette.tire()
-	var chrome := Palette.chrome()
-	var dark := Palette.metal_dark()
-	var axis := Basis(Vector3.FORWARD, PI * 0.5)  # eje Y del cilindro -> X
-	k.cyl(tire, Transform3D(axis, Vector3.ZERO), r, tw, 18)
-	k.cyl(tire, Transform3D(axis, Vector3(tw * 0.5, 0, 0)), r * 0.86, 0.02, 18)
-	var rim_r := r * (0.62 if not heavy else 0.55)
-	k.cyl(chrome, Transform3D(axis, Vector3(tw * 0.5 + 0.004, 0, 0)), rim_r, 0.012, 16)
-	k.cyl(dark, Transform3D(axis, Vector3(tw * 0.5 + 0.008, 0, 0)), rim_r * 0.85, 0.012, 16)
-	k.cyl(chrome, Transform3D(axis, Vector3(tw * 0.5 + 0.012, 0, 0)), rim_r * 0.3, 0.03, 10)
-	var spokes := 5 if not heavy else 8
-	for i in spokes:
-		var ang := TAU * i / spokes
-		var b := Basis(Vector3.RIGHT, ang)
-		k.box(chrome, Vector3(tw * 0.5 + 0.014, 0, 0) + b * Vector3(0, rim_r * 0.55, 0), Vector3(0.016, rim_r * 0.8, rim_r * 0.22), b)
+	var tire := MatActors.tire()
+	var dark := trim_mat()
+	var h := tw * 0.5
+	var rim_r := r * (0.66 if not heavy else 0.6)
+	# Perfil (radio, eje). kind: 0 = flanco interior, 1 = rodamiento, 2 = flanco exterior.
+	var prof := [
+		[rim_r + 0.01, -h * 0.82, 0], [r * 0.8, -h * 0.98, 0], [r * 0.93, -h * 0.96, 0], [r - 0.012, -h * 0.8, 0],
+		[r - 0.002, -h * 0.5, 1], [r, 0.0, 1], [r - 0.002, h * 0.5, 1], [r - 0.012, h * 0.8, 2],
+		[r * 0.93, h * 0.96, 2], [r * 0.8, h * 0.98, 2], [rim_r + 0.01, h * 0.82, 2]]
+	var segs := 22
+	var gid := k.new_group()
+	for i in segs:
+		var a0 := TAU * i / segs
+		var a1 := TAU * (i + 1) / segs
+		for j in prof.size() - 1:
+			var p0: Array = prof[j]
+			var p1: Array = prof[j + 1]
+			var tread: bool = p0[2] == 1 or p1[2] == 1
+			if (p0[2] as int) == 0 and (p1[2] as int) == 1:
+				tread = true
+			var pts := []
+			var uvs := []
+			for q in [[p0, a0], [p1, a0], [p1, a1], [p0, a1]]:
+				var pr: Array = q[0]
+				var ang: float = q[1]
+				var rad: float = pr[0]
+				var ax: float = pr[1]
+				pts.append(Vector3(ax, cos(ang) * rad, sin(ang) * rad))
+				if tread:
+					uvs.append(Vector2(ang / TAU, clampf((ax + h * 0.8) / (h * 1.6), 0.0, 1.0) * 0.5))
+				else:
+					var cu := 0.25 if ax > 0.0 else 0.75
+					var rr := rad / r * 0.245
+					uvs.append(Vector2(cu + cos(ang) * rr, 0.75 + sin(ang) * rr))
+			var mid: Vector3 = (pts[0] + pts[2]) * 0.5
+			var out := Vector3(0, mid.y, mid.z).normalized() * 0.3 + Vector3(signf(mid.x) * (0.0 if tread else 1.0), 0, 0)
+			k.col = Color.WHITE
+			k.quad_uv(tire, pts[0], pts[1], pts[2], pts[3], uvs[0], uvs[1], uvs[2], uvs[3], out, gid)
+	# Fondo del rin (barril oscuro + disco) y rin con alfa.
+	var axis := Basis(Vector3.FORWARD, PI * 0.5)
+	k.cyl(dark, Transform3D(axis, Vector3(h * 0.3, 0, 0)), rim_r + 0.012, h * 1.1, 14, true)
+	k.cyl(dark, Transform3D(axis, Vector3(-h * 0.25, 0, 0)), rim_r + 0.012, 0.01, 14)
+	var rx := h * 0.8
+	var rr2 := rim_r * 1.02
+	k.quad_uv(MatActors.rim(), Vector3(rx, rr2, -rr2), Vector3(rx, rr2, rr2), Vector3(rx, -rr2, rr2), Vector3(rx, -rr2, -rr2),
+		Vector2(0, 0), Vector2(1, 0), Vector2(1, 1), Vector2(0, 1), Vector3.RIGHT)
 	var m := k.commit()
 	_mesh_cache[key] = m
 	return m
@@ -683,12 +1300,23 @@ static func _add_markers(v: Vehicle, kind: String, s: Dictionary) -> void:
 	v.camera_anchor = anchor
 
 
+
 # ------------------------------------------------------------------ Kit de mallas
 
 ## Acumula geometría por material y la convierte en una ArrayMesh (1 superficie/material).
+## Normales: SurfaceTool.generate_normals con grupos de suavizado (FLAT = cara plana).
+## Cada vértice lleva color (`col`, usado por paint_mat) y UV (planar en metros si no se da).
 class Kit:
+	const FLAT := 4294967295
 	var _surfaces := {}
 	var _order: Array[Material] = []
+	var col := Color.WHITE
+	var tri_count := 0
+	var _group := 0
+
+	func new_group() -> int:
+		_group += 16
+		return _group
 
 	func _st(mat: Material) -> SurfaceTool:
 		if not _surfaces.has(mat):
@@ -698,26 +1326,112 @@ class Kit:
 			_order.append(mat)
 		return _surfaces[mat]
 
-	## Triángulo con normal plana orientada hacia `outward` (Godot: caras frontales en sentido horario).
-	func tri(mat: Material, a: Vector3, b: Vector3, c: Vector3, outward: Vector3) -> void:
+	## Triángulo orientado hacia `outward` (Godot: caras frontales en sentido horario).
+	func tri_uv(mat: Material, a: Vector3, b: Vector3, c: Vector3, ua: Vector2, ub: Vector2, uc: Vector2,
+			outward: Vector3, sg := FLAT) -> void:
 		var n := (b - a).cross(c - a)
-		if n.length_squared() < 1e-10:
+		if n.length_squared() < 1e-12:
 			return
 		if n.dot(outward) > 0.0:
 			var t := b
 			b = c
 			c = t
-			n = -n
-		var nn := -n.normalized()
+			var tu := ub
+			ub = uc
+			uc = tu
 		var st := _st(mat)
-		for p in [a, b, c]:
-			st.set_normal(nn)
-			st.add_vertex(p)
+		st.set_smooth_group(sg)
+		st.set_color(col)
+		st.set_uv(ua)
+		st.add_vertex(a)
+		st.set_uv(ub)
+		st.add_vertex(b)
+		st.set_uv(uc)
+		st.add_vertex(c)
+		tri_count += 1
+
+	func tri(mat: Material, a: Vector3, b: Vector3, c: Vector3, outward: Vector3) -> void:
+		var n := (b - a).cross(c - a).abs()
+		var f := func(p: Vector3) -> Vector2:
+			if n.x >= n.y and n.x >= n.z:
+				return Vector2(p.z, -p.y)
+			if n.y >= n.z:
+				return Vector2(p.x, p.z)
+			return Vector2(p.x, -p.y)
+		tri_uv(mat, a, b, c, f.call(a), f.call(b), f.call(c), outward)
 
 	func quad(mat: Material, a: Vector3, b: Vector3, c: Vector3, d: Vector3, center: Vector3) -> void:
 		var out := (a + b + c + d) * 0.25 - center
 		tri(mat, a, b, c, out)
 		tri(mat, a, c, d, out)
+
+	func quad_uv(mat: Material, a: Vector3, b: Vector3, c: Vector3, d: Vector3, ua: Vector2, ub: Vector2,
+			uc: Vector2, ud: Vector2, outward: Vector3, sg := FLAT) -> void:
+		tri_uv(mat, a, b, c, ua, ub, uc, outward, sg)
+		tri_uv(mat, a, c, d, ua, uc, ud, outward, sg)
+
+	## Loft de secciones (mismo número de puntos). seg_fn(i, j, side) -> [mat, color, banda] o [] (hueco).
+	## sign orienta las normales (+1: perfil de abajo hacia arriba en la mitad +X, estaciones hacia +Z).
+	## mirror: duplica en -X. Bandas distintas = arista viva; tiras entre estaciones de igual z = planas.
+	func loft(secs: Array, seg_fn: Callable, sign := 1.0, mirror := true) -> void:
+		var gid := new_group()
+		var n: int = (secs[0] as PackedVector3Array).size()
+		var us: Array = []
+		for s: PackedVector3Array in secs:
+			var u := PackedFloat32Array()
+			u.resize(n)
+			var acc := 0.0
+			for j in n:
+				if j > 0:
+					acc += s[j].distance_to(s[j - 1])
+				u[j] = acc
+			us.append(u)
+		var sides := [1.0, -1.0] if mirror else [1.0]
+		for i in secs.size() - 1:
+			var s0: PackedVector3Array = secs[i]
+			var s1: PackedVector3Array = secs[i + 1]
+			var u0: PackedFloat32Array = us[i]
+			var u1: PackedFloat32Array = us[i + 1]
+			var flat_strip := mirror
+			if mirror:
+				for j in n:
+					if absf(s0[j].z - s1[j].z) > 1e-4:
+						flat_strip = false
+						break
+			for j in n - 1:
+				for side: float in sides:
+					var info: Array = seg_fn.call(i, j, side)
+					if info.is_empty():
+						continue
+					var m := Vector3(side, 1, 1)
+					var a := s0[j] * m
+					var b := s0[j + 1] * m
+					var c := s1[j + 1] * m
+					var d := s1[j] * m
+					var out := ((b - a) + (c - d)).cross((d - a) + (c - b)) * sign * side
+					if out.length_squared() < 1e-14:
+						out = Vector3(0, 0, 1)
+					var sg: int = FLAT if flat_strip else gid + int(info[2])
+					col = info[1]
+					var va := (s0[j].z if mirror else s0[j].x)
+					var vd := (s1[j].z if mirror else s1[j].x)
+					quad_uv(info[0], a, b, c, d, Vector2(u0[j] * side, va), Vector2(u0[j + 1] * side, va),
+						Vector2(u1[j + 1] * side, vd), Vector2(u1[j] * side, vd), out, sg)
+		col = Color.WHITE
+
+	## Tapa de una sección simétrica en bandas horizontales (permite material/color por banda).
+	func ladder(sec: PackedVector3Array, band_fn: Callable, outward: Vector3) -> void:
+		for j in sec.size() - 1:
+			var info: Array = band_fn.call(j)
+			if info.is_empty():
+				continue
+			var a := sec[j]
+			var b := sec[j + 1]
+			var c := Vector3(-b.x, b.y, b.z)
+			var d := Vector3(-a.x, a.y, a.z)
+			col = info[1]
+			quad_uv(info[0], a, b, c, d, Vector2(a.x, -a.y), Vector2(b.x, -b.y), Vector2(c.x, -c.y), Vector2(d.x, -d.y), outward)
+		col = Color.WHITE
 
 	## 8 puntos: abajo [-x-z, +x-z, +x+z, -x+z], arriba en el mismo orden.
 	func hull(mat: Material, p: Array) -> void:
@@ -733,7 +1447,6 @@ class Kit:
 		quad(mat, p[1], p[2], p[6], p[5], c)
 
 	## Prisma afinado: ancho medio abajo/arriba, z abajo [zb0,zb1], z arriba [zt0,zt1].
-	## Si y1f/y1b >= 0, la cara superior se inclina (frente y1f, atrás y1b).
 	func prism(mat: Material, hwb: float, hwt: float, y0: float, y1: float, zb0: float, zb1: float,
 			zt0: float, zt1: float, y1f := -1.0, y1b := -1.0) -> void:
 		var ya := y1 if y1f < 0.0 else y1f
@@ -758,9 +1471,9 @@ class Kit:
 		hull(mat, [a - s1 - s2, a + s1 - s2, b + s1 - s2, b - s1 - s2,
 			a - s1 + s2, a + s1 + s2, b + s1 + s2, b - s1 + s2])
 
-	## Cilindro a lo largo del eje Y del transform.
+	## Cilindro a lo largo del eje Y del transform (lados suavizados).
 	func cyl(mat: Material, xf: Transform3D, r: float, h: float, segs: int, ring_only := false) -> void:
-		var c := xf.origin
+		var gid := new_group()
 		for i in segs:
 			var a0 := TAU * i / segs
 			var a1 := TAU * (i + 1) / segs
@@ -771,8 +1484,9 @@ class Kit:
 			var t0 := xf * (p0 + Vector3(0, h * 0.5, 0))
 			var t1 := xf * (p1 + Vector3(0, h * 0.5, 0))
 			var out := xf.basis * ((p0 + p1) * 0.5)
-			tri(mat, b0, b1, t1, out)
-			tri(mat, b0, t1, t0, out)
+			var u0 := float(i) / segs
+			var u1 := float(i + 1) / segs
+			quad_uv(mat, b0, b1, t1, t0, Vector2(u0, 1), Vector2(u1, 1), Vector2(u1, 0), Vector2(u0, 0), out, gid)
 			if not ring_only:
 				var up := xf.basis.y
 				tri(mat, xf * Vector3(0, h * 0.5, 0), t0, t1, up)
@@ -782,6 +1496,8 @@ class Kit:
 		var m := ArrayMesh.new()
 		for mat in _order:
 			var st: SurfaceTool = _surfaces[mat]
+			st.generate_normals()
+			st.generate_tangents()
 			st.commit(m)
 			m.surface_set_material(m.get_surface_count() - 1, mat)
 		return m

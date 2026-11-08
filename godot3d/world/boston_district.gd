@@ -100,6 +100,7 @@ func _ready() -> void:
 	_build_cones()
 	_build_spawns()
 	_build_bounds()
+	_p2plants_park()
 	_flush()
 
 
@@ -162,7 +163,11 @@ func _build_ground() -> void:
 				_tslab(Palette.sidewalk(), Palette.curb(), x1 - w, x1, z0 + w, z1 - w, 0.0, -CURB)
 				_tslab(Palette.plaza_tile(), Palette.curb(), x0 + w, x1 - w, z0 + w, z1 - w, 0.0, -CURB)
 			else:
-				_tslab(Palette.sidewalk(), Palette.curb(), x0, x1, z0, z1, 0.0, -CURB)
+				# F2-02: algunas manzanas residenciales (sin vía comercial alrededor) con andén de ladrillo (ref. 6).
+				var top_mat: Material = MatPaving.brick_sidewalk() if _p2plants_brick_cell(cx, cz) else Palette.sidewalk()
+				_tslab(top_mat, Palette.curb(), x0, x1, z0, z1, 0.0, -CURB)
+	# F2-02: franja táctil guía en andenes de vías comerciales y alerta en las esquinas.
+	_p2plants_tactile()
 	# Separadores de vías anchas (con cortes en cada cruce).
 	for s in _xs:
 		if s.wide:
@@ -199,53 +204,118 @@ func _is_park_cell(cx: Dictionary, cz: Dictionary) -> bool:
 
 
 func _build_markings() -> void:
-	var yellow := Palette.road_line()
-	var white := WorldMaterials.paint_white()
-	# Líneas longitudinales por tramo entre cruces.
+	# F2-04: pintura vial con el atlas MatAsphalt.road_decals() fusionada en mallas por trozo
+	# (1 draw call por trozo de 160 m), más tapas de alcantarilla y sumideros en la calzada.
+	# RNG propio (no consume _rng: no altera el determinismo del resto del distrito).
+	var rng := RandomNumberGenerator.new()
+	rng.seed = SEED + 404
+	var d := Traffic.Decals.new()
+	d.slope = SLOPE
+	d.base = -CURB
 	for s in _xs:
-		var cuts: Array = []
-		for c in _zs:
-			cuts.append([float(c.pos) - float(c.half), float(c.pos) + float(c.half)])
-		for seg in _segments(Z_MIN + 2.0, Z_MAX - 2.0, cuts):
-			if s.wide:
-				for off in [-(MEDIAN_HALF + 3.5), MEDIAN_HALF + 3.5]:
-					_dashes(white, float(s.pos) + off, seg[0] + 4.0, seg[1] - 4.0, true)
-			else:
-				_dashes(yellow, float(s.pos), seg[0] + 4.0, seg[1] - 4.0, true)
+		_p2tr_road_paint(d, rng, s, true, _zs)
 	for s in _zs:
-		var cuts: Array = []
-		for c in _xs:
-			cuts.append([float(c.pos) - float(c.half), float(c.pos) + float(c.half)])
-		for seg in _segments(X_MIN + 2.0, X_MAX - 2.0, cuts):
-			if s.wide:
-				for off in [-(MEDIAN_HALF + 3.5), MEDIAN_HALF + 3.5]:
-					_dashes(white, float(s.pos) + off, seg[0] + 4.0, seg[1] - 4.0, false)
+		_p2tr_road_paint(d, rng, s, false, _xs)
+	for m in d.meshes("p2tr_decal"):
+		place_mesh(m[0], m[1], Transform3D.IDENTITY, false)
+
+
+## ¿Cruce con semáforo? (misma regla que usaba _build_traffic_lights).
+func _p2tr_signalized(k: Dictionary, c: Dictionary) -> bool:
+	return (k.id in ["K38", "K39"] and c.id in ["C54", "C55"]) or k.wide or c.wide or (c.id == "C58" and k.id in ["K38", "K40"])
+
+
+## Punto del mundo (XZ) a `a` m a lo largo de la vía s y `l` m del eje (l > 0: este / sur).
+func _p2tr_w(s: Dictionary, along_z: bool, a: float, l: float) -> Vector2:
+	return Vector2(float(s.pos) + l, a) if along_z else Vector2(a, float(s.pos) + l)
+
+
+func _p2tr_dir(along_z: bool, sgn: float) -> Vector2:
+	return Vector2(0, sgn) if along_z else Vector2(sgn, 0)
+
+
+## Líneas, cebras, líneas de pare, flechas, "PARE", "30", tapas y sumideros de una vía.
+func _p2tr_road_paint(d: Traffic.Decals, rng: RandomNumberGenerator, s: Dictionary, along_z: bool, crosses: Array) -> void:
+	var half: float = s.half
+	var wide: bool = s.wide
+	var inner := MEDIAN_HALF if wide else 0.0
+	var tilt := Basis(Vector3(0, 0, 1), atan(SLOPE))
+	var cuts: Array = []
+	for c in crosses:
+		cuts.append([float(c.pos) - float(c.half), float(c.pos) + float(c.half)])
+	var lo := (Z_MIN if along_z else X_MIN) + 2.0
+	var hi := (Z_MAX if along_z else X_MAX) - 2.0
+	# --- líneas longitudinales por tramo
+	for seg in _segments(lo, hi, cuts):
+		var a0: float = seg[0] + 4.7
+		var a1: float = seg[1] - 4.7
+		if a1 - a0 < 3.0:
+			continue
+		for sd: float in [-1.0, 1.0]:
+			d.line("line_white", _p2tr_w(s, along_z, a0, sd * (half - 0.3)), _p2tr_w(s, along_z, a1, sd * (half - 0.3)))
+			if wide:
+				d.line("line_yellow", _p2tr_w(s, along_z, a0, sd * (inner + 0.2)), _p2tr_w(s, along_z, a1, sd * (inner + 0.2)))
+				d.dashed("dash_white", _p2tr_w(s, along_z, a0 + 2.0, sd * (inner + 3.5)), _p2tr_w(s, along_z, a1 - 2.0, sd * (inner + 3.5)))
+		if not wide:
+			# eje amarillo: continuo cerca de los cruces, discontinuo en el medio de la cuadra
+			if a1 - a0 > 44.0:
+				d.line("line_yellow", _p2tr_w(s, along_z, a0, 0.0), _p2tr_w(s, along_z, a0 + 16.0, 0.0))
+				d.dashed("line_yellow", _p2tr_w(s, along_z, a0 + 19.0, 0.0), _p2tr_w(s, along_z, a1 - 16.0, 0.0), 2.56, 6.0)
+				d.line("line_yellow", _p2tr_w(s, along_z, a1 - 16.0, 0.0), _p2tr_w(s, along_z, a1, 0.0))
 			else:
-				_dashes(yellow, float(s.pos), seg[0] + 4.0, seg[1] - 4.0, false)
-	# Cebras en todos los cruces (4 accesos).
-	for k in _xs:
-		for c in _zs:
-			var kx: float = k.pos
-			var kh: float = k.half
-			var cz: float = c.pos
-			var ch: float = c.half
-			for side: float in [-1.0, 1.0]:
-				# Sobre la carrera, a cada lado de la calle.
-				var za := cz + side * (ch + 0.6)
-				var zb := cz + side * (ch + 3.6)
-				var u := kx - kh + 0.5
-				while u + 0.5 < kx + kh - 0.3:
-					if not (k.wide and absf(u + 0.25 - kx) < MEDIAN_HALF):
-						_paint(white, u, u + 0.5, minf(za, zb), maxf(za, zb))
-					u += 1.1
-				# Sobre la calle, a cada lado de la carrera.
-				var xa := kx + side * (kh + 0.6)
-				var xb := kx + side * (kh + 3.6)
-				var v := cz - ch + 0.5
-				while v + 0.5 < cz + ch - 0.3:
-					if not (c.wide and absf(v + 0.25 - cz) < MEDIAN_HALF):
-						_paint(white, minf(xa, xb), maxf(xa, xb), v, v + 0.5)
-					v += 1.1
+				d.line("line_yellow", _p2tr_w(s, along_z, a0, 0.0), _p2tr_w(s, along_z, a1, 0.0))
+			# "30" a mitad de cuadra en algunas vías
+			if a1 - a0 > 50.0 and rng.randf() < 0.35:
+				var mid := (a0 + a1) * 0.5
+				for sd2: float in [-1.0, 1.0]:
+					var t2: float = -sd2 if along_z else sd2
+					d.add("num_30", _p2tr_w(s, along_z, mid - t2 * 5.0, sd2 * 1.75), _p2tr_dir(along_z, t2))
+		# tapas de alcantarilla en los carriles
+		var a := a0 + rng.randf_range(4.0, 20.0)
+		while a < a1 - 3.0:
+			if rng.randf() < 0.7:
+				var lat := rng.randf_range(-1.0, 1.0)
+				var l := signf(lat) * (inner + (half - inner) * rng.randf_range(0.3, 0.7)) if wide else lat * 1.9
+				var p := _p2tr_w(s, along_z, a, l)
+				var v := rng.randi_range(0, 1)
+				place_mesh("p2tr_manhole_%d" % v, Traffic.manhole(v),
+					Transform3D(tilt * Basis(Vector3.UP, rng.randf() * TAU), Vector3(p.x, road_y(p.x) - 0.004, p.y)), false)
+			a += rng.randf_range(30.0, 46.0)
+	# --- accesos a cada cruce
+	for c in crosses:
+		var k: Dictionary = s if along_z else c
+		var cl: Dictionary = c if along_z else s
+		var sig := _p2tr_signalized(k, cl)
+		var cpos: float = c.pos
+		var chalf: float = c.half
+		var lat_dir := _p2tr_dir(not along_z, 1.0)
+		# cebras a ambos lados del cruce
+		for side: float in [-1.0, 1.0]:
+			var ac := cpos + side * (chalf + 2.1)
+			var l := -half + 0.5
+			while l <= half - 0.45:
+				if not (wide and absf(l) < MEDIAN_HALF + 0.3):
+					d.add("zebra_bar", _p2tr_w(s, along_z, ac, l), lat_dir, Vector2(3.0, 0.8))
+				l += 1.0
+		# línea de pare, flecha o "PARE", sumidero
+		for sd: float in [-1.0, 1.0]:
+			var t: float = -sd if along_z else sd     # sentido de marcha en el eje de la vía
+			var fwd := _p2tr_dir(along_z, t)
+			var a_stop := cpos - t * (chalf + 4.2)
+			var lane_w := half - inner
+			d.add("line_white", _p2tr_w(s, along_z, a_stop, sd * (inner + lane_w * 0.5)), lat_dir,
+				Vector2(0.55, lane_w - 0.3), (lane_w - 0.3) / 2.56)
+			var lanes: Array = [sd * (inner + 1.75)] if not wide else [sd * (inner + 1.75), sd * (inner + 5.25)]
+			if not sig and not along_z:
+				d.add("text_pare", _p2tr_w(s, along_z, a_stop - t * 2.3, sd * 1.75), fwd)
+			else:
+				for ln in lanes:
+					d.add("arrow_straight", _p2tr_w(s, along_z, a_stop - t * 7.5, ln), fwd)
+			# sumidero junto al sardinel, antes de la cebra
+			var g := _p2tr_w(s, along_z, cpos - t * (chalf + 5.6), sd * half)
+			var to_c := Vector3(-sd, 0, 0) if along_z else Vector3(0, 0, -sd)
+			place_mesh("p2tr_grate", Traffic.drain_grate(),
+				Transform3D(tilt * Basis.looking_at(-to_c), Vector3(g.x, road_y(g.x) - 0.004, g.y)), false)
 
 
 func _dashes(mat: Material, at: float, a: float, b: float, along_z: bool) -> void:
@@ -264,15 +334,10 @@ func _paint(mat: Material, x0: float, x1: float, z0: float, z1: float) -> void:
 
 # ------------------------------------------------------------------ parque
 func _build_park() -> void:
-	# Jardineras elevadas en L por cuadrante, dejando plaza central 24x24 y caminos en cruz.
-	for sx: float in [-1.0, 1.0]:
-		for sz: float in [-1.0, 1.0]:
-			for r in [[12.0, 31.0, 2.5, 31.0], [2.5, 12.0, 12.0, 31.0]]:
-				var xa: float = sx * r[0]
-				var xb: float = sx * r[1]
-				var za: float = sz * r[2]
-				var zb: float = sz * r[3]
-				_tslab(Palette.grass(), Palette.concrete(), minf(xa, xb), maxf(xa, xb), minf(za, zb), maxf(za, zb), 0.35, 0.0)
+	# Jardineras en L por cuadrante (muro enchapado en pizarra, reja verde hacia los senderos),
+	# plaza central 24x24 en espina de pescado y senderos hexagonales con bordillo (F2-06).
+	_p2park_planters()
+	_p2park_pavers()
 	# Árboles del parque (deterministas, dentro de las jardineras).
 	var spots := [Vector2(20, 8), Vector2(27, 19), Vector2(17, 26), Vector2(7, 23), Vector2(28, 6),
 		Vector2(22, 14), Vector2(28, 28), Vector2(9, 16), Vector2(15, 4)]
@@ -290,27 +355,33 @@ func _build_park() -> void:
 				_tree(Vector3(q.x, walk_y(q.x) + 0.35, q.y), _rng.randf_range(1.1, 1.5), kind)
 	# Estatua ecuestre sobre pedestal escalonado.
 	_statue()
-	# Bancas alrededor de la plaza mirando a la estatua y a lo largo de los caminos.
+	# Bancas: de madera contra los muros de la plaza mirando a la estatua; de granito en los senderos,
+	# arrimadas al bordillo y mirando al centro del sendero. Canecas junto a ellas.
 	for ang: float in [0.0, PI * 0.5, PI, PI * 1.5]:
+		var b := Basis(Vector3.UP, ang)
 		for u in [-7.0, 7.0]:
-			var b := Basis(Vector3.UP, ang)
-			var p := b * Vector3(u, 0, 11.2)
+			var p := b * Vector3(u, 0, 11.45)
 			_bench(Transform3D(b * Basis(Vector3.UP, PI), Vector3(p.x, walk_y(p.x), p.z)))
+		var k := 1
 		for d in [17.0, 25.0]:
-			var b2 := Basis(Vector3.UP, ang)
-			var p2 := b2 * Vector3(3.2, 0, d)
-			_bench(Transform3D(b2 * Basis(Vector3.UP, -PI * 0.5), Vector3(p2.x, walk_y(p2.x), p2.z)))
-	# Faroles del parque.
+			var p2 := b * Vector3(2.05, 0, d)
+			_bench(Transform3D(b * Basis(Vector3.UP, -PI * 0.5), Vector3(p2.x, walk_y(p2.x), p2.z)), k)
+			k += 1
+		var pb := b * Vector3(9.3, 0, 11.6)
+		_p2park_bin(Transform3D(b * Basis(Vector3.UP, PI), Vector3(pb.x, walk_y(pb.x), pb.z)))
+		var pb2 := b * Vector3(2.0, 0, 21.0)
+		_p2park_bin(Transform3D(b * Basis(Vector3.UP, -PI * 0.5), Vector3(pb2.x, walk_y(pb2.x), pb2.z)))
+	# Faroles del parque (linterna en los senderos, globo en las esquinas de la plaza).
 	var lamp_pos: Array = []
 	for d in [16.0, 27.0]:
 		for ang: float in [0.0, PI * 0.5, PI, PI * 1.5]:
-			lamp_pos.append(Basis(Vector3.UP, ang) * Vector3(-3.2, 0, d))
+			lamp_pos.append(Basis(Vector3.UP, ang) * Vector3(-2.0, 0, d))
 	for sx: float in [-1.0, 1.0]:
 		for sz: float in [-1.0, 1.0]:
 			lamp_pos.append(Vector3(11.6 * sx, 0, 11.6 * sz))
 	for i in lamp_pos.size():
 		var p: Vector3 = lamp_pos[i]
-		_park_lamp(Vector3(p.x, walk_y(p.x), p.z), i % 2 == 0)
+		_park_lamp(Vector3(p.x, walk_y(p.x), p.z), i % 2 == 0, 0 if i < 8 else 1)
 	# Carritos de comida callejera.
 	_food_cart(Transform3D(Basis(Vector3.UP, PI * 0.25), Vector3(8.5, walk_y(8.5), 8.5)), 0)
 	_food_cart(Transform3D(Basis(Vector3.UP, -PI * 0.75), Vector3(-8.5, walk_y(-8.5), -8.5)), 1)
@@ -325,63 +396,28 @@ func _build_park() -> void:
 
 
 func _statue() -> void:
-	var stone := Palette.stone()
-	var bronze := Palette.bronze()
-	var o := Transform3D.IDENTITY
-	# Pedestal escalonado (el primer escalón se entierra para absorber la pendiente).
-	_box(stone, o.translated(Vector3(0, -0.2, 0)), Vector3(7.0, 0.7, 7.0))
-	_box(stone, o.translated(Vector3(0, 0.3, 0)), Vector3(6.0, 0.3, 6.0))
-	_box(stone, o.translated(Vector3(0, 0.6, 0)), Vector3(5.0, 0.3, 5.0))
-	_box(stone, o.translated(Vector3(0, 2.25, 0)), Vector3(3.4, 3.0, 3.4))
-	_box(stone, o.translated(Vector3(0, 3.9, 0)), Vector3(4.0, 0.35, 4.0))
-	_box(stone, o.translated(Vector3(0, 4.22, 0)), Vector3(3.3, 0.3, 3.3))
-	_box(bronze, o.translated(Vector3(0, 2.4, 1.72)), Vector3(1.6, 0.9, 0.06))  # placa
-	_col_box(o.translated(Vector3(0, 1.0, 0)), Vector3(7.0, 3.0, 7.0))
-	_col_box(o.translated(Vector3(0, 2.4, 0)), Vector3(4.0, 4.6, 4.0))
-	# Caballo y jinete (mira al sur, +Z) a partir de primitivas.
-	var t := Transform3D(Basis.IDENTITY, Vector3(0, 4.37, 0))
-	_box(bronze, t.translated_local(Vector3(0, 0.05, 0)), Vector3(1.3, 0.1, 2.9))
-	_cyl(bronze, t * Vector3(0, 1.55, -1.05), t * Vector3(0, 1.6, 1.0), 0.52, 0.5, 8, true)
-	_cyl(bronze, t * Vector3(0, 1.75, 0.85), t * Vector3(0, 2.6, 1.4), 0.34, 0.24, 8, true)
-	_box(bronze, t * Transform3D(Basis(Vector3.RIGHT, 0.7), Vector3(0, 2.62, 1.72)), Vector3(0.3, 0.32, 0.85))
-	_box(bronze, t.translated_local(Vector3(0.1, 2.95, 1.35)), Vector3(0.06, 0.2, 0.08))
-	_box(bronze, t.translated_local(Vector3(-0.1, 2.95, 1.35)), Vector3(0.06, 0.2, 0.08))
-	_cyl(bronze, t * Vector3(0, 2.7, 1.25), t * Vector3(0, 1.9, 0.55), 0.08, 0.05, 5, false)  # crin
-	# Patas: delantera izquierda levantada (paso de vencedores).
-	_cyl(bronze, t * Vector3(0.25, 1.25, 0.8), t * Vector3(0.25, 0.75, 1.15), 0.12, 0.1, 6, false)
-	_cyl(bronze, t * Vector3(0.25, 0.75, 1.15), t * Vector3(0.25, 0.55, 0.95), 0.1, 0.09, 6, true)
-	_cyl(bronze, t * Vector3(-0.25, 1.25, 0.85), t * Vector3(-0.25, 0.08, 0.95), 0.12, 0.09, 6, true)
-	_cyl(bronze, t * Vector3(0.25, 1.25, -0.85), t * Vector3(0.27, 0.08, -0.95), 0.13, 0.09, 6, true)
-	_cyl(bronze, t * Vector3(-0.25, 1.25, -0.85), t * Vector3(-0.27, 0.08, -1.05), 0.13, 0.09, 6, true)
-	_cyl(bronze, t * Vector3(0, 1.8, -1.1), t * Vector3(0, 0.75, -1.5), 0.12, 0.05, 5, false)  # cola
-	# Jinete.
-	_cyl(bronze, t * Vector3(0, 2.05, 0.05), t * Vector3(0, 2.95, 0.0), 0.24, 0.2, 8, true)
-	_cyl(bronze, t * Vector3(0.22, 2.1, 0.05), t * Vector3(0.52, 1.5, 0.25), 0.11, 0.08, 6, true)
-	_cyl(bronze, t * Vector3(-0.22, 2.1, 0.05), t * Vector3(-0.52, 1.5, 0.25), 0.11, 0.08, 6, true)
-	_cyl(bronze, t * Vector3(0, 2.95, 0), t * Vector3(0, 3.28, 0.02), 0.14, 0.13, 8, true)    # cabeza
-	_cyl(bronze, t * Vector3(0, 3.26, 0), t * Vector3(0, 3.48, -0.04), 0.16, 0.13, 8, true)   # morrión
-	_cyl(bronze, t * Vector3(0.24, 2.85, 0), t * Vector3(0.5, 3.35, 0.35), 0.07, 0.06, 6, true)   # brazo alzado
-	_cyl(bronze, t * Vector3(0.5, 3.35, 0.35), t * Vector3(0.58, 4.25, 0.55), 0.025, 0.015, 4, true)  # sable
-	_cyl(bronze, t * Vector3(-0.24, 2.8, 0), t * Vector3(-0.15, 2.3, 0.5), 0.07, 0.06, 6, true)  # riendas
+	# Monumento a José María Córdova (F2-05): figura de pie en bronce sobre pedestal alto de mármol,
+	# seto redondo, bordillo de granito y reja baja verde. Mallas, placa y colisiones en Monument.
+	Monument.build(self)
 
 
-func _bench(xf: Transform3D) -> void:
-	var wood := Palette.wood()
-	var metal := Palette.metal_dark()
-	_box(wood, xf.translated_local(Vector3(0, 0.45, 0)), Vector3(1.8, 0.07, 0.45))
-	_box(wood, xf * Transform3D(Basis(Vector3.RIGHT, -0.2), Vector3(0, 0.8, -0.24)), Vector3(1.8, 0.35, 0.05))
-	for u in [-0.75, 0.75]:
-		_box(metal, xf.translated_local(Vector3(u, 0.2, 0)), Vector3(0.06, 0.6, 0.45))
-	_col_box(xf.translated_local(Vector3(0, 0.45, 0)), Vector3(1.8, 0.9, 0.5))
+## kind 0 = banca de listones de madera con costados de hierro; 1/2 = bancas de granito (F2-06).
+## La banca mira a +Z local.
+func _bench(xf: Transform3D, kind := 0) -> void:
+	var sxf := _p2park_sheared(xf)
+	if kind == 0:
+		place_mesh("park_bench_wood", ParkFurniture.wood_bench(), sxf)
+		_col_box(xf.translated_local(Vector3(0, 0.45, -0.02)), Vector3(1.8, 0.9, 0.55))
+	else:
+		place_mesh("park_bench_granite_%d" % (kind - 1), ParkFurniture.granite_bench(kind - 1), sxf)
+		_col_box(xf.translated_local(Vector3(0, 0.23, 0)), Vector3(1.9, 0.46, 0.52))
 
 
-func _park_lamp(p: Vector3, with_light: bool) -> void:
-	var metal := Palette.metal_dark()
-	_cyl(metal, p + Vector3(0, -0.2, 0), p + Vector3(0, 3.9, 0), 0.08, 0.06, 6, false)
-	_cyl(metal, p + Vector3(0, -0.2, 0), p + Vector3(0, 0.5, 0), 0.16, 0.14, 6, true)
-	_cyl(metal, p + Vector3(0, 4.3, 0), p + Vector3(0, 4.55, 0), 0.32, 0.05, 6, true)
-	_mm_add("bulb", Transform3D(Basis.from_scale(Vector3.ONE * 0.26), p + Vector3(0, 4.1, 0)))
-	_col_cyl(p + Vector3(0, 2.0, 0), 0.1, 4.0)
+## Farol de hierro fundido (variant 0 = linterna hexagonal, 1 = globo). Luz cálida sin sombra si with_light.
+func _park_lamp(p: Vector3, with_light: bool, variant := 0) -> void:
+	place_mesh("park_lamp_%d" % (variant % 2), ParkFurniture.park_lamp(variant), Transform3D(Basis(Vector3.UP, 0.4 * float(variant)), p))
+	_col_cyl(p + Vector3(0, 0.3, 0), 0.21, 0.6)
+	_col_cyl(p + Vector3(0, 2.2, 0), 0.08, 4.4)
 	if with_light and _lights < 12:
 		_lights += 1
 		var l := OmniLight3D.new()
@@ -389,53 +425,155 @@ func _park_lamp(p: Vector3, with_light: bool) -> void:
 		l.light_energy = 1.4
 		l.omni_range = 11.0
 		l.shadow_enabled = false
-		l.position = p + Vector3(0, 3.8, 0)
+		l.position = p + Vector3(0, ParkFurniture.LAMP_LIGHT_Y, 0)
 		add_child(l)
 
 
+## Carrito de comida callejera (variant % 3: mango, arepas, salpicón; colores por variant % 4).
 func _food_cart(xf: Transform3D, variant: int) -> void:
-	var paint := WorldMaterials.cart(variant)
-	var chrome := Palette.chrome()
-	_box(paint, xf.translated_local(Vector3(0, 0.75, 0)), Vector3(1.7, 0.8, 0.85))
-	_box(chrome, xf.translated_local(Vector3(0, 1.18, 0)), Vector3(1.8, 0.06, 0.95))
-	_box(Palette.window_glass(), xf.translated_local(Vector3(0, 1.45, -0.1)), Vector3(1.4, 0.5, 0.5))
-	for u in [-0.6, 0.6]:
-		var a := xf * Vector3(u, 0.3, -0.45)
-		var b := xf * Vector3(u, 0.3, 0.45)
-		_cyl(Palette.tire(), a, a + (b - a).normalized() * -0.08, 0.3, 0.3, 8, true)
-		_cyl(Palette.tire(), b, b + (b - a).normalized() * 0.08, 0.3, 0.3, 8, true)
-	var top := xf * Vector3(0.7, 2.6, 0)
-	_cyl(chrome, xf * Vector3(0.7, 1.2, 0), top, 0.03, 0.03, 4, false)
-	_cyl(WorldMaterials.awning(variant + 1), top + Vector3(0, -0.4, 0), top + Vector3(0, 0.15, 0), 1.3, 0.05, 8, true)
-	_mm_add("bulb", Transform3D(Basis.from_scale(Vector3.ONE * 0.12), top + Vector3(0, -0.55, 0)))
-	_col_box(xf.translated_local(Vector3(0, 0.75, 0)), Vector3(1.8, 1.5, 1.0))
+	place_mesh("park_cart_%d" % posmod(variant, 4), ParkFurniture.food_cart(variant), _p2park_sheared(xf))
+	_col_box(xf.translated_local(Vector3(-0.13, 0.62, 0)), Vector3(2.0, 1.24, 0.85))
+	_col_cyl(xf * Vector3(0.62, 1.7, -0.2), 0.03, 1.5)
+
+
+# ------------------------------------------------------------------ parque F2-06 (helpers propios)
+## Aplica la cizalla de la pendiente (y += SLOPE·x) para que el mueble asiente sobre el piso inclinado.
+func _p2park_sheared(xf: Transform3D) -> Transform3D:
+	var shear := Basis(Vector3(1, SLOPE, 0), Vector3(0, 1, 0), Vector3(0, 0, 1))
+	return Transform3D(shear * xf.basis, xf.origin)
+
+
+## Transformación para piezas lineales de a→b (XZ): X local a lo largo, Z local = d × arriba,
+## X escalada por `sx`; con cizalla de pendiente. y_off sobre walk_y del inicio.
+func _p2park_line(a: Vector2, b: Vector2, y_off: float, sx: float) -> Transform3D:
+	var d := Vector3(b.x - a.x, 0, b.y - a.y).normalized()
+	var z := d.cross(Vector3.UP)
+	return _p2park_sheared(Transform3D(Basis(d * sx, Vector3.UP, z), Vector3(a.x, walk_y(a.x) + y_off, a.y)))
+
+
+## Caja de colisión a lo largo de a→b (inclinada con la pendiente si va en X).
+func _p2park_col_line(a: Vector2, b: Vector2, h: float, w: float) -> void:
+	var c := (a + b) * 0.5
+	var l := a.distance_to(b)
+	var along_x := absf(b.x - a.x) > absf(b.y - a.y)
+	var bas := Basis(Vector3.BACK, atan(SLOPE)) if along_x else Basis.IDENTITY
+	var size := Vector3(l, h, w) if along_x else Vector3(w, h, l)
+	_col_box(Transform3D(bas, Vector3(c.x, walk_y(c.x) + h * 0.5, c.y)), size)
+
+
+## Jardineras en L: tapa de pasto a +0.35 (misma huella de siempre, ver README_mapa "Jardineras del parque"),
+## muros de pizarra de 0.30 × 0.45, reja baja verde y bordillo hacia los senderos hexagonales.
+func _p2park_planters() -> void:
+	var wall := ParkFurniture.planter_wall()
+	var fence := ParkFurniture.fence_segment()
+	var curb := ParkFurniture.path_curb()
+	var t := ParkFurniture.WALL_T * 0.5
+	for sx: float in [-1.0, 1.0]:
+		for sz: float in [-1.0, 1.0]:
+			var m := Vector2(sx, sz)
+			for r in [[12.0, 31.0, 2.5, 31.0], [2.5, 12.0, 12.0, 31.0]]:
+				var xa: float = sx * r[0]
+				var xb: float = sx * r[1]
+				var za: float = sz * r[2]
+				var zb: float = sz * r[3]
+				_tilted_top(MatGround.pasto(), minf(xa, xb), maxf(xa, xb), minf(za, zb), maxf(za, zb), 0.35, true, false)
+			# Bordes: [inicio, fin, normal hacia dentro, ¿reja y bordillo?]
+			var edges := [
+				[Vector2(2.5, 12), Vector2(12, 12), Vector2(0, 1), false],
+				[Vector2(12, 2.5), Vector2(12, 12), Vector2(1, 0), false],
+				[Vector2(12, 2.5), Vector2(31, 2.5), Vector2(0, 1), true],
+				[Vector2(31, 2.5), Vector2(31, 31), Vector2(-1, 0), true],
+				[Vector2(2.5, 31), Vector2(31, 31), Vector2(0, -1), true],
+				[Vector2(2.5, 12), Vector2(2.5, 31), Vector2(1, 0), true],
+			]
+			for e in edges:
+				var n: Vector2 = e[2] * m
+				var a: Vector2 = e[0] * m + n * t
+				var b: Vector2 = e[1] * m + n * t
+				place_mesh("park_wall", wall, _p2park_line(a, b, 0.0, a.distance_to(b)))
+				var fenced: bool = e[3]
+				_p2park_col_line(a, b, ParkFurniture.WALL_H + (ParkFurniture.FENCE_H if fenced else 0.0), ParkFurniture.WALL_T)
+				if fenced:
+					var ca: Vector2 = e[0] * m - n * 0.08
+					var cb: Vector2 = e[1] * m - n * 0.08
+					place_mesh("park_curb", curb, _p2park_line(ca, cb, 0.0, ca.distance_to(cb)), false)
+			# Esquina entrante (12, 12).
+			var cc := Vector2(12.0 + t, 12.0 + t) * m
+			place_mesh("park_wall_corner", ParkFurniture.planter_corner(), Transform3D(Basis.IDENTITY, Vector3(cc.x, walk_y(cc.x), cc.y)))
+			# Rejas sobre el eje de los muros (los tramos encadenan postes en las esquinas).
+			var runs := [
+				[Vector2(12 + t, 2.5 + t), Vector2(31 - t, 2.5 + t)],
+				[Vector2(31 - t, 2.5 + t), Vector2(31 - t, 31 - t)],
+				[Vector2(2.5 + t, 31 - t), Vector2(31 - t, 31 - t)],
+				[Vector2(2.5 + t, 12 + t), Vector2(2.5 + t, 31 - t)],
+			]
+			for rn in runs:
+				var a: Vector2 = rn[0] * m
+				var b: Vector2 = rn[1] * m
+				var l := a.distance_to(b)
+				var cnt := maxi(1, roundi(l / ParkFurniture.FENCE_LEN))
+				var s := l / (cnt * ParkFurniture.FENCE_LEN)
+				for i in cnt:
+					var p := a.lerp(b, float(i) / cnt)
+					place_mesh("park_fence", fence, _p2park_line(p, b, ParkFurniture.WALL_H, s))
+			var pe := Vector2(31 - t, 31 - t) * m
+			place_mesh("park_fence_post", ParkFurniture.fence_post(), Transform3D(Basis.IDENTITY, Vector3(pe.x, walk_y(pe.x) + ParkFurniture.WALL_H, pe.y)))
+
+
+## Pisos del parque sobre la losa de la manzana: plaza en espina de pescado, senderos hexagonales,
+## bordillos en la boca de los senderos y en el borde con el andén perimetral.
+func _p2park_pavers() -> void:
+	var hb := MatPaving.herringbone_pavers()
+	var hx := MatPaving.hex_pavers()
+	var off := 0.012
+	_tilted_top(hb, -12.0, 12.0, -12.0, 12.0, off, false, false)
+	for s: float in [-1.0, 1.0]:
+		_tilted_top(hx, -2.5, 2.5, minf(12.0 * s, 31.0 * s), maxf(12.0 * s, 31.0 * s), off, false, false)
+		_tilted_top(hx, minf(12.0 * s, 31.0 * s), maxf(12.0 * s, 31.0 * s), -2.5, 2.5, off, false, false)
+		_tilted_top(hx, -34.0, 34.0, minf(31.0 * s, 34.0 * s), maxf(31.0 * s, 34.0 * s), off, false, false)
+		_tilted_top(hx, minf(31.0 * s, 34.0 * s), maxf(31.0 * s, 34.0 * s), -31.0, 31.0, off, false, false)
+	var curb := ParkFurniture.path_curb()
+	for s: float in [-1.0, 1.0]:
+		# boca de cada sendero (cambio de espina de pescado a hexagonal)
+		place_mesh("park_curb", curb, _p2park_line(Vector2(-2.5, 12.0 * s), Vector2(2.5, 12.0 * s), 0.0, 5.0), false)
+		place_mesh("park_curb", curb, _p2park_line(Vector2(12.0 * s, -2.5), Vector2(12.0 * s, 2.5), 0.0, 5.0), false)
+		# borde con el andén perimetral
+		var e := 33.92 * s
+		place_mesh("park_curb", curb, _p2park_line(Vector2(-34.0, e), Vector2(34.0, e), 0.0, 68.0), false)
+		place_mesh("park_curb", curb, _p2park_line(Vector2(e, -34.0), Vector2(e, 34.0), 0.0, 68.0), false)
+
+
+## Caneca de parque (poste hacia -Z local).
+func _p2park_bin(xf: Transform3D) -> void:
+	place_mesh("park_bin", ParkFurniture.park_bin(), _p2park_sheared(xf))
+	_col_cyl(xf.origin + Vector3(0, 0.5, 0), 0.24, 1.0)
 
 
 func _street_plate(p: Vector3, calle: String, carrera: String) -> void:
+	# F2-04: poste galvanizado con placas verdes de nomenclatura del atlas (doble cara).
+	# "Calle 55 · Perú" → C55, "Carrera 38" → K38. La placa de la calle va paralela a la calle.
 	var y := walk_y(p.x)
 	var base := Vector3(p.x, y, p.z)
-	_cyl(Palette.metal_dark(), base, base + Vector3(0, 3.0, 0), 0.05, 0.05, 6, false)
-	_col_cyl(base + Vector3(0, 1.5, 0), 0.06, 3.0)
-	# Placa de la calle (texto mirando al este/oeste) y de la carrera (norte/sur).
-	var panel := WorldMaterials.paint_white()
-	_box(panel, Transform3D(Basis.IDENTITY, base + Vector3(0, 2.8, 0)), Vector3(0.06, 0.32, 1.6))
-	_box(panel, Transform3D(Basis.IDENTITY, base + Vector3(0, 2.4, 0)), Vector3(1.4, 0.32, 0.06))
-	var sx: float = signf(-p.x)
-	var sz: float = signf(-p.z)
-	_label(calle, Transform3D(Basis(Vector3.UP, sx * PI * 0.5), base + Vector3(sx * 0.04, 2.8, 0)), Color(0.05, 0.15, 0.4), 36, 0.006)
-	_label(carrera, Transform3D(Basis(Vector3.UP, 0.0 if sz > 0.0 else PI), base + Vector3(0, 2.4, sz * 0.04)), Color(0.05, 0.15, 0.4), 36, 0.006)
-	_label(calle, Transform3D(Basis(Vector3.UP, -sx * PI * 0.5), base + Vector3(-sx * 0.04, 2.8, 0)), Color(0.05, 0.15, 0.4), 36, 0.006)
+	var cparts := calle.split(" ")
+	var kparts := carrera.split(" ")
+	var ci := Traffic.plate_index("C" + (cparts[1] if cparts.size() > 1 else ""))
+	var ki := Traffic.plate_index("K" + (kparts[1] if kparts.size() > 1 else ""))
+	place_mesh("p2tr_platepost_%d_%d" % [ci, ki], Traffic.plate_post(ci, ki), Transform3D(Basis.IDENTITY, base))
+	_col_cyl(base + Vector3(0, 1.7, 0), 0.06, 3.4)
+	if ci < 0 or ki < 0:
+		# vía sin placa en el atlas: rótulo de texto sobre una placa genérica
+		var sx: float = signf(-p.x)
+		_label(calle if ci < 0 else carrera, Transform3D(Basis(Vector3.UP, sx * PI * 0.5), base + Vector3(sx * 0.05, 3.0, 0)), Color(0.95, 0.97, 0.95), 36, 0.006)
 
 
 # ------------------------------------------------------------------ iglesia del Sufragio
 func _build_church() -> void:
 	# Calle 55 #39-61 → cuadra entre Cra 39 y Cra 40, frente sobre la Calle 55 (mira al norte).
+	# Geometría visual neorrománica en Church (F2-05); aquí quedan podio, colisiones y entorno.
 	var xc := -72.0
 	var zf := -30.5               # línea de fachada
 	var zb := 12.0                # fondo de la nave
-	var wall := WorldMaterials.church_wall()
 	var stone := Palette.stone()
-	var dark := WorldMaterials.dark_opening()
 	var floor_y := walk_y(-60.0) + 0.9
 	_excl.append(Rect2(-88.0, -36.0, 42.5, 60.0))
 	# Podio que absorbe la pendiente.
@@ -443,7 +581,7 @@ func _build_church() -> void:
 	var pod := Transform3D(Basis.IDENTITY, Vector3(xc, floor_y - podium_h * 0.5, (zf + zb + 10.0) * 0.5))
 	_box(stone, pod, Vector3(26.0, podium_h, zb + 10.0 - zf))
 	_col_box(pod, Vector3(26.0, podium_h, zb + 10.0 - zf))
-	# Escalinata hacia la Calle 55.
+	# Escalinata hacia la Calle 55 (colisión; los peldaños de granito los dibuja Church).
 	var steps := 6
 	var base_y := walk_y(-80.0)
 	for i in steps:
@@ -451,81 +589,14 @@ func _build_church() -> void:
 		var z0 := -34.0 + 0.55 * i
 		var bot := walk_y(-86.0) - 0.5
 		var sxf := Transform3D(Basis.IDENTITY, Vector3(xc, (top + bot) * 0.5, (z0 + zf) * 0.5))
-		var ssz := Vector3(18.0, top - bot, zf - z0)
-		_box(stone, sxf, ssz)
-		_col_box(sxf, ssz)
-	# Nave.
+		_col_box(sxf, Vector3(18.0, top - bot, zf - z0))
+	# Iglesia: nave, ábside, torres, fachada, escalinata (mallas en MultiMesh por key).
+	Church.build(self, Transform3D(Basis.IDENTITY, Vector3(xc, floor_y, zf)), floor_y - base_y)
 	var nave_h := 15.0
-	var nave := Transform3D(Basis.IDENTITY, Vector3(xc, floor_y + nave_h * 0.5, (zf + zb) * 0.5))
-	_box(wall, nave, Vector3(18.0, nave_h, zb - zf))
-	_col_box(nave, Vector3(18.0, nave_h, zb - zf))
-	_gable(Palette.roof_tile(), Transform3D(Basis(Vector3.UP, PI * 0.5), Vector3(xc, floor_y + nave_h, (zf + zb) * 0.5 + 0.5)), zb - zf + 1.0, 19.0, 5.0)
-	# Cornisas.
-	_box(stone, Transform3D(Basis.IDENTITY, Vector3(xc, floor_y + nave_h - 0.2, (zf + zb) * 0.5)), Vector3(18.6, 0.4, zb - zf + 0.2))
-	_box(stone, Transform3D(Basis.IDENTITY, Vector3(xc, floor_y + 0.6, (zf + zb) * 0.5)), Vector3(18.3, 1.2, zb - zf + 0.2))
-	# Ábside semicircular.
-	_cyl(wall, Vector3(xc, floor_y, zb), Vector3(xc, floor_y + 12.0, zb), 7.5, 7.5, 12, false)
-	_cyl(Palette.roof_tile(), Vector3(xc, floor_y + 12.0, zb), Vector3(xc, floor_y + 15.5, zb), 7.9, 0.4, 12, true)
+	_col_box(Transform3D(Basis.IDENTITY, Vector3(xc, floor_y + nave_h * 0.5, (zf + zb) * 0.5)), Vector3(18.0, nave_h, zb - zf))
 	_col_cyl(Vector3(xc, floor_y + 6.0, zb), 7.5, 12.0)
-	# Ventanas de arco de medio punto en los costados.
-	var z := zf + 6.0
-	while z < zb - 3.0:
-		for sx: float in [-1.0, 1.0]:
-			var wx: float = xc + sx * 9.03
-			var wb := Basis(Vector3.UP, sx * PI * 0.5)
-			_box(dark, Transform3D(wb, Vector3(wx, floor_y + 7.0, z)), Vector3(1.4, 4.0, 0.08))
-			_cyl(dark, Vector3(wx, floor_y + 9.0, z), Vector3(wx + sx * 0.08, floor_y + 9.0, z), 0.7, 0.7, 10, true)
-			_cyl(stone, Vector3(wx - sx * 0.02, floor_y + 9.0, z), Vector3(wx + sx * 0.05, floor_y + 9.0, z), 0.95, 0.95, 10, true)
-		z += 6.0
-	# Fachada principal: frontón, portal, rosetón.
-	var fz := zf - 0.05
-	_box(wall, Transform3D(Basis.IDENTITY, Vector3(xc, floor_y + 9.0, zf - 0.4)), Vector3(13.0, 18.0, 0.8))
-	_gable(wall, Transform3D(Basis(Vector3.UP, PI * 0.5), Vector3(xc, floor_y + 18.0, zf - 0.4)), 0.8, 13.0, 4.0)
-	_box(stone, Transform3D(Basis.IDENTITY, Vector3(xc, floor_y + 18.0, zf - 0.6)), Vector3(13.4, 0.35, 0.6))
-	_cyl(Palette.metal_dark(), Vector3(xc, floor_y + 22.0, zf - 0.4), Vector3(xc, floor_y + 24.0, zf - 0.4), 0.06, 0.06, 4, false)
-	_box(Palette.metal_dark(), Transform3D(Basis.IDENTITY, Vector3(xc, floor_y + 23.4, zf - 0.4)), Vector3(0.9, 0.1, 0.1))
-	for d in [[0.0, 2.0, 4.6], [-4.3, 1.1, 3.0], [4.3, 1.1, 3.0]]:
-		var dx: float = d[0]
-		var r: float = d[1]
-		var h: float = d[2]
-		_box(stone, Transform3D(Basis.IDENTITY, Vector3(xc + dx, floor_y + h * 0.5, fz - 0.35)), Vector3(r * 2.0 + 0.9, h + 0.2, 0.25))
-		_cyl(stone, Vector3(xc + dx, floor_y + h, fz - 0.3), Vector3(xc + dx, floor_y + h, fz - 0.5), r + 0.45, r + 0.45, 14, true)
-		_box(Palette.wood(), Transform3D(Basis.IDENTITY, Vector3(xc + dx, floor_y + h * 0.5, fz - 0.55)), Vector3(r * 2.0, h, 0.1))
-		_cyl(dark, Vector3(xc + dx, floor_y + h, fz - 0.5), Vector3(xc + dx, floor_y + h, fz - 0.56), r, r, 14, true)
-	_cyl(stone, Vector3(xc, floor_y + 11.0, fz - 0.3), Vector3(xc, floor_y + 11.0, fz - 0.55), 2.6, 2.6, 16, true)
-	_cyl(WorldMaterials.rosette(), Vector3(xc, floor_y + 11.0, fz - 0.55), Vector3(xc, floor_y + 11.0, fz - 0.6), 2.1, 2.1, 16, true)
-	# Torres campanario.
 	for sx: float in [-1.0, 1.0]:
-		var tx: float = xc + sx * 8.5
-		var tz := zf + 1.8
-		var tb := floor_y
-		var shaft := Transform3D(Basis.IDENTITY, Vector3(tx, tb + 11.0, tz))
-		_box(wall, shaft, Vector3(5.2, 22.0, 5.2))
-		_col_box(shaft, Vector3(5.2, 22.0, 5.2))
-		for yy: float in [8.0, 15.0, 22.0]:
-			_box(stone, Transform3D(Basis.IDENTITY, Vector3(tx, tb + yy, tz)), Vector3(5.6, 0.4, 5.6))
-		# Campanario con vanos de arco en las cuatro caras.
-		_box(wall, Transform3D(Basis.IDENTITY, Vector3(tx, tb + 25.0, tz)), Vector3(4.6, 6.0, 4.6))
-		for k in 4:
-			var fb := Basis(Vector3.UP, k * PI * 0.5)
-			var n := fb * Vector3(0, 0, 1)
-			var c := Vector3(tx, tb + 24.6, tz) + n * 2.32
-			_box(dark, Transform3D(fb, c), Vector3(1.6, 3.2, 0.06))
-			_cyl(dark, c + Vector3(0, 1.6, 0), c + Vector3(0, 1.6, 0) + n * 0.06, 0.8, 0.8, 10, true)
-		_box(stone, Transform3D(Basis.IDENTITY, Vector3(tx, tb + 28.2, tz)), Vector3(5.2, 0.45, 5.2))
-		_cyl(Palette.roof_tile(), Vector3(tx, tb + 28.4, tz), Vector3(tx, tb + 35.0, tz), 3.1, 0.05, 4, true)
-		_cyl(Palette.metal_dark(), Vector3(tx, tb + 35.0, tz), Vector3(tx, tb + 36.6, tz), 0.05, 0.05, 4, false)
-		_box(Palette.metal_dark(), Transform3D(Basis.IDENTITY, Vector3(tx, tb + 36.1, tz)), Vector3(0.7, 0.08, 0.08))
-		# Ventanas angostas del fuste.
-		for yy: float in [5.0, 12.0, 18.5]:
-			_box(dark, Transform3D(Basis.IDENTITY, Vector3(tx, tb + yy, tz - 2.63)), Vector3(0.6, 1.8, 0.06))
-		# Reloj en la torre oriental.
-		if sx > 0.0:
-			var cc := Vector3(tx, tb + 20.0, tz - 2.62)
-			_cyl(stone, cc, cc + Vector3(0, 0, -0.08), 1.2, 1.2, 16, true)
-			_cyl(WorldMaterials.clock_face(), cc + Vector3(0, 0, -0.08), cc + Vector3(0, 0, -0.12), 1.0, 1.0, 16, true)
-			_box(Palette.metal_dark(), Transform3D(Basis(Vector3.BACK, 0.5), cc + Vector3(0.15, 0.25, -0.15)), Vector3(0.06, 0.7, 0.03))
-			_box(Palette.metal_dark(), Transform3D(Basis(Vector3.BACK, -1.2), cc + Vector3(-0.2, 0.08, -0.15)), Vector3(0.06, 0.5, 0.03))
+		_col_box(Transform3D(Basis.IDENTITY, Vector3(xc + sx * 8.5, floor_y + 11.0, zf + 1.8)), Vector3(5.2, 22.0, 5.2))
 	# Plazuela del Sufragio en la esquina con la Cra 39 (aproximada): baldosa, árboles, bancas.
 	_tslab(Palette.plaza_tile(), Palette.curb(), -59.0, -46.0, -34.0, 20.0, 0.02, -0.05)
 	for pz: float in [-26.0, -12.0, 2.0, 14.0]:
@@ -644,79 +715,27 @@ func _building(xf: Transform3D, w: float, d: float, main: bool) -> void:
 		_house(xf, w, d, shop, near)
 	elif r < 0.82:
 		var floors := 4 + int(pow(_rng.randf(), 2.0) * 6.0)
-		_apartment(xf, w, d, shop, Palette.brick(), floors, near)
+		_apartment(xf, w, d, shop, MatBrick.fachada_variante(_rng.randi_range(0, 5)), floors, near)
+	elif r < 0.9 and w >= 9.0:
+		# Edificio moderno de vidrio y concreto liso (F2-08, Buildings.modern).
+		Buildings.modern(self, xf, w, d, shop, _rng.randi_range(4, 7), near)
 	else:
-		_apartment(xf, w, d, shop, Palette.stucco(_rng.randi_range(0, 5)), _rng.randi_range(3, 6), near)
+		_apartment(xf, w, d, shop, MatPlaster.stucco_house(_rng.randi_range(0, 5)), _rng.randi_range(3, 6), near)
 
 
-## Casa antigua de dos pisos: alero de teja, balcón de madera/hierro, rejas.
+## Casa antioqueña de dos pisos (F2-08, world/props/buildings.gd): zócalo de piedra, estuco de color,
+## moldura, puertas/ventanas rehundidas con reja, balcón de madera o balconcillos, alero con canecillos y teja.
+## Llama a _shopfront si tiene local. Colisión: caja w × (g + 4.2) × d como antes.
 func _house(xf: Transform3D, w: float, d: float, shop: bool, near: bool) -> void:
-	var g := 3.4 if shop else 3.1
-	var h := g + 3.0
-	var wall := Palette.stucco(_rng.randi_range(0, 5))
-	var trim := Palette.stucco(_rng.randi_range(0, 5))
-	_box(wall, xf.translated_local(Vector3(0, (h - 1.2) * 0.5, -d * 0.5)), Vector3(w, h + 1.2, d))
-	_col_box(xf.translated_local(Vector3(0, (h - 1.2) * 0.5, -d * 0.5)), Vector3(w, h + 1.2, d))
-	_box(trim, xf.translated_local(Vector3(0, -0.3, 0.03)), Vector3(w, 1.8, 0.06))   # zócalo
-	_box(trim, xf.translated_local(Vector3(0, g, 0.05)), Vector3(w, 0.2, 0.1))       # cornisa de entrepiso
-	# Techo a dos aguas con alero sobre el andén.
-	_gable(Palette.roof_tile(), xf.translated_local(Vector3(0, h, (-d - 0.3 + 1.0) * 0.5)), w + 0.06, d + 1.3, 1.6)
-	_box(Palette.wood(), xf.translated_local(Vector3(0, h - 0.08, 0.5)), Vector3(w, 0.12, 0.95))
-	if shop:
-		_shopfront(xf, w, g)
-	else:
-		_box(Palette.wood(), xf.translated_local(Vector3(-w * 0.5 + 1.1, 1.15, 0.04)), Vector3(1.1, 2.3, 0.08))
-		_window_row(xf, -w * 0.5 + 2.2, w * 0.5 - 0.3, 1.65, 1.1, 1.4, 2.4, near, 0.25)
-	# Segundo piso: ventanas altas y quizá balcón.
-	var up_y := g + 1.45
-	_window_row(xf, -w * 0.5 + 0.3, w * 0.5 - 0.3, up_y, 1.0, 1.9, 2.3, false, 0.35)
-	if _rng.randf() < 0.6:
-		var bl := minf(w - 1.0, _rng.randf_range(3.5, 7.0))
-		var bmat := Palette.wood() if _rng.randf() < 0.6 else Palette.metal_dark()
-		var by := g + 0.15
-		_box(Palette.wood(), xf.translated_local(Vector3(0, by, 0.45)), Vector3(bl, 0.12, 0.9))
-		_box(bmat, xf.translated_local(Vector3(0, by + 1.0, 0.87)), Vector3(bl, 0.06, 0.06))
-		_box(bmat, xf.translated_local(Vector3(0, by + 0.15, 0.87)), Vector3(bl, 0.05, 0.05))
-		var u := -bl * 0.5
-		while u <= bl * 0.5 + 0.01:
-			_box(bmat, xf.translated_local(Vector3(u, by + 0.55, 0.87)), Vector3(0.05, 0.85, 0.05), false, true)
-			u += 0.55
-		for su: float in [-1.0, 1.0]:
-			_box(bmat, xf.translated_local(Vector3(su * bl * 0.5, by + 0.55, 0.45)), Vector3(0.05, 0.9, 0.85))
+	Buildings.house(self, xf, w, d, shop, near)
 
 
-## Edificio de apartamentos de ladrillo o estuco, 3-9 pisos, balcones sólidos, tanque de agua.
+## Edificio de apartamentos de ladrillo (mat de MatBrick) o estuco, 3-9 pisos (F2-08, buildings.gd):
+## franjas de losa, ventanas rehundidas con alféizar y dintel de petaco, balcones, calado de escalera,
+## antejardín, retranqueo superior, azotea con cuarto de máquinas/tanque/antena. Llama a _shopfront.
 func _apartment(xf: Transform3D, w: float, d: float, shop: bool, mat: Material, floors: int, near: bool) -> void:
-	var g := 3.4
-	var fh := 2.8
-	var h := g + fh * (floors - 1) + 0.8
-	_box(mat, xf.translated_local(Vector3(0, (h - 1.2) * 0.5, -d * 0.5)), Vector3(w, h + 1.2, d))
-	_col_box(xf.translated_local(Vector3(0, (h - 1.2) * 0.5, -d * 0.5)), Vector3(w, h + 1.2, d))
-	var conc := Palette.concrete()
-	_box(WorldMaterials.roof_flat(), xf.translated_local(Vector3(0, h + 0.03, -d * 0.5)), Vector3(w - 0.3, 0.06, d - 0.3))
-	_box(conc, xf.translated_local(Vector3(0, h + 0.45, 0.0)), Vector3(w, 0.9, 0.2))   # antepecho de fachada
-	if shop:
-		_shopfront(xf, w, g)
-	else:
-		_box(Palette.concrete(), xf.translated_local(Vector3(0, g * 0.5 - 0.6, 0.04)), Vector3(w, g + 1.2, 0.08))
-		_box(Palette.metal_dark(), xf.translated_local(Vector3(-w * 0.5 + 1.0, 1.15, 0.1)), Vector3(1.2, 2.3, 0.06))
-		if w > 9.0:
-			_box(WorldMaterials.shutter(), xf.translated_local(Vector3(w * 0.5 - 2.2, 1.3, 0.1)), Vector3(3.2, 2.6, 0.06))
-		else:
-			_window_row(xf, -w * 0.5 + 2.0, w * 0.5 - 0.3, 1.7, 1.2, 1.3, 2.4, near, 0.3)
-	var big := mat != Palette.brick()
-	var balcony := _rng.randf() < 0.4
-	var bl := minf(w - 1.0, w * 0.5)
-	for f in range(1, floors):
-		var fy := g + fh * (f - 1)
-		_box(conc, xf.translated_local(Vector3(0, fy, 0.06)), Vector3(w + 0.1, 0.18, 0.14))
-		_window_row(xf, -w * 0.5 + 0.4, w * 0.5 - 0.4, fy + 1.45, 2.0 if big else 1.4, 1.4, 3.0 if big else 2.4, false, 0.32)
-		if balcony:
-			_box(conc, xf.translated_local(Vector3(0, fy + 0.05, 0.55)), Vector3(bl, 0.15, 1.1))
-			_box(mat, xf.translated_local(Vector3(0, fy + 0.55, 1.08)), Vector3(bl, 0.9, 0.08))
-	if _rng.randf() < 0.35:
-		var p := xf * Vector3(_rng.randf_range(-w * 0.3, w * 0.3), h + 0.1, -d * 0.5)
-		_cyl(Palette.concrete(), p, p + Vector3(0, 1.6, 0), 1.0, 1.0, 8, true)
+	var brick := mat.resource_path.contains("brick") or (mat is BaseMaterial3D and (mat as BaseMaterial3D).albedo_texture != null and (mat as BaseMaterial3D).albedo_texture.resource_path.contains("/brick/"))
+	Buildings.apartment(self, xf, w, d, shop, mat, floors, near, brick)
 
 
 ## Primer piso comercial: interior iluminado o persiana, aviso con neón y toldo.
@@ -725,47 +744,20 @@ func _wants_label(xf: Transform3D) -> bool:
 
 
 func _shopfront(xf: Transform3D, w: float, g: float) -> void:
-	var ow := maxf(2.5, w - 1.2)
-	var oh := g - 0.5
+	# F2-07: locales modelados en world/props/shopfronts.gd (vitrinas, puerta, cortina, dintel con letrero
+	# del atlas, toldos, avisos de bandera, celosía, materas, neones). Se consumen del _rng exactamente los
+	# mismos sorteos que antes para no alterar el resto del barrio; la variación propia usa semilla local.
 	var open := _rng.randf() < 0.7
-	_box(Palette.concrete(), xf.translated_local(Vector3(-w * 0.5 + 0.3, oh * 0.5, 0.08)), Vector3(0.5, oh, 0.16))
-	_box(Palette.concrete(), xf.translated_local(Vector3(w * 0.5 - 0.3, oh * 0.5, 0.08)), Vector3(0.5, oh, 0.16))
-	if open:
-		_box(WorldMaterials.shop_interior(), xf.translated_local(Vector3(0, oh * 0.5, 0.03)), Vector3(ow - 0.4, oh, 0.06), false)
-		_box(Palette.metal_dark(), xf.translated_local(Vector3(0, oh + 0.05, 0.1)), Vector3(ow, 0.12, 0.12))
-		# Vidriera con marcos y zócalo bajo.
-		_box(Palette.metal_dark(), xf.translated_local(Vector3(0, 0.35, 0.09)), Vector3(ow - 0.4, 0.7, 0.08), false)
-		var mu := -ow * 0.5 + 0.2 + 1.6
-		while mu < ow * 0.5 - 0.6:
-			_box(Palette.metal_dark(), xf.translated_local(Vector3(mu, oh * 0.5, 0.09)), Vector3(0.07, oh, 0.07), false, true)
-			mu += 1.6
-	else:
-		_box(WorldMaterials.shutter(), xf.translated_local(Vector3(0, oh * 0.5, 0.06)), Vector3(ow - 0.4, oh, 0.08))
-		var y := 0.4
-		while y < oh:
-			_box(Palette.metal_dark(), xf.translated_local(Vector3(0, y, 0.11)), Vector3(ow - 0.4, 0.03, 0.03), false)
-			y += 0.5
-	# Aviso.
-	var colors := [Color(0.1, 0.9, 1.0), Color(1.0, 0.15, 0.75), Color(1.0, 0.62, 0.1)]
-	var col: Color = colors[_rng.randi_range(0, 2)]
-	var neon := Palette.neon(col)
-	var sw := minf(w - 0.8, 9.0)
-	var sy := g - 0.05
-	var sxf := xf.translated_local(Vector3(0, sy, 0.14))
-	_box(WorldMaterials.sign_panel(), sxf, Vector3(sw, 0.75, 0.18), false)
-	_box(neon, sxf.translated_local(Vector3(0, 0.37, 0.1)), Vector3(sw, 0.07, 0.07), false)
-	_box(neon, sxf.translated_local(Vector3(0, -0.37, 0.1)), Vector3(sw, 0.07, 0.07), false)
-	_box(neon, sxf.translated_local(Vector3(-sw * 0.5, 0, 0.1)), Vector3(0.07, 0.8, 0.07), false)
-	_box(neon, sxf.translated_local(Vector3(sw * 0.5, 0, 0.1)), Vector3(0.07, 0.8, 0.07), false)
-	var name: String = SHOP_NAMES[_shop_i % SHOP_NAMES.size()]
-	_shop_i += 1
-	# Texto solo en avisos de vías comerciales cerca del parque (cada Label3D es un draw call).
-	if _wants_label(xf) and _labels < MAX_SHOP_LABELS:
-		var px: float = 0.21 * minf(1.0, sw / (name.length() * 0.2 + 0.4))
-		_label(name.to_upper(), sxf.translated_local(Vector3(0, 0, 0.1)), col.lightened(0.35), 64, px * 0.03)
-	# Toldo inclinado.
+	_rng.randi_range(0, 2)   # (antes: color del neón)
+	var awning := false
 	if open and _rng.randf() < 0.5:
-		_box(WorldMaterials.awning(_rng.randi_range(0, 4)), xf * Transform3D(Basis(Vector3.RIGHT, 0.35), Vector3(0, oh - 0.1, 0.6)), Vector3(ow, 0.05, 1.3))
+		awning = true
+		_rng.randi_range(0, 4)   # (antes: material del toldo)
+	var near := absf(xf.origin.x) < 130.0 and absf(xf.origin.z) < 130.0
+	# Edificio moderno (g = 4 m): marcos laterales de concreto de 0.45 m → el local va entre ellos.
+	var ws := w - 0.9 if g > 3.7 else w
+	Shopfronts.build(self, xf, ws, g, open, awning, near or _wants_label(xf), _shop_i)
+	_shop_i += 1
 
 
 ## Fila de ventanas entre u0 y u1 (local) a la altura y. Quads en MultiMesh; rejas opcionales.
@@ -790,6 +782,8 @@ func _window_row(xf: Transform3D, u0: float, u1: float, y: float, ww: float, wh:
 
 # ------------------------------------------------------------------ red eléctrica y alumbrado
 func _build_poles_and_cables() -> void:
+	var sw := Poles.make_light_switch()   # enciende las luminarias según el preset de StreetLook
+	place_node(sw, Transform3D.IDENTITY)
 	for s in _xs:
 		var x: float = float(s.pos) + (float(s.half) + 0.6 if s.wide else -(float(s.half) + 0.5))
 		var pts: Array = []
@@ -804,7 +798,7 @@ func _build_poles_and_cables() -> void:
 			if clear:
 				pts.append(Vector3(x, walk_y(x), z))
 			z += 33.0
-		_pole_line(pts, Vector3(1, 0, 0) * (-1.0 if s.wide else 1.0))
+		_pole_line(pts, Vector3(1, 0, 0) * (-1.0 if s.wide else 1.0), s, sw)
 	for s in _zs:
 		var zz: float = float(s.pos) + (float(s.half) + 0.6 if s.wide else -(float(s.half) + 0.5))
 		var pts2: Array = []
@@ -819,47 +813,99 @@ func _build_poles_and_cables() -> void:
 			if clear2:
 				pts2.append(Vector3(xx, walk_y(xx), zz))
 			xx += 33.0
-		_pole_line(pts2, Vector3(0, 0, 1) * (-1.0 if s.wide else 1.0))
+		_pole_line(pts2, Vector3(0, 0, 1) * (-1.0 if s.wide else 1.0), s, sw)
 
 
-## Postes con cruceta, luminaria (uno sí, uno no) y 3 cables con catenaria.
-func _pole_line(pts: Array, to_road: Vector3) -> void:
-	var conc := WorldMaterials.pole_concrete()
-	var metal := Palette.metal_dark()
+## Línea de postes de concreto (world/props/poles.gd): 4 variantes (básico, transformador, rollos de
+## telecom, botella de empalme + medidor), luminaria LED en 2 de cada 3 postes (luz real en 1 de cada 2
+## luminarias), vanos de 10 cables con catenaria (también sobre los cruces), retenidas en los extremos y
+## acometidas a las fachadas. Variación determinista por posición (no consume _rng).
+func _pole_line(pts: Array, to_road: Vector3, street: Dictionary, sw: Node3D) -> void:
 	var along := Vector3(to_road.z, 0, -to_road.x)
+	var pb := Basis(along, Vector3.UP, to_road)
+	var r := RandomNumberGenerator.new()
+	var side := -1.0 if to_road.x + to_road.z > 0.0 else 1.0       # lado de la vía donde está la línea
+	var edge: float = float(street.half) + float(street.walk)       # distancia del eje a las fachadas
+	var lums := 0
 	for i in pts.size():
 		var p: Vector3 = pts[i]
-		_cyl(conc, p + Vector3(0, -0.3, 0), p + Vector3(0, 9.6, 0), 0.17, 0.11, 6, true)
-		_box(conc, Transform3D(Basis.looking_at(along), p + Vector3(0, 9.0, 0)), Vector3(1.8, 0.14, 0.14))
-		_col_cyl(p + Vector3(0, 4.5, 0), 0.17, 9.0)
-		if i % 2 == 0:
-			var a := p + Vector3(0, 7.8, 0)
-			var b := a + to_road * 2.2 + Vector3(0, 0.35, 0)
-			_cyl(metal, a, b, 0.05, 0.04, 4, false)
-			_box(metal, Transform3D(Basis.looking_at(to_road), b + to_road * 0.25), Vector3(0.3, 0.14, 0.7), false)
-			_mm_add("bulb", Transform3D(Basis.from_scale(Vector3(0.22, 0.06, 0.4)), b + to_road * 0.25 + Vector3(0, -0.08, 0)))
+		r.seed = hash(Vector2i(int(p.x * 10.0), int(p.z * 10.0)))
+		var roll := r.randf()
+		var variant := 0
+		if roll < 0.2:
+			variant = 1
+		elif roll < 0.5:
+			variant = 2
+		elif roll < 0.7:
+			variant = 3
+		var xf := Transform3D(pb, p)
+		place_mesh("p2poles_pole_%d" % variant, Poles.pole(variant), xf, true)
+		_col_cyl(p + Vector3(0, Poles.POLE_TOP * 0.5, 0), Poles.POLE_R0, Poles.POLE_TOP)
+		if i % 3 != 1:
+			place_mesh("p2poles_lum", Poles.luminaire(), xf, false)
+			if lums % 2 == 0 and sw.get_child_count() < 72:
+				sw.add_child(Poles.make_lamp_light())
+				(sw.get_child(sw.get_child_count() - 1) as Node3D).transform = Poles.lamp_light_xform(xf)
+			lums += 1
+		# vano hacia el poste anterior (33 m; 66 m sobre un cruce)
 		if i > 0:
 			var q: Vector3 = pts[i - 1]
-			if p.distance_to(q) < 45.0:
-				for k in [-0.8, 0.0, 0.8]:
-					var off: Vector3 = to_road * k + Vector3(0, 9.1, 0)
-					_cable(q + off, p + off, 0.45)
+			if q.distance_to(p) < 70.0:
+				var sp := Poles.span_transform(q, p, to_road)
+				var sxf: Transform3D = sp[0]
+				var quad := int(p.x > (X_MIN + X_MAX) * 0.5) + 2 * int(p.z > (Z_MIN + Z_MAX) * 0.5)
+				place_mesh("p2poles_span_%d_%d_q%d" % [int(sp[2]), int(sp[1]), quad], Poles.span(sp[2], sp[1]), sxf, false)
+		# retenidas en los extremos de la línea
+		if i == 0 or i == pts.size() - 1:
+			var nb: Vector3 = pts[1] if i == 0 else pts[i - 1]
+			if pts.size() > 1:
+				var away := Vector3(p.x - nb.x, 0, p.z - nb.z).normalized()
+				var gx := -away
+				place_mesh("p2poles_guy", Poles.guy(), Transform3D(Basis(gx, Vector3.UP, gx.cross(Vector3.UP)), p), false)
+		# acometidas a las fachadas (cerca: baja tensión; enfrente: telecom cruzando la calle)
+		var st := _st(Poles.cable_mat(), p, false)
+		var n_drops := r.randi_range(0, 2)
+		for k in n_drops:
+			var off := r.randf_range(2.5, 9.0) * (1.0 if k == 0 else -1.0)
+			var f := _p2poles_facade(street, p, to_road, along, side * edge, off, r.randf_range(4.6, 5.4))
+			if f != Vector3.INF:
+				Poles.append_cable(st, xf * Poles.DROP_LV, f, r.randf_range(0.12, 0.3), 0.008, 3, 5)
+		if not street.wide and r.randf() < 0.55:
+			var f2 := _p2poles_facade(street, p, to_road, along, -side * edge, r.randf_range(-7.0, 7.0), r.randf_range(5.6, 6.4))
+			if f2 != Vector3.INF:
+				Poles.append_cable(st, xf * Poles.DROP_TEL, f2, r.randf_range(0.25, 0.5), 0.01, 3, 7)
 
 
+## Punto en la fachada a `dist` (con signo) del eje de la vía, desplazado `off` a lo largo de la línea, a
+## `h` m sobre el andén. Vector3.INF si allí no hay edificio (parque, iglesia, teatro, borde del mapa).
+func _p2poles_facade(street: Dictionary, p: Vector3, to_road: Vector3, along: Vector3, dist: float, off: float, h: float) -> Vector3:
+	var axis: Vector3 = to_road.abs()
+	var q := p + along * off
+	q += axis * (float(street.pos) + dist - p.dot(axis))
+	if absf(q.x) < 40.0 and absf(q.z) < 40.0:
+		return Vector3.INF
+	if q.x < X_MIN + 2.0 or q.x > X_MAX - 2.0 or q.z < Z_MIN + 2.0 or q.z > Z_MAX - 2.0:
+		return Vector3.INF
+	if _hits_excl(Rect2(q.x - 1.0, q.z - 1.0, 2.0, 2.0)):
+		return Vector3.INF
+	for c in (_zs if axis.x > 0.5 else _xs):   # no sobre la calzada de una vía transversal
+		if absf((q.z if axis.x > 0.5 else q.x) - float(c.pos)) < float(c.half) + float(c.walk) + 0.5:
+			return Vector3.INF
+	q.y = walk_y(q.x) + h
+	return q
+
+
+## Cable suelto con catenaria (lote del distrito, material de cable de Poles).
 func _cable(a: Vector3, b: Vector3, sag: float) -> void:
-	var segs := 4
-	var prev := a
-	for i in range(1, segs + 1):
-		var t := float(i) / segs
-		var p := a.lerp(b, t) + Vector3(0, -4.0 * sag * t * (1.0 - t), 0)
-		_cyl(Palette.metal_dark(), prev, p, 0.022, 0.022, 3, false, false)
-		prev = p
+	Poles.append_cable(_st(Poles.cable_mat(), (a + b) * 0.5, false), a, b, sag, 0.012, 3, 6)
 
 
 func _build_traffic_lights() -> void:
+	# F2-04: un único nodo cicla las lentes de todos los semáforos (grupos de fase A/B).
+	place_node(Traffic.Cycle.new(), Transform3D.IDENTITY)
 	for k in _xs:
 		for c in _zs:
-			var important: bool = (k.id in ["K38", "K39"] and c.id in ["C54", "C55"]) or k.wide or c.wide or (c.id == "C58" and k.id in ["K38", "K40"])
+			var important: bool = _p2tr_signalized(k, c)
 			if not important:
 				continue
 			var cx: float = k.pos
@@ -872,30 +918,70 @@ func _build_traffic_lights() -> void:
 			_signal(Vector3(cx - kh - 0.9, 0, cz - chh - 0.9), Vector3(1, 0, 0), kh, Vector3(0, 0, -1), carrera_green)
 			_signal(Vector3(cx + kh + 0.9, 0, cz - chh - 0.9), Vector3(0, 0, 1), chh, Vector3(1, 0, 0), not carrera_green)
 			_signal(Vector3(cx - kh - 0.9, 0, cz + chh + 0.9), Vector3(0, 0, -1), chh, Vector3(-1, 0, 0), not carrera_green)
+			# placas de nomenclatura en los postes SE y NW (si el atlas tiene ambas vías)
+			for sg: float in [-1.0, 1.0]:
+				_p2tr_pole_plates(Vector3(cx + sg * (kh + 0.9), 0, cz + sg * (chh + 0.9)), c.id, k.id, sg)
+	_p2tr_stop_signs()
 
 
+## green: el grupo de fase de este acceso arranca en verde ("A") o en rojo ("B").
 func _signal(p: Vector3, arm_dir: Vector3, arm_len: float, face: Vector3, green: bool) -> void:
-	var metal := Palette.metal_dark()
 	var base := Vector3(p.x, walk_y(p.x), p.z)
-	_cyl(metal, base + Vector3(0, -0.2, 0), base + Vector3(0, 5.6, 0), 0.1, 0.08, 6, true)
-	_col_cyl(base + Vector3(0, 2.8, 0), 0.12, 5.6)
+	_col_cyl(base + Vector3(0, 3.1, 0), 0.13, 6.2)
 	var reach: float = minf(arm_len + 0.5, 7.0)
-	var tip := base + Vector3(0, 5.4, 0) + arm_dir * reach
-	_cyl(metal, base + Vector3(0, 5.4, 0), tip, 0.06, 0.05, 4, false)
-	var hb := Basis.looking_at(-face)   # el frente local +Z mira hacia `face`
-	var head := Transform3D(hb, tip + Vector3(0, -0.6, 0))
-	_box(metal, head, Vector3(0.42, 1.15, 0.3), false)
-	var cols := [Color(1, 0.1, 0.05), Color(1, 0.6, 0.05), Color(0.1, 1, 0.45)]
-	var on := 2 if green else 0
-	for i in 3:
-		var m: Material = Palette.neon(cols[i], 3.0) if i == on else WorldMaterials.signal_off()
-		_box(m, head.translated_local(Vector3(0, 0.35 - i * 0.35, 0.16)), Vector3(0.24, 0.24, 0.04), false)
-	# Repetidor bajo en el poste.
-	var low := Transform3D(hb, base + Vector3(0, 2.8, 0) + face * 0.2)
-	_box(metal, low, Vector3(0.3, 0.85, 0.22), false)
-	for i in 3:
-		var m2: Material = Palette.neon(cols[i], 3.0) if i == on else WorldMaterials.signal_off()
-		_box(m2, low.translated_local(Vector3(0, 0.26 - i * 0.26, 0.12)), Vector3(0.17, 0.17, 0.03), false)
+	var g := "A" if green else "B"
+	var other := "B" if green else "A"
+	var pxf := Transform3D(Basis(arm_dir, Vector3.UP, -face), base)   # brazo = +X local, cabezas a -Z
+	var rkey := "p2tr_pole_%d" % int(snappedf(reach, 0.5) * 10.0)
+	place_mesh(rkey, Traffic.signal_pole(reach), pxf)
+	var an: Dictionary = Traffic.signal_anchors(reach)
+	for h in an.heads:
+		place_mesh("p2tr_head_" + g, Traffic.signal_head(g), pxf * (h as Transform3D))
+	place_mesh("p2tr_head_" + g, Traffic.signal_head(g), pxf * (an.rep as Transform3D))
+	# peatonales: la que mira por el brazo sirve el cruce de la vía transversal (otro grupo)
+	place_mesh("p2tr_ped_" + other, Traffic.ped_head(other), pxf * (an.ped_arm as Transform3D))
+	place_mesh("p2tr_ped_" + g, Traffic.ped_head(g), pxf * (an.ped_back as Transform3D))
+
+
+## Placas verdes en un poste de semáforo: la de la calle paralela a la calle, la de la carrera
+## paralela a la carrera; desplazadas hacia fuera del cruce (sg: lado de la esquina).
+func _p2tr_pole_plates(p: Vector3, calle_id: String, carrera_id: String, sg: float) -> void:
+	var ci := Traffic.plate_index(calle_id)
+	var ki := Traffic.plate_index(carrera_id)
+	var base := Vector3(p.x, walk_y(p.x), p.z)
+	if ci >= 0:
+		place_mesh("p2tr_plate_%d" % ci, Traffic.street_plate(ci), Transform3D(Basis.IDENTITY, base + Vector3(0, 4.2, sg * 0.13)))
+	if ki >= 0:
+		place_mesh("p2tr_plate_%d" % ki, Traffic.street_plate(ki), Transform3D(Basis(Vector3.UP, PI * 0.5), base + Vector3(sg * 0.13, 3.72, 0)))
+
+
+## Señales de PARE en los accesos de las calles a cruces sin semáforo (la carrera tiene prelación).
+func _p2tr_stop_signs() -> void:
+	for k in _xs:
+		for c in _zs:
+			if _p2tr_signalized(k, c):
+				continue
+			var kx: float = k.pos
+			var kh: float = k.half
+			var cz: float = c.pos
+			var ch: float = c.half
+			for sd: float in [-1.0, 1.0]:
+				# sd = +1: tráfico hacia el este (carril sur), señal antes del cruce en el andén sur.
+				var off := kh + 4.6
+				var x := kx - sd * off
+				var z := cz + sd * (ch + 0.45)
+				if not c.wide and sd < 0.0 and _p2tr_near_cable_pole(x):
+					x -= sd * 1.3
+				var face := Vector3(-sd, 0, 0)
+				place_mesh("p2tr_sign_pare", Traffic.sign_post_named("pare", 2.35),
+					Transform3D(Basis.looking_at(-face), Vector3(x, walk_y(x), z)))
+				_col_cyl(Vector3(x, walk_y(x) + 1.2, z), 0.05, 2.4)
+
+
+## ¿Hay un poste de energía de las calles (andén norte) a menos de 0.7 m en X?
+func _p2tr_near_cable_pole(x: float) -> bool:
+	var t := fposmod(x - (X_MIN + 6.0), 33.0)
+	return t < 0.7 or t > 32.3
 
 
 func _build_street_trees() -> void:
@@ -939,23 +1025,264 @@ func _build_street_trees() -> void:
 				if ok3:
 					var zz: float = float(s.pos) + float(s.half) + 1.0
 					_tree(Vector3(x2, walk_y(x2), zz), _rng.randf_range(0.6, 0.85), 0)
+					_p2plants_pit(Vector3(x2, walk_y(x2), zz))   # F2-02: alcorque con plantas
 			x2 += 9.0
+	# F2-02: palmas en separadores y andenes residenciales, macizos en los separadores.
+	_p2plants_street_palms()
+
+
+# ------------------------------------------------------------------ vegetación baja F2-02 (helpers propios)
+## Coloca un modelo de Plants agrupado por región (~220 × 200 m) para que el MultiMesh se pueda recortar.
+func _p2plants_place(key: String, mesh: Mesh, xf: Transform3D, shadow := true) -> void:
+	var rx := int((xf.origin.x - X_MIN) / 330.0)
+	var rz := int((xf.origin.z - Z_MIN) / 300.0)
+	place_mesh("p2plants_%s_r%d_%d" % [key, rx, rz], mesh, xf, shadow)
+
+
+## Cizalla de la pendiente (y += SLOPE·x) para piezas planas que deben asentar sobre el piso inclinado.
+func _p2plants_sheared(xf: Transform3D) -> Transform3D:
+	var shear := Basis(Vector3(1, SLOPE, 0), Vector3(0, 1, 0), Vector3(0, 0, 1))
+	return Transform3D(shear * xf.basis, xf.origin)
+
+
+## Variante determinista a partir de la posición (no consume _rng).
+func _p2plants_hash(p: Vector3, n: int) -> int:
+	return posmod(int(floor(p.x * 3.7)) * 73856093 ^ int(floor(p.z * 3.1)) * 19349663, n)
+
+
+## Alcorque de andén (marco + mantillo + plantas) bajo un árbol de andén.
+func _p2plants_pit(base: Vector3) -> void:
+	var v := _p2plants_hash(base, Plants.PIT_VARIANTS)
+	_p2plants_place("pit_%d" % v, Plants.tree_pit(v),
+		_p2plants_sheared(Transform3D(Basis(Vector3.UP, PI * 0.5 * (v % 2)), base)), false)
+
+
+func _p2plants_palm(base: Vector3, r: RandomNumberGenerator, with_pit: bool) -> void:
+	var v := r.randi() % Plants.TALL_PALM_VARIANTS
+	var s := r.randf_range(0.9, 1.1)
+	_p2plants_place("palm_%d" % v, Plants.tall_palm(v),
+		Transform3D(Basis(Vector3.UP, r.randf() * TAU).scaled(Vector3(s, s, s)), base))
+	add_col_cyl(base + Vector3(0, 1.5, 0), 0.2, 3.0)
+	if with_pit:
+		_p2plants_pit(base)
+
+
+func _p2plants_street_palms() -> void:
+	var r := RandomNumberGenerator.new()
+	r.seed = SEED + 202
+	# Separador de La Playa: palma entre cada par de árboles (uno sí, uno no) y macizos en las puntas.
+	for s in _zs:
+		if not s.wide:
+			continue
+		var x := X_MIN + 8.0 + 5.5
+		var k := 0
+		while x < X_MAX - 8.0:
+			var ok := true
+			for c in _xs:
+				if absf(x - float(c.pos)) < float(c.half) + 6.0:
+					ok = false
+			if ok and k % 2 == 0:
+				_p2plants_palm(Vector3(x, walk_y(x) - 0.05, float(s.pos)), r, false)
+			k += 1
+			x += 11.0
+		for c in _xs:
+			for side: float in [-1.0, 1.0]:
+				var bx: float = float(c.pos) + side * (float(c.half) + 4.0 + 2.6)
+				if bx < X_MIN + 3.0 or bx > X_MAX - 3.0:
+					continue
+				var mix := r.randi() % 3
+				_p2plants_place("bed_m%d" % mix, Plants.garden_bed(4.0, 3.0, mix),
+					_p2plants_sheared(Transform3D(Basis.IDENTITY, Vector3(bx, walk_y(bx), float(s.pos)))))
+	# Separador de la Cra 43 (Girardot): palmas intercaladas y macizos en las puntas.
+	for s in _xs:
+		if not s.wide:
+			continue
+		var px: float = float(s.pos)
+		var z := Z_MIN + 8.0 + 7.0
+		var k2 := 0
+		while z < Z_MAX - 8.0:
+			var ok2 := true
+			for c in _zs:
+				if absf(z - float(c.pos)) < float(c.half) + 6.0:
+					ok2 = false
+			if ok2 and k2 % 2 == 1:
+				_p2plants_palm(Vector3(px, walk_y(px) - 0.05, z), r, false)
+			k2 += 1
+			z += 14.0
+		for c in _zs:
+			for side: float in [-1.0, 1.0]:
+				var bz: float = float(c.pos) + side * (float(c.half) + 4.0 + 2.6)
+				if bz < Z_MIN + 3.0 or bz > Z_MAX - 3.0:
+					continue
+				var mix2 := r.randi() % 3
+				_p2plants_place("bed_m%d" % mix2, Plants.garden_bed(4.0, 3.0, mix2),
+					_p2plants_sheared(Transform3D(Basis(Vector3.UP, PI * 0.5), Vector3(px, walk_y(px), bz))))
+	# Andenes residenciales (carreras no comerciales), costado oriental: palmas con alcorque (ref. 7).
+	for s in _xs:
+		if s.wide or s.id in MAIN_IDS:
+			continue
+		var ax: float = float(s.pos) + float(s.half) + 1.0
+		var z2 := Z_MIN + 10.0
+		while z2 < Z_MAX - 10.0:
+			var roll := r.randf()
+			var ok3 := roll < 0.3
+			for c in _zs:
+				if absf(z2 - float(c.pos)) < float(c.half) + float(c.walk) + 5.0:
+					ok3 = false
+			if ok3:
+				_p2plants_palm(Vector3(ax, walk_y(ax), z2), r, true)
+			z2 += 10.0
+
+
+## ¿Manzana residencial con andén de ladrillo? (ninguna vía comercial alrededor; 1 de cada 3 por posición).
+func _p2plants_brick_cell(cx: Dictionary, cz: Dictionary) -> bool:
+	for st in [cx.lo, cx.hi, cz.lo, cz.hi]:
+		if st == null or st.id in MAIN_IDS:
+			return false
+	return posmod(int(cx.a) * 7 + int(cz.a) * 13, 3) == 0
+
+
+## Baldosa táctil: franja guía de 40 cm a (andén - 0.5 m) del sardinel en los andenes de las vías
+## comerciales, y alerta en cada esquina (cuadro 0.8 m + franja hasta el sardinel del cruce).
+func _p2plants_tactile() -> void:
+	var gx := MatPaving.tactile_guide(true)    # barras a lo largo de X (andenes de calles)
+	var gz := MatPaving.tactile_guide(false)   # barras a lo largo de Z (andenes de carreras)
+	var al := MatPaving.tactile_alert()
+	var off := 0.008
+	for cx in _cells(_xs, X_MIN, X_MAX):
+		for cz in _cells(_zs, Z_MIN, Z_MAX):
+			if cx.lo == null or cx.hi == null or cz.lo == null or cz.hi == null:
+				continue
+			# Esquinas de la franja (cruce con la franja del andén perpendicular).
+			var jx0: float = float(cx.a) + float(cx.lo.walk) - 0.5
+			var jx1: float = float(cx.b) - float(cx.hi.walk) + 0.5
+			var jz0: float = float(cz.a) + float(cz.lo.walk) - 0.5
+			var jz1: float = float(cz.b) - float(cz.hi.walk) + 0.5
+			# Andenes a lo largo de las calles (norte y sur de la manzana).
+			for side in [[cz.lo, float(cz.a), 1.0], [cz.hi, float(cz.b), -1.0]]:
+				var st: Dictionary = side[0]
+				if not (st.id in MAIN_IDS):
+					continue
+				var curb: float = side[1]
+				var dir: float = side[2]
+				var lc := snappedf(curb + dir * (float(st.walk) - 0.5) - 0.2, 0.4) + 0.2
+				_tilted_top(gx, jx0 + 0.4, jx1 - 0.4, lc - 0.2, lc + 0.2, off, false, false)
+				for jx in [jx0, jx1]:
+					_tilted_top(al, jx - 0.4, jx + 0.4, minf(curb, lc + dir * 0.4), maxf(curb, lc + dir * 0.4), off, false, false)
+			# Andenes a lo largo de las carreras (oeste y este de la manzana).
+			for side2 in [[cx.lo, float(cx.a), 1.0], [cx.hi, float(cx.b), -1.0]]:
+				var st2: Dictionary = side2[0]
+				if not (st2.id in MAIN_IDS):
+					continue
+				var curb2: float = side2[1]
+				var dir2: float = side2[2]
+				var lc2 := snappedf(curb2 + dir2 * (float(st2.walk) - 0.5) - 0.2, 0.4) + 0.2
+				_tilted_top(gz, lc2 - 0.2, lc2 + 0.2, jz0 + 0.4, jz1 - 0.4, off, false, false)
+				for jz in [jz0, jz1]:
+					_tilted_top(al, minf(curb2, lc2 + dir2 * 0.4), maxf(curb2, lc2 + dir2 * 0.4), jz - 0.4, jz + 0.4, off, false, false)
+
+
+## Siembra de las jardineras del parque (cuadrantes, coordenadas u,v ≥ 0 multiplicadas por el signo):
+## setos tras las rejas del perímetro, macizos al pie de los árboles, hiedra en los bordes hacia los
+## senderos, palmas pequeñas, una palma alta por cuadrante, agaves y matas de pasto.
+## Huella de las jardineras: [12..31]×[2.5..31] y [2.5..12]×[12..31], tapa a walk_y + 0.35, muros de 0.30.
+func _p2plants_park() -> void:
+	var r := RandomNumberGenerator.new()
+	r.seed = SEED + 303
+	var top := 0.35
+	var q := 0
+	for sx: float in [-1.0, 1.0]:
+		for sz: float in [-1.0, 1.0]:
+			var m := Vector2(sx, sz)
+			var P := func(u: float, v: float, yaw: float) -> Transform3D:
+				var w := Vector2(u, v) * m
+				return _p2plants_sheared(Transform3D(Basis(Vector3.UP, yaw), Vector3(w.x, walk_y(w.x) + top, w.y)))
+			# Setos detrás de la reja perimetral (u = 30.25 y v = 30.25), con hueco en la esquina exterior.
+			var hv := 0
+			for run in [[Vector2(30.25, 3.3), Vector2(30.25, 29.6)], [Vector2(3.3, 30.25), Vector2(29.6, 30.25)]]:
+				var a: Vector2 = run[0]
+				var b: Vector2 = run[1]
+				var l := a.distance_to(b)
+				var n := int(ceil(l / Plants.HEDGE_SEG))
+				var along := (b - a).normalized() * m
+				var yaw := atan2(-along.y, along.x)
+				for i in n:
+					var c := a.lerp(b, (i + 0.5) / n)
+					_p2plants_place("hedge_%d" % (hv % Plants.HEDGE_VARIANTS), Plants.hedge(hv % Plants.HEDGE_VARIANTS),
+						P.call(c.x, c.y, yaw).scaled_local(Vector3(l / (n * Plants.HEDGE_SEG), 1, 1)))
+					hv += 1
+				var cw := (a + b) * 0.5 * m
+				var cy := walk_y(cw.x) + top + 0.45
+				var hs := Vector3(l, 0.9, 0.7) if absf(along.x) > 0.5 else Vector3(0.7, 0.9, l)
+				var hb := Basis(Vector3.BACK, atan(SLOPE)) if absf(along.x) > 0.5 else Basis.IDENTITY
+				add_col_box(Transform3D(hb, Vector3(cw.x, cy, cw.y)), hs)
+			# Macizos al pie de los árboles (los que no quedan contra el seto).
+			for sp in [Vector2(20, 8), Vector2(17, 25.5), Vector2(7, 23), Vector2(22, 14), Vector2(9, 16), Vector2(15.5, 5.2)]:
+				var mix := r.randi() % 3
+				_p2plants_place("pbed_%d" % mix, Plants.garden_bed(3.2, 2.2, mix),
+					P.call(sp.x, sp.y, r.randf_range(-0.3, 0.3)))
+			# Hiedra en los bordes que dan a los senderos y a la plaza (franja de 1.2 m).
+			var ivy_runs := [
+				[Vector2(12.6, 3.45), Vector2(29.4, 3.45), true],    # junto al sendero E-O
+				[Vector2(3.45, 12.6), Vector2(3.45, 29.4), false],   # junto al sendero N-S
+				[Vector2(3.0, 12.95), Vector2(11.6, 12.95), true],   # hacia la plaza
+				[Vector2(12.95, 3.0), Vector2(12.95, 11.6), false],
+			]
+			for ir in ivy_runs:
+				var a2: Vector2 = ir[0]
+				var b2: Vector2 = ir[1]
+				var l2 := a2.distance_to(b2)
+				var cnt := maxi(1, int(round(l2 / 4.2)))
+				for i in cnt:
+					var c2 := a2.lerp(b2, (i + 0.5) / cnt)
+					var iv := (q + i) % 3
+					var along_u: bool = ir[2]
+					_p2plants_place("ivy_%d" % iv, Plants.ivy_patch(4.2, 1.2, iv),
+						P.call(c2.x, c2.y, 0.0 if along_u else PI * 0.5).scaled_local(Vector3(l2 / (cnt * 4.2), 1, 1)), false)
+			# Palmas pequeñas en macolla y una palma alta.
+			for sp2 in [Vector2(5.0, 14.6), Vector2(25.0, 9.8), Vector2(13.6, 28.4)]:
+				var v := r.randi() % Plants.SMALL_PALM_VARIANTS
+				_p2plants_place("spalm_%d" % v, Plants.small_palm(v), P.call(sp2.x, sp2.y, r.randf() * TAU))
+			var tp := Vector2(13.6, 20.0) * m
+			var tb := Vector3(tp.x, walk_y(tp.x) + top - 0.05, tp.y)
+			var tv := q % Plants.TALL_PALM_VARIANTS
+			_p2plants_place("palm_%d" % tv, Plants.tall_palm(tv), Transform3D(Basis(Vector3.UP, r.randf() * TAU), tb))
+			add_col_cyl(tb + Vector3(0, 1.5, 0), 0.2, 3.0)
+			# Agaves junto a la esquina de la plaza y matas de pasto alto al pie del seto.
+			for sp3 in [Vector2(4.2, 13.9), Vector2(5.6, 13.6), Vector2(13.8, 4.6)]:
+				var av := r.randi() % Plants.AGAVE_VARIANTS
+				_p2plants_place("agave_%d" % av, Plants.agave(av), P.call(sp3.x, sp3.y, r.randf() * TAU))
+			for i in 8:
+				var gu := r.randf_range(4.0, 28.0)
+				var gp := Vector2(gu, 29.4) if i % 2 == 0 else Vector2(29.4, gu)
+				var gv := r.randi() % Plants.GRASS_VARIANTS
+				_p2plants_place("grass_%d" % gv, Plants.grass_tuft(gv), P.call(gp.x, gp.y, r.randf() * TAU), false)
+			q += 1
 
 
 ## kind: 0 = verde, 1 = guayacán amarillo, 2 = guayacán rosado.
 func _tree(base: Vector3, s: float, kind: int) -> void:
-	var trunk_h := 5.0 * s
-	_mm_add("trunk", Transform3D(Basis.from_scale(Vector3(s, trunk_h, s)), base + Vector3(0, trunk_h * 0.5 - 0.1, 0)))
-	_col_cyl(base + Vector3(0, 1.5, 0), 0.25 * s, 3.0)
-	var leaf := "leaf" if kind == 0 else ("leaf_y" if kind == 1 else "leaf_p")
+	# Fase 2 (F2-01): árboles procedurales de world/props/trees.gd (Trees). Consume exactamente los
+	# mismos números de _rng que la versión anterior (1 randi + 4 randf por bloque de copa) para no
+	# alterar el resto del mapa; esos valores dan la variación (semilla, giro, escala).
 	var n := 3 + _rng.randi_range(0, 2)
-	for i in n:
-		var a := TAU * i / n + _rng.randf()
-		var r := _rng.randf_range(0.8, 1.6) * s
-		var c := base + Vector3(cos(a) * r, trunk_h + _rng.randf_range(-0.2, 1.2) * s, sin(a) * r)
-		var sc := _rng.randf_range(1.8, 2.6) * s
-		_mm_add(leaf, Transform3D(Basis.from_scale(Vector3(sc, sc * 0.75, sc)), c))
-	_mm_add(leaf, Transform3D(Basis.from_scale(Vector3(2.4, 1.9, 2.4) * s), base + Vector3(0, trunk_h + 1.4 * s, 0)))
+	var r: Array[float] = []
+	for i in n * 4:
+		r.append(_rng.randf())
+	var tk := Trees.SAMAN
+	var sc := s / 1.3
+	if kind == 1:
+		tk = Trees.GUAYACAN_AMARILLO
+	elif kind == 2:
+		tk = Trees.GUAYACAN_ROSADO
+	elif s < 1.05:
+		tk = Trees.ANDEN
+		sc = s / 0.85
+	sc *= 0.92 + 0.16 * r[2]
+	var seed := (n - 3 + int(r[3] * 3.0)) % Trees.VARIANTS
+	var xf := Transform3D(Basis(Vector3.UP, r[0] * TAU).scaled(Vector3.ONE * sc), base)
+	place_mesh("p2tree_%d_%d" % [tk, seed], Trees.mesh(tk, seed), xf)
+	add_col_cyl(base + Vector3(0, 1.5, 0), Trees.trunk_radius(tk) * sc, 3.0)
 
 
 func _build_small_furniture() -> void:
@@ -976,22 +1303,96 @@ func _build_small_furniture() -> void:
 				_hydrant(corner)
 			elif roll < 0.65:
 				_bin(corner)
+	_p2tr_bollards()
+	_p2tr_extra_signs()
+
+
+## Variante/rumbo deterministas por posición (no consumen _rng).
+func _p2tr_hash(p: Vector3) -> int:
+	return absi(int(floor(p.x * 7.31) * 73856093) ^ int(floor(p.z * 5.17) * 19349663))
+
+
+## Rumbo hacia la calzada más cercana (+Z del modelo mirando a la vía).
+func _p2tr_face_road(p: Vector3) -> Basis:
+	var best := 1e9
+	var dir := Vector3(0, 0, 1)
+	for k in _xs:
+		var dx: float = float(k.pos) - p.x
+		if absf(dx) < best:
+			best = absf(dx)
+			dir = Vector3(signf(dx), 0, 0)
+	for c in _zs:
+		var dz: float = float(c.pos) - p.z
+		if absf(dz) < best:
+			best = absf(dz)
+			dir = Vector3(0, 0, signf(dz))
+	return Basis.looking_at(-dir)
 
 
 func _bin(p: Vector3) -> void:
 	var base := Vector3(p.x, walk_y(p.x), p.z)
-	_cyl(WorldMaterials.bin_green(), base, base + Vector3(0, 0.95, 0), 0.3, 0.33, 8, true)
-	_cyl(Palette.metal_dark(), base + Vector3(0, 0.95, 0), base + Vector3(0, 1.02, 0), 0.35, 0.35, 8, true)
-	_col_cyl(base + Vector3(0, 0.5, 0), 0.34, 1.0)
+	var v := _p2tr_hash(p) % 2
+	place_mesh("p2tr_bin_%d" % v, Traffic.bin(v), Transform3D(_p2tr_face_road(p), base))
+	_col_cyl(base + Vector3(0, 0.55, 0), 0.32, 1.1)
 
 
 func _hydrant(p: Vector3) -> void:
 	var base := Vector3(p.x, walk_y(p.x), p.z)
-	var m := WorldMaterials.hydrant()
-	_cyl(m, base, base + Vector3(0, 0.6, 0), 0.15, 0.14, 8, true)
-	_cyl(m, base + Vector3(0, 0.6, 0), base + Vector3(0, 0.75, 0), 0.17, 0.06, 8, true)
-	_cyl(m, base + Vector3(-0.25, 0.42, 0), base + Vector3(0.25, 0.42, 0), 0.06, 0.06, 6, true)
-	_col_cyl(base + Vector3(0, 0.38, 0), 0.18, 0.76)
+	var v := _p2tr_hash(p) % 2
+	place_mesh("p2tr_hydrant_%d" % v, Traffic.hydrant(v), Transform3D(_p2tr_face_road(p), base))
+	_col_cyl(base + Vector3(0, 0.4, 0), 0.18, 0.8)
+
+
+## Bolardos amarillos flanqueando las cebras de los cruces que rodean el parque.
+func _p2tr_bollards() -> void:
+	for kid in ["K38", "K39"]:
+		for cid in ["C54", "C55"]:
+			var k := _street(kid)
+			var c := _street(cid)
+			var kx: float = k.pos
+			var kh: float = k.half
+			var cz: float = c.pos
+			var ch: float = c.half
+			for sx: float in [-1.0, 1.0]:
+				for sz: float in [-1.0, 1.0]:
+					for q in [Vector2(kh + 0.35, ch + 3.95), Vector2(kh + 3.95, ch + 0.35), Vector2(kh + 0.35, ch + 4.9), Vector2(kh + 4.9, ch + 0.35)]:
+						var x: float = kx + sx * q.x
+						var z: float = cz + sz * q.y
+						var v := _p2tr_hash(Vector3(x, 0, z)) % 2
+						place_mesh("p2tr_bollard_%d" % v, Traffic.bollard(v), Transform3D(Basis.IDENTITY, Vector3(x, walk_y(x), z)))
+						_col_cyl(Vector3(x, walk_y(x) + 0.45, z), 0.09, 0.9)
+
+
+func _p2tr_sign(sign_name: String, x: float, z: float, face: Vector3, top := 2.5) -> void:
+	place_mesh("p2tr_sign_%s_%d" % [sign_name, int(top * 100.0)], Traffic.sign_post_named(sign_name, top),
+		Transform3D(Basis.looking_at(-face), Vector3(x, walk_y(x), z)))
+	_col_cyl(Vector3(x, walk_y(x) + 1.2, z), 0.05, 2.4)
+
+
+## Señales sueltas: velocidad 30 en las carreras del parque, paso peatonal antes de las cebras del
+## parque, no parquear frente a la iglesia y "BAJE EN 2a" en la parte alta (oriente) del barrio.
+func _p2tr_extra_signs() -> void:
+	var off := ROAD_HALF + 0.45
+	for kx: float in [40.0, -40.0]:
+		_p2tr_sign("velocidad_30", kx + off, 74.0, Vector3(0, 0, 1))      # hacia el norte, andén este
+		var zs := -74.0
+		if fposmod(zs - (Z_MIN + 6.0), 33.0) < 0.8 or fposmod(zs - (Z_MIN + 6.0), 33.0) > 32.2:
+			zs -= 1.5
+		_p2tr_sign("velocidad_30", kx - off, zs, Vector3(0, 0, -1))      # hacia el sur, andén oeste
+	for cz: float in [-40.0, 40.0]:
+		_p2tr_sign("paso_peatonal", -57.5, cz + off, Vector3(-1, 0, 0), 2.6)
+		var xw := 57.5
+		if _p2tr_near_cable_pole(xw):
+			xw += 1.5
+		_p2tr_sign("paso_peatonal", xw, cz - off, Vector3(1, 0, 0), 2.6)
+	for x: float in [-96.0, -66.0]:
+		_p2tr_sign("no_parquear", x, -40.0 + off, Vector3(-1, 0, 0), 2.4)
+	for cid in ["C54", "C55", "C56"]:
+		var cz2: float = _street(cid).pos
+		var xb := 168.0
+		if _p2tr_near_cable_pole(xb):
+			xb += 1.5
+		_p2tr_sign("baje_en_2a", xb, cz2 - off, Vector3(1, 0, 0), 2.7)
 
 
 func _build_cones() -> void:
@@ -1313,6 +1714,32 @@ func _mm_add(kind: String, xf: Transform3D) -> void:
 				mat = Palette.foliage() if kind == "leaf" else WorldMaterials.blossom(kind == "leaf_p")
 		_mm[kind] = {"mesh": mesh, "mat": mat, "xf": [], "shadow": shadow}
 	_mm[kind].xf.append(xf)
+
+
+## API común de la Fase 2 para colocar modelos de world/props/.
+## key: nombre único del modelo+variante (p. ej. "tree_saman_0"). mesh: ArrayMesh con
+## sus materiales por superficie (se respetan; no hay material_override).
+## Todas las instancias de una key se dibujan en UN MultiMesh (pocas draw calls).
+func place_mesh(key: String, mesh: Mesh, xf: Transform3D, shadow := true) -> void:
+	if not _mm.has(key):
+		_mm[key] = {"mesh": mesh, "mat": null, "xf": [], "shadow": shadow}
+	_mm[key].xf.append(xf)
+
+
+## Para modelos que necesitan nodos propios (luces, partículas, cuerpos dinámicos, Label3D).
+## Se agregan como hijos del distrito. Úsalo con moderación (cada nodo cuesta).
+func place_node(node: Node3D, xf: Transform3D) -> void:
+	node.transform = xf
+	add_child(node)
+
+
+## Colisiones estáticas para props (capa 1). Se suman al StaticBody único del distrito.
+func add_col_box(xf: Transform3D, size: Vector3) -> void:
+	_col_box(xf, size)
+
+
+func add_col_cyl(center: Vector3, r: float, h: float) -> void:
+	_col_cyl(center, r, h)
 
 
 func _label(text: String, xf: Transform3D, color: Color, font_size: int, pixel: float) -> void:

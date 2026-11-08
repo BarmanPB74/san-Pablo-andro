@@ -403,7 +403,7 @@ func _refresh_lights() -> void:
 	for s in head_spots:
 		s.visible = on
 	if head_lens != null:
-		head_lens.material_override = Palette.headlight() if on else Palette.chrome()
+		head_lens.material_override = MatActors.headlight(2.6) if on else MatActors.headlight(0.0)
 	_set_brake_lights(is_braking and driver != null)
 
 
@@ -412,11 +412,11 @@ func _set_brake_lights(on: bool) -> void:
 		return
 	var mat: Material
 	if on:
-		mat = Palette.taillight()
+		mat = MatActors.taillight(5.0)
 	elif _lights_on:
-		mat = Palette.neon(Color(1.0, 0.08, 0.05), 1.0)
+		mat = MatActors.taillight(1.4)
 	else:
-		mat = Palette.car_paint(Color(0.35, 0.03, 0.03))
+		mat = MatActors.taillight(0.0)
 	if tail_lens.material_override != mat:
 		tail_lens.material_override = mat
 

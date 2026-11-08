@@ -73,6 +73,9 @@ def font(name, size):
     return ImageFont.truetype(FONTS[name], int(size))
 
 
+TEXT_OVERFLOW = []  # textos que no cupieron en su caja ni con la fuente mínima
+
+
 def text_mask(w, h, text, fname, max_size, box=None, ss=3):
     """Máscara [0,1] (h,w) con el texto ajustado y centrado dentro de box=(x0,y0,x1,y1)."""
     if box is None:
@@ -86,6 +89,8 @@ def text_mask(w, h, text, fname, max_size, box=None, ss=3):
         if tw <= bw * ss and th <= bh * ss:
             break
         size -= 1
+    else:
+        TEXT_OVERFLOW.append(text)
     img = Image.new("L", (w * ss, h * ss), 0)
     d = ImageDraw.Draw(img)
     cx = (box[0] + box[2]) / 2 * ss
@@ -738,9 +743,12 @@ def wear_mask(h, w, seed, amount=0.3, cells=16):
     return np.clip((n * 0.7 + n2 * 0.3 - (1 - amount)) * 8, 0, 1)
 
 
+SIGN_PAD = (4, 2)  # margen transparente (x, y) dentro de la banda 256x128: evita sangrado entre celdas en mips
+
+
 def sign_band(kind, seed):
-    """(rgb, alpha, height, rough, metal, emis) de 128x256."""
-    W, Hh = 256, 128
+    """(rgb, alpha, height, rough, metal, emis) de 128x256 (contenido 248x124 + margen SIGN_PAD)."""
+    W, Hh = 256 - 2 * SIGN_PAD[0], 128 - 2 * SIGN_PAD[1]
     yy, xx = np.mgrid[0:Hh, 0:W].astype(np.float64)
     n = noise(Hh, W, cells=8, octaves=5, seed=seed)
     emis = np.zeros((Hh, W, 3))
@@ -852,7 +860,19 @@ def sign_band(kind, seed):
         rough = 0.45 - t2 * 0.2 - poles * 0.25
         metal = t2 * 0.8
         emis = C("#ffffff") * t1[..., None] * 0.6 + C("#ffcf80") * t2[..., None] * 0.5 + rgb * poles[..., None] * 0.6
-    return rgb, alpha, hgt, rough, metal, emis
+    return _pad_band(rgb, alpha, hgt, rough, metal, emis)
+
+
+def _pad_band(*maps):
+    px, py = SIGN_PAD
+    out = []
+    for m in maps:
+        m = np.asarray(m, dtype=np.float64)
+        if m.ndim == 0:
+            m = np.full((128 - 2 * py, 256 - 2 * px), float(m))
+        pad = ((py, py), (px, px)) + (((0, 0),) if m.ndim == 3 else ())
+        out.append(np.pad(m, pad, mode="constant"))
+    return tuple(out)
 
 
 SIGN_KINDS = [
@@ -976,6 +996,30 @@ def build_signs():
     save_pbr(OUT + "/signs", np.clip(A, 0, 1), height=H, rough=np.clip(R, 0.05, 1), metal=np.clip(M, 0, 1), ao=ao,
              normal_strength=4.0, emission=np.clip(E, 0, 1))
     _rgba(OUT + "/signs_albedo.png", A, AL)
+    check_signs(AL, E, cells)
+
+
+def check_signs(AL, E, cells, margin=2):
+    """Verifica que el contenido de cada celda (alpha y emisión) quede dentro de la región que muestra
+    MatFacade.sign() (banda 256x128 centrada o celda completa) con un margen mínimo, y que todo texto quepa."""
+    S = SIGN_CELL
+    bad = []
+    occ = (AL > 0.02) | (E.max(-1) > 0.02)
+    for i, cell in cells.items():
+        r, c = divmod(i, 4)
+        y0 = r * S + (64 if cell[0] == "band" else 0)
+        y1 = y0 + (128 if cell[0] == "band" else S)
+        x0, x1 = c * S, (c + 1) * S
+        reg = occ[r * S:(r + 1) * S, x0:x1].copy()
+        reg[y0 - r * S + margin:y1 - r * S - margin, margin:S - margin] = False
+        if reg.any():
+            bad.append(f"celda {i}: contenido fuera de su región o pegado al borde")
+    for t in TEXT_OVERFLOW:
+        bad.append(f"texto no cabe: {t!r}")
+    for b in bad:
+        print("SIGNS CHECK FAIL:", b)
+    if not bad:
+        print("SIGNS CHECK OK: 16 celdas dentro de su región (margen %d px), todos los textos caben" % margin)
 
 
 # ============================================================ TOLDOS (tileables)
