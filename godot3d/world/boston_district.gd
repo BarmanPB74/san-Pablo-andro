@@ -65,6 +65,7 @@ var _mm := {}                 # nombre → {"mesh": Mesh, "mat": Material, "xf":
 var _shop_i := 0
 var _labels := 0
 var _lights := 0
+var _contact: Array[Vector4] = []   # 2.2: bases (x, y_suelo, z, radio) para ContactShadows
 var _cur_main := false
 
 
@@ -102,6 +103,7 @@ func _ready() -> void:
 	_build_bounds()
 	_p2plants_park()
 	_flush()
+	add_child(ContactShadows.build(_contact))
 
 
 # ------------------------------------------------------------------ vías
@@ -418,13 +420,16 @@ func _park_lamp(p: Vector3, with_light: bool, variant := 0) -> void:
 	place_mesh("park_lamp_%d" % (variant % 2), ParkFurniture.park_lamp(variant), Transform3D(Basis(Vector3.UP, 0.4 * float(variant)), p))
 	_col_cyl(p + Vector3(0, 0.3, 0), 0.21, 0.6)
 	_col_cyl(p + Vector3(0, 2.2, 0), 0.08, 4.4)
-	if with_light and _lights < 12:
+	if with_light and _lights < 16:
 		_lights += 1
 		var l := OmniLight3D.new()
 		l.light_color = Color(1.0, 0.75, 0.45)
-		l.light_energy = 1.4
-		l.omni_range = 11.0
+		l.light_energy = 2.0
+		l.omni_range = 12.0
 		l.shadow_enabled = false
+		l.distance_fade_enabled = true   # 2.2: luz por zonas — las lejanas se apagan solas
+		l.distance_fade_begin = 45.0
+		l.distance_fade_length = 15.0
 		l.position = p + Vector3(0, ParkFurniture.LAMP_LIGHT_Y, 0)
 		add_child(l)
 
@@ -1672,6 +1677,8 @@ func _col_cyl(center: Vector3, r: float, h: float) -> void:
 	var c := CylinderShape3D.new()
 	c.radius = r
 	c.height = h
+	if h >= 0.5 and r <= 1.0:   # 2.2: base de troncos, postes y faroles → sombra de contacto
+		_contact.append(Vector4(center.x, center.y - h * 0.5, center.z, r))
 	_col_shapes.append([c, Transform3D(Basis.IDENTITY, center)])
 
 

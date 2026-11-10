@@ -20,15 +20,21 @@ Plan gráfico anterior (fases 1-5): `PLAN_GRAFICOS.md`. El plan vigente está en
 - Sin APK todavía (a propósito): se juega desde el editor de Godot en el teléfono.
 
 ## Última sesión
-- 2.1: manchas negras en copas de árboles. Las texturas del follaje están bien (alfa y AO revisados).
-  Se apagó el mapa de normales de la copa (`normal_depth = 0` en `LEAF_SHADER`, `world/props/trees.gd`).
-  SIN VERIFICAR en el teléfono. Si siguen las manchas, la causa es otra: probar `ALPHA_SCISSOR` → `alpha_hash`
-  o revisar el post-proceso (`look/post_fx.gdshader`).
-- Semáforos: no necesitan arreglo. Tienen carcasa, 3 lentes con visera y borde reflectivo; en el video se
-  veían por detrás.
+- 2.2 (hecho, probado con capturas por software y `integration_test` PASS):
+  - Noche (`rainy_night` en `look/second_son_environment.gd`): luna 0.12→0.35, ambiente 1.1→1.6 y más claro,
+    niebla más clara, exposición 1.9→2.2. Luminancia media de la captura 13→39 (de 255).
+  - Luz por zonas: luces del parque con `distance_fade` (45 m + 15 m), 16 luces máx. (antes 12), más energía.
+    Las luminarias de calle y los locales ya tenían fade.
+  - Sombras de contacto: `look/contact_shadows.gd` (1 MultiMesh, 1 draw call). `boston_district.gd` registra la base
+    de cada cilindro de colisión (troncos, postes, faroles) y las dibuja al final de `_ready()`.
+- 2.1: manchas negras del follaje. Texturas OK; se apagó el mapa de normales de la copa (`normal_depth = 0` en
+  `LEAF_SHADER`, `world/props/trees.gd`). SIN VERIFICAR en el teléfono. Si siguen: probar `alpha_hash` o revisar
+  `look/post_fx.gdshader`.
+- Semáforos: no necesitan arreglo (carcasa, 3 lentes con visera, borde reflectivo; el video los mostraba por detrás).
+- No medido en el teléfono: FPS tras 2.2 (+4 luces, +1 draw call). Si baja de ~40 FPS, quitar luces del parque primero.
 
 ## Pendiente conocido
-- Edificios del fondo son bloques (la neblina los disimula). Noche muy oscura.
+- Edificios del fondo son bloques (la neblina los disimula).
 - Ciudad vacía: sin peatones, tráfico, policías ni ladrones.
 
 ## Cómo probar barato
