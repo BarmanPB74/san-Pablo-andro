@@ -405,52 +405,66 @@ static func _commit(am: ArrayMesh, g: Geo, mat: Material, tangents: bool) -> voi
 
 
 # ------------------------------------------------------------------ material de copa
+## Modo de diagnóstico del follaje (cambiar y mirar una copa; volver a 0 al terminar):
+## 0 = normal · 1 = color de vértice · 2 = AO de la textura · 3 = cara (verde=frente, rojo=reverso) · 4 = normal
+const LEAF_DEBUG := 0
+
 const LEAF_SHADER := """
 shader_type spatial;
-render_mode cull_disabled, depth_draw_opaque;
-// Copa de árbol: atlas MatFoliage + normales esféricas del mesh (no se voltean en la cara trasera),
+render_mode cull_disabled, depth_draw_opaque, shadows_disabled;
+// Copa de árbol: atlas MatFoliage + normales esféricas del mesh, iguales en ambas caras.
 // AO/variación por color de vértice y recoloreo a flor (COLOR.a = cantidad de flor).
+// 2.1b: la normal sale de un varying (no depende de cómo cada renderer voltea la cara trasera), sin mapa de
+// normales, sin recibir sombras (evita parches negros por auto-sombra del follaje en Mobile) y con pisos
+// mínimos de AO y color de vértice para que ninguna hoja pueda quedar negra.
 uniform sampler2D tex_albedo : source_color, filter_linear_mipmap_anisotropic;
-uniform sampler2D tex_normal : hint_normal, filter_linear_mipmap_anisotropic;
 uniform sampler2D tex_orm : hint_default_white, filter_linear_mipmap;
 uniform vec4 tint : source_color = vec4(1.0);
 uniform vec4 flower_a : source_color = vec4(1.0, 0.8, 0.1, 1.0);
 uniform vec4 flower_b : source_color = vec4(0.95, 0.65, 0.05, 1.0);
 uniform vec4 backlight_col : source_color = vec4(0.42, 0.52, 0.16, 1.0);
 uniform float wind = 1.0;
-uniform float normal_depth : hint_range(0.0, 1.0) = 0.0;
+uniform int debug_mode = 0;
+varying vec3 n_out;
 
 void vertex() {
 	float h = max(VERTEX.y - 2.5, 0.0);
 	vec3 wp = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
 	float ph = TIME * 1.4 + wp.x * 0.35 + wp.z * 0.29;
 	VERTEX.xz += vec2(sin(ph), cos(ph * 0.83)) * wind * 0.006 * h;
+	n_out = normalize(MODELVIEW_NORMAL_MATRIX * NORMAL);
 }
 
 void fragment() {
 	vec4 a = texture(tex_albedo, UV);
+	float lum = dot(a.rgb, vec3(0.3, 0.59, 0.11));
+	if (lum < 0.004) {
+		discard;   // texel casi negro (borde de compresión): nunca es hoja
+	}
 	vec3 col = a.rgb * tint.rgb;
 	float leafness = clamp((a.g / (a.r + 0.02) - 1.0) * 5.0, 0.0, 1.0) * step(a.b, a.g);
-	float lum = dot(a.rgb, vec3(0.3, 0.59, 0.11));
 	float nz = fract(sin(dot(floor(UV * 96.0), vec2(12.9898, 78.233))) * 43758.5453);
 	vec3 fl = mix(flower_a.rgb, flower_b.rgb, nz) * (0.45 + 1.9 * lum);
 	col = mix(col, fl, leafness * COLOR.a);
-	ALBEDO = col * COLOR.rgb;
+	vec3 vc = max(COLOR.rgb, vec3(0.25));
+	ALBEDO = col * vc;
 	ALPHA = a.a;
 	ALPHA_SCISSOR_THRESHOLD = 0.5;
 	vec3 orm = texture(tex_orm, UV).rgb;
-	AO = orm.r;
+	AO = clamp(orm.r, 0.35, 1.0);
 	ROUGHNESS = orm.g;
 	METALLIC = 0.0;
-	if (!FRONT_FACING) {
-		NORMAL = -NORMAL;
+	NORMAL = normalize(n_out);
+	BACKLIGHT = min(mix(backlight_col.rgb, fl * 0.5, leafness * COLOR.a) * vc, vec3(1.0));
+	if (debug_mode != 0) {
+		vec3 d = vec3(0.0);
+		if (debug_mode == 1) d = COLOR.rgb;
+		else if (debug_mode == 2) d = vec3(orm.r);
+		else if (debug_mode == 3) d = FRONT_FACING ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0);
+		else d = n_out * 0.5 + 0.5;
+		ALBEDO = vec3(0.0);
+		EMISSION = d;
 	}
-	// 2.1: el mapa de normales de la copa queda apagado (normal_depth = 0). Las normales esféricas del
-	// mesh ya dan la luz suave, y en la cara trasera la base tangente queda invertida respecto a NORMAL,
-	// lo que puede dar parches oscuros en GPU móvil. Para probar con relieve: normal_depth = 0.5.
-	NORMAL_MAP = texture(tex_normal, UV).rgb;
-	NORMAL_MAP_DEPTH = normal_depth;
-	BACKLIGHT = min(mix(backlight_col.rgb, fl * 0.5, leafness * COLOR.a) * COLOR.rgb, vec3(1.0));
 }
 """
 
@@ -465,7 +479,7 @@ static func _leaf_mat(kind: int) -> Material:
 	m.shader = _shader
 	var base := MatFoliage.BASE + "canopy_atlas"
 	m.set_shader_parameter("tex_albedo", load(base + "_albedo.png"))
-	m.set_shader_parameter("tex_normal", load(base + "_normal.png"))
+	m.set_shader_parameter("debug_mode", LEAF_DEBUG)
 	m.set_shader_parameter("tex_orm", load(base + "_orm.png"))
 	m.set_shader_parameter("backlight_col", MatFoliage.BACKLIGHT)
 	match kind:

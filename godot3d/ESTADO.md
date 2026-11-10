@@ -20,18 +20,19 @@ Plan gráfico anterior (fases 1-5): `PLAN_GRAFICOS.md`. El plan vigente está en
 - Sin APK todavía (a propósito): se juega desde el editor de Godot en el teléfono.
 
 ## Última sesión
-- 2.2 (hecho, probado con capturas por software y `integration_test` PASS):
-  - Noche (`rainy_night` en `look/second_son_environment.gd`): luna 0.12→0.35, ambiente 1.1→1.6 y más claro,
-    niebla más clara, exposición 1.9→2.2. Luminancia media de la captura 13→39 (de 255).
-  - Luz por zonas: luces del parque con `distance_fade` (45 m + 15 m), 16 luces máx. (antes 12), más energía.
-    Las luminarias de calle y los locales ya tenían fade.
-  - Sombras de contacto: `look/contact_shadows.gd` (1 MultiMesh, 1 draw call). `boston_district.gd` registra la base
-    de cada cilindro de colisión (troncos, postes, faroles) y las dibuja al final de `_ready()`.
-- 2.1: manchas negras del follaje. Texturas OK; se apagó el mapa de normales de la copa (`normal_depth = 0` en
-  `LEAF_SHADER`, `world/props/trees.gd`). SIN VERIFICAR en el teléfono. Si siguen: probar `alpha_hash` o revisar
-  `look/post_fx.gdshader`.
-- Semáforos: no necesitan arreglo (carcasa, 3 lentes con visera, borde reflectivo; el video los mostraba por detrás).
-- No medido en el teléfono: FPS tras 2.2 (+4 luces, +1 draw call). Si baja de ~40 FPS, quitar luces del parque primero.
+- 2.2 confirmado en el teléfono (capturas de día): 65-83 FPS en calle y parque. Las luces y sombras de contacto no
+  costaron FPS. La noche aún no se vio en el teléfono, solo en capturas por software (luminancia 13→39).
+  Detalle: luces del parque con `distance_fade`, tope 16; `look/contact_shadows.gd` (1 MultiMesh) dibuja la base de cada
+  cilindro de colisión registrado en `boston_district.gd`.
+- 2.1b (en prueba): las manchas negras del follaje SIGUEN en el teléfono (Mobile/Vulkan) y NO se reproducen en
+  el renderer por software (opengl3). Meshes revisados: sin NaN (`tests/foliage_mesh_check.gd`). `LEAF_SHADER` en
+  `world/props/trees.gd` reescrito a la defensiva: normal desde un varying (sin voltear cara trasera), sin mapa de
+  normales, `shadows_disabled`, pisos de AO y color de vértice, descarta texels casi negros.
+  Si SIGUEN: poner `LEAF_DEBUG = 3` (verde = frente, rojo = reverso), mirar una copa y mandar captura; luego 1, 2 y 4.
+  Cada modo descarta una causa (reverso, color de vértice, AO, normal). Volver a 0 al terminar.
+- Semáforos: no necesitan arreglo (en el video se veían por detrás).
+- Visto en las capturas y pendiente: asfalto con grano muy ruidoso junto al sardinel (foto 2), auto blanco sin detalle
+  (fase 4/5), recuadros cian en avisos pequeños (¿intencional?).
 
 ## Pendiente conocido
 - Edificios del fondo son bloques (la neblina los disimula).
