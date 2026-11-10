@@ -357,6 +357,11 @@ func _build_park() -> void:
 				_tree(Vector3(q.x, walk_y(q.x) + 0.35, q.y), _rng.randf_range(1.1, 1.5), kind)
 	# Estatua ecuestre sobre pedestal escalonado.
 	_statue()
+	# Fase 3: pila (fuente) y tarima redonda en las dos esquinas libres de la plaza central, y el león
+	# de piedra echado al pie del pedestal (mira hacia el oeste, como en las fotos).
+	ParkPlaza.build_fountain(self, Vector3(-8.0, walk_y(-8.0), 8.0))
+	ParkPlaza.build_stage(self, Vector3(8.0, walk_y(8.0), -8.0))
+	ParkPlaza.build_lion(self, Vector3(0.0, 0.0, 2.1), PI * 0.5)
 	# Bancas: de madera contra los muros de la plaza mirando a la estatua; de granito en los senderos,
 	# arrimadas al bordillo y mirando al centro del sendero. Canecas junto a ellas.
 	for ang: float in [0.0, PI * 0.5, PI, PI * 1.5]:
@@ -573,43 +578,44 @@ func _street_plate(p: Vector3, calle: String, carrera: String) -> void:
 
 # ------------------------------------------------------------------ iglesia del Sufragio
 func _build_church() -> void:
-	# Calle 55 #39-61 → cuadra entre Cra 39 y Cra 40, frente sobre la Calle 55 (mira al norte).
-	# Geometría visual neorrománica en Church (F2-05); aquí quedan podio, colisiones y entorno.
-	var xc := -72.0
-	var zf := -30.5               # línea de fachada
-	var zb := 12.0                # fondo de la nave
+	# Calle 55 #39-61. La fachada da a la Carrera 39 y MIRA AL ESTE, hacia el parque (Cra 39 es su costado
+	# oeste); la nave se extiende hacia el oeste y las torres quedan a norte y sur de la fachada (fotos de
+	# referencia). Marco local de Church: fachada a -Z local, nave a +Z. Con Basis(UP, -PI/2):
+	# local (x, y, z) → mundo (cx - z, y, cz + x).
+	var cx := -52.0                  # línea de fachada
+	var cz := -20.0                  # eje de la nave, cerca de la esquina con la Cl 55
+	var step_drop := 0.6             # 6 peldaños de 0.1 m desde el andén
+	var y0 := walk_y(cx + 3.5)       # andén al pie de la escalinata
+	var floor_y := y0 + step_drop
 	var stone := Palette.stone()
-	var floor_y := walk_y(-60.0) + 0.9
-	_excl.append(Rect2(-88.0, -36.0, 42.5, 60.0))
-	# Podio que absorbe la pendiente.
-	var podium_h := floor_y - (walk_y(-86.0) - 0.6)
-	var pod := Transform3D(Basis.IDENTITY, Vector3(xc, floor_y - podium_h * 0.5, (zf + zb + 10.0) * 0.5))
-	_box(stone, pod, Vector3(26.0, podium_h, zb + 10.0 - zf))
-	_col_box(pod, Vector3(26.0, podium_h, zb + 10.0 - zf))
-	# Escalinata hacia la Calle 55 (colisión; los peldaños de granito los dibuja Church).
-	var steps := 6
-	var base_y := walk_y(-80.0)
-	for i in steps:
-		var top := base_y + (floor_y - base_y) * float(i + 1) / steps
-		var z0 := -34.0 + 0.55 * i
-		var bot := walk_y(-86.0) - 0.5
-		var sxf := Transform3D(Basis.IDENTITY, Vector3(xc, (top + bot) * 0.5, (z0 + zf) * 0.5))
-		_col_box(sxf, Vector3(18.0, top - bot, zf - z0))
+	var xf := Transform3D(Basis(Vector3.UP, -PI * 0.5), Vector3(cx, floor_y, cz))
+	_excl.append(Rect2(cx - Church.L - 14.0, cz - 14.0, Church.L + 14.0 + 8.0, 28.0))
+	# Podio que absorbe la pendiente (el terreno baja hacia el oeste) bajo toda la nave.
+	var west_x := cx - Church.L - 10.0
+	var podium_h := floor_y - (walk_y(west_x) - 0.6)
+	var pod := Transform3D(Basis.IDENTITY, Vector3((cx + west_x) * 0.5, floor_y - podium_h * 0.5, cz))
+	_box(stone, pod, Vector3(cx - west_x, podium_h, 26.0))
+	_col_box(pod, Vector3(cx - west_x, podium_h, 26.0))
+	# Escalinata hacia la Cra 39 (colisión; los peldaños de granito los dibuja Church).
+	for i in 6:
+		var top := floor_y - step_drop + step_drop * float(i + 1) / 6.0
+		var depth := 3.5 - 0.55 * float(i)
+		_col_box(Transform3D(Basis.IDENTITY, Vector3(cx + depth * 0.5, top - 1.25, cz)), Vector3(depth, 2.5, Church.W))
 	# Iglesia: nave, ábside, torres, fachada, escalinata (mallas en MultiMesh por key).
-	Church.build(self, Transform3D(Basis.IDENTITY, Vector3(xc, floor_y, zf)), floor_y - base_y)
-	var nave_h := 15.0
-	_col_box(Transform3D(Basis.IDENTITY, Vector3(xc, floor_y + nave_h * 0.5, (zf + zb) * 0.5)), Vector3(18.0, nave_h, zb - zf))
-	_col_cyl(Vector3(xc, floor_y + 6.0, zb), 7.5, 12.0)
+	Church.build(self, xf, step_drop)
+	_col_box(xf * Transform3D(Basis.IDENTITY, Vector3(0, Church.NAVE_H * 0.5, Church.L * 0.5)), Vector3(Church.W, Church.NAVE_H, Church.L))
+	_col_cyl(xf * Vector3(0, 6.0, Church.L), 7.5, 12.0)
 	for sx: float in [-1.0, 1.0]:
-		_col_box(Transform3D(Basis.IDENTITY, Vector3(xc + sx * 8.5, floor_y + 11.0, zf + 1.8)), Vector3(5.2, 22.0, 5.2))
-	# Plazuela del Sufragio en la esquina con la Cra 39 (aproximada): baldosa, árboles, bancas.
-	_tslab(Palette.plaza_tile(), Palette.curb(), -59.0, -46.0, -34.0, 20.0, 0.02, -0.05)
-	for pz: float in [-26.0, -12.0, 2.0, 14.0]:
-		_tree(Vector3(-52.5, walk_y(-52.5), pz), _rng.randf_range(0.9, 1.2), 1 if pz == -12.0 else 0)
+		_col_box(xf * Transform3D(Basis.IDENTITY, Vector3(sx * Church.TW_X, 11.0, Church.TW_Z)), Vector3(5.2, 22.0, 5.2))
+	# Baldosa frente a la escalinata, entre la acera de la Cra 39 y el primer peldaño.
+	_tslab(Palette.plaza_tile(), Palette.curb(), cx + 2.5, -46.0, cz - 14.0, cz + 14.0, 0.02, -0.05)
+	# Faroles flanqueando la escalinata.
+	_park_lamp(Vector3(cx + 3.0, walk_y(cx + 3.0), cz - 10.5), false)
+	_park_lamp(Vector3(cx + 3.0, walk_y(cx + 3.0), cz + 10.5), false)
+	# Árboles y bancas en la acera de la Cra 39 al sur de la iglesia (frente al colegio).
+	for pz: float in [2.0, 14.0]:
+		_tree(Vector3(-52.5, walk_y(-52.5), pz), _rng.randf_range(0.9, 1.2), 0)
 		_bench(Transform3D(Basis(Vector3.UP, PI * 0.5), Vector3(-49.0, walk_y(-49.0) + 0.02, pz + 5.0)))
-	# Atrio: faroles.
-	_park_lamp(Vector3(xc - 9.5, walk_y(xc - 9.5), -33.2), false)
-	_park_lamp(Vector3(xc + 9.5, walk_y(xc + 9.5), -33.2), false)
 
 
 # ------------------------------------------------------------------ teatro (La Playa con Cra 40)
@@ -800,6 +806,8 @@ func _build_poles_and_cables() -> void:
 					clear = false
 			if absf(x) < 34.0 and absf(z) < 34.0:
 				clear = false
+			if absf(x + 44.0) < 3.0 and z > -36.0 and z < -4.0:
+				clear = false   # frente a la iglesia (fachada sobre la Cra 39)
 			if clear:
 				pts.append(Vector3(x, walk_y(x), z))
 			z += 33.0
@@ -813,8 +821,6 @@ func _build_poles_and_cables() -> void:
 			for c in _xs:
 				if absf(xx - float(c.pos)) < float(c.half) + float(c.walk) + 1.5:
 					clear2 = false
-			if xx > -88.0 and xx < -56.0 and absf(zz + 40.0) < 10.0:
-				clear2 = false   # frente a la iglesia
 			if clear2:
 				pts2.append(Vector3(xx, walk_y(xx), zz))
 			xx += 33.0
@@ -1748,6 +1754,14 @@ func add_col_box(xf: Transform3D, size: Vector3) -> void:
 
 func add_col_cyl(center: Vector3, r: float, h: float) -> void:
 	_col_cyl(center, r, h)
+
+
+## Cilindro con transformada propia (p. ej. inclinado con el terreno).
+func add_col_cyl_xf(xf: Transform3D, r: float, h: float) -> void:
+	var c := CylinderShape3D.new()
+	c.radius = r
+	c.height = h
+	_col_shapes.append([c, xf])
 
 
 func _label(text: String, xf: Transform3D, color: Color, font_size: int, pixel: float) -> void:

@@ -15,7 +15,7 @@ func _initialize() -> void:
 	cam.fov = 75.0
 	root.add_child(cam)
 	cam.current = true
-	cam.look_at_from_position(p.global_position + Vector3(4.5, 1.2, 4.5), p.global_position + Vector3(0.0, 8.5, 0.0))
+	cam.look_at_from_position(p.global_position + Vector3(7.0, 1.4, 7.0), p.global_position + Vector3(-1.0, 6.0, -1.0))
 	for i in 20: await process_frame
 	root.get_viewport().get_texture().get_image().save_png(out)
 	print("SHOT ", out)

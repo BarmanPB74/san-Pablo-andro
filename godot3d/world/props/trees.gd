@@ -447,12 +447,13 @@ void fragment() {
 	vec3 fl = mix(flower_a.rgb, flower_b.rgb, nz) * (0.45 + 1.9 * lum);
 	col = mix(col, fl, leafness * COLOR.a);
 	vec3 vc = max(COLOR.rgb, vec3(0.25));
-	ALBEDO = col * vc;
+	ALBEDO = max(col * vc, vec3(0.02, 0.035, 0.012));   // piso (lineal): ninguna hoja puede quedar negra
 	ALPHA = a.a;
 	ALPHA_SCISSOR_THRESHOLD = 0.5;
 	vec3 orm = texture(tex_orm, UV).rgb;
 	AO = clamp(orm.r, 0.35, 1.0);
-	ROUGHNESS = orm.g;
+	ROUGHNESS = clamp(orm.g, 0.6, 1.0);
+	SPECULAR = 0.2;
 	METALLIC = 0.0;
 	NORMAL = normalize(n_out);
 	BACKLIGHT = min(mix(backlight_col.rgb, fl * 0.5, leafness * COLOR.a) * vc, vec3(1.0));

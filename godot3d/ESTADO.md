@@ -19,20 +19,24 @@ Plan gráfico anterior (fases 1-5): `PLAN_GRAFICOS.md`. El plan vigente está en
 - Rendimiento medido en el editor del teléfono: ~51 FPS en el parque, ~78 FPS en la calle.
 - Sin APK todavía (a propósito): se juega desde el editor de Godot en el teléfono.
 
-## Última sesión
-- 2.2 confirmado en el teléfono (capturas de día): 65-83 FPS en calle y parque. Las luces y sombras de contacto no
-  costaron FPS. La noche aún no se vio en el teléfono, solo en capturas por software (luminancia 13→39).
-  Detalle: luces del parque con `distance_fade`, tope 16; `look/contact_shadows.gd` (1 MultiMesh) dibuja la base de cada
-  cilindro de colisión registrado en `boston_district.gd`.
-- 2.1b (en prueba): las manchas negras del follaje SIGUEN en el teléfono (Mobile/Vulkan) y NO se reproducen en
-  el renderer por software (opengl3). Meshes revisados: sin NaN (`tests/foliage_mesh_check.gd`). `LEAF_SHADER` en
-  `world/props/trees.gd` reescrito a la defensiva: normal desde un varying (sin voltear cara trasera), sin mapa de
-  normales, `shadows_disabled`, pisos de AO y color de vértice, descarta texels casi negros.
-  Si SIGUEN: poner `LEAF_DEBUG = 3` (verde = frente, rojo = reverso), mirar una copa y mandar captura; luego 1, 2 y 4.
-  Cada modo descarta una causa (reverso, color de vértice, AO, normal). Volver a 0 al terminar.
+## Última sesión (10 nov 2026) — Fase 3: pulir parque y zona
+- Manchas negras del follaje: causa hallada = celda 3 del atlas (hoja ancha) casi negra × AO de vértice. Arreglo:
+  `tools/texgen/foliage_lift.py` (gamma 0.62 en esa celda; correr después de foliage.py, es idempotente) + piso de albedo
+  en `LEAF_SHADER` (`world/props/trees.gd`). Verificado con el renderer Mobile real por software (lavapipe, ver abajo).
+  NO se pudo probar en Adreno: falta confirmar en el teléfono. Si siguen: `LEAF_DEBUG = 3/1/2/4` y mandar captura.
+- Iglesia: ahora al oeste de la Cra 39 (centro x=-52, z=-20), fachada mirando al este, al parque (`_build_church`,
+  `add_col_cyl_xf`). Color del pañete algo más rosado.
+- Nuevo `world/props/park_plaza.gd`: fuente de piedra con reja verde y adoquín hexagonal, tarima redonda de dos
+  escalones (con colisión inclinada para la pendiente) y león al pie del pedestal de Córdova.
+- Técnica de captura barata: `tests/look_shots.gd` (varias cámaras) con
+  `xvfb-run godot --rendering-method mobile --rendering-driver vulkan` + `mesa-vulkan-drivers` (lavapipe).
+- Pendiente de esta zona: paraderos de bus en Cra 39/38, guadua, sombrillas de vendedores, grano del asfalto,
+  auto blanco sin detalle, recuadros cian en avisos, noche sin ver en el teléfono. Siguiente: 2.3 edificios del fondo.
+
+## Sesión anterior
+- 2.2 confirmado en el teléfono: 65-83 FPS en calle y parque; luces del parque con `distance_fade`, tope 16;
+  `look/contact_shadows.gd` dibuja la base de cada cilindro de colisión registrado.
 - Semáforos: no necesitan arreglo (en el video se veían por detrás).
-- Visto en las capturas y pendiente: asfalto con grano muy ruidoso junto al sardinel (foto 2), auto blanco sin detalle
-  (fase 4/5), recuadros cian en avisos pequeños (¿intencional?).
 
 ## Pendiente conocido
 - Edificios del fondo son bloques (la neblina los disimula).

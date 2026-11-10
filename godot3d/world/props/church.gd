@@ -29,7 +29,7 @@ static var _dark: Material
 static func _mats() -> void:
 	if _plaster:
 		return
-	_plaster = MatPlaster.stucco(Color(0.95, 0.88, 0.74))
+	_plaster = MatPlaster.stucco(Color(0.95, 0.84, 0.72))
 	_sillar = MatStone.sillar()
 	_dark = WorldMaterials.dark_opening()
 
