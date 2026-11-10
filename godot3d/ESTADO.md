@@ -19,7 +19,19 @@ Plan gráfico anterior (fases 1-5): `PLAN_GRAFICOS.md`. El plan vigente está en
 - Rendimiento medido en el editor del teléfono: ~51 FPS en el parque, ~78 FPS en la calle.
 - Sin APK todavía (a propósito): se juega desde el editor de Godot en el teléfono.
 
-## Última sesión (10 nov 2026) — Fase 3.5: barba y estilo "tinta y papel"
+## Última sesión (10 nov 2026) — Fase 3.6: personaje nuevo (traje oscuro, alto y delgado)
+- Pablo no quedó contento con Andro y pidió un personaje basado en una ilustración de referencia: hombre alto y delgado, saco
+  negro abierto sobre camisa blanca, pantalón entubado, zapatos negros, pelo negro con copete y ojos grandes. Es una versión propia
+  adaptada al estilo realista del juego, no un calco de la ilustración (sin cabeza ni cuello exagerados).
+- Cambios en `character/player_model.gd`: piezas rehechas (saco con solapas/bolsillos/cuello, camisa con botones y cuello, cinturón,
+  pantalón con raya, manos descubiertas, zapatos negros). Piernas +6 cm (`THIGH_LEN` 0.46, `SHIN_LEN` 0.41, `HIPS_HEIGHT` 1.01),
+  brazos +10 % (`ARM_K`), cuello más largo, hombros/cintura más estrechos (helper `_sc`). Piel más clara. Ojos más grandes.
+- Barba: `BEARD_ON = false` (el concepto va afeitado); poner `true` para recuperarla. El Andro anterior queda en git (commit f260803).
+- `player.gd`: `CAPSULE_H` 1.78 → 1.86 y el centro de la cápsula ahora sale de `CAPSULE_H * 0.5` (antes 0.89 fijo; con otra altura
+  la cápsula se hundía y fallaba subir sardineles).
+- Pruebas: `character_logic_test`, `integration_test`, `all_spawns_drive_test` PASS. Sin probar en teléfono.
+
+## Sesión anterior (10 nov 2026) — Fase 3.5: barba y estilo "tinta y papel"
 - Barba completa en Andro: cáscara de pelo con volumen (`_beard_mask`, `BEARD_THICK`, `BEARD_CHIN` en `player_model.gd`):
   mejillas, patillas, bigote y mentón; los labios quedan libres. Ajustable cambiando esas constantes.
 - Nuevo preset de ambiente `tinta_y_papel` (`look/second_son_environment.gd`): paleta apagada beige-oliva, sombras suaves,

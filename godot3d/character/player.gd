@@ -35,7 +35,7 @@ signal punched(body: Node3D, idx: int)
 
 const GRAVITY_MULT := 1.35
 const CAPSULE_RADIUS := 0.3             # caída más "pesada" que la gravedad del mundo
-const CAPSULE_H := 1.78
+const CAPSULE_H := 1.86
 const CAPSULE_H_CROUCH := 1.2
 const PUNCH_DUR := [0.34, 0.38, 0.5]    # duración de cada golpe del combo
 const PUNCH_HIT := [0.12, 0.14, 0.2]    # instante en que conecta
@@ -105,7 +105,7 @@ func _ready() -> void:
 		cap.radius = CAPSULE_RADIUS
 		cap.height = CAPSULE_H
 		cs.shape = cap
-		cs.position = Vector3(0, 0.89, 0)
+		cs.position = Vector3(0, CAPSULE_H * 0.5, 0)
 		add_child(cs)
 
 	model = get_node_or_null("Model") as PlayerModel
@@ -542,7 +542,7 @@ func _update_crouch(on_floor: bool) -> void:
 		_set_crouch(false)
 
 
-## Cambia la cápsula entre de pie (1.78 m) y agachado (1.2 m). Para levantarse debe haber espacio
+## Cambia la cápsula entre de pie (1.86 m) y agachado (1.2 m). Para levantarse debe haber espacio
 ## encima (rayo contra el mundo); `force` salta esa comprobación (p. ej. al entrar a un auto).
 func _set_crouch(on: bool, force := false) -> void:
 	if on == _crouching:
