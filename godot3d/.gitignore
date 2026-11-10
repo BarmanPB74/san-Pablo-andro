@@ -1,0 +1,6 @@
+.godot/
+# Las .import de art/tex se versionan: fijan compresión VRAM, mipmaps y normal maps
+/*.import
+/tests/**/*.import
+export_presets.cfg
+/android/
