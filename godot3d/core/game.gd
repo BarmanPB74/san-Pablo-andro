@@ -2,7 +2,7 @@ extends Node3D
 ## Escena principal: ensambla los módulos de cada agente según CONTRACT.md.
 ## Se cargan por ruta (load) para que la escena no se rompa si un módulo falta.
 
-@export var time_of_day := "overcast_day"   # overcast_day | golden_hour | rainy_night
+@export var time_of_day := "overcast_day"   # overcast_day | golden_hour | rainy_night | tinta_y_papel
 
 var look: Node
 var district: Node3D

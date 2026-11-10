@@ -739,6 +739,26 @@ static func _head_keys() -> Array:
 
 
 ## Modelado fino de la cara: cuencas, arco superciliar, pómulos, surco bajo el labio.
+const BEARD_THICK := 0.0065    # espesor de la barba en mejillas (m)
+const BEARD_CHIN := 0.006      # largo extra en el mentón (m)
+
+
+## Máscara de barba en coordenadas de cabeza: x = cobertura (0–1), y = zona de mentón (largo extra).
+func _beard_mask(q: Vector3) -> Vector2:
+	var front := clampf((0.03 - q.z) / 0.05, 0.0, 1.0)
+	var ax := absf(q.x)
+	# borde superior: línea de la mejilla, que sube hacia las patillas
+	var top := 0.062 + 0.045 * clampf((ax - 0.03) / 0.04, 0.0, 1.0)
+	var mv := clampf((top - q.y) / 0.014, 0.0, 1.0)
+	var must := clampf(1.0 - ax / 0.036, 0.0, 1.0) * clampf((0.078 - q.y) / 0.008, 0.0, 1.0) \
+		* clampf((q.y - 0.061) / 0.006, 0.0, 1.0)
+	var m := maxf(mv, must)
+	var mouth := clampf(exp(-(q.x * q.x / 0.0005 + pow(q.y - 0.0575, 2.0) / 0.000035)) * 1.6, 0.0, 1.0)
+	m *= (1.0 - mouth) * front
+	var chin := clampf((0.045 - q.y) / 0.04, 0.0, 1.0) * clampf(1.0 - ax / 0.04, 0.0, 1.0) * front
+	return Vector2(m, chin)
+
+
 func _head_deform(p: Vector3) -> Vector3:
 	if p.z > -0.02:
 		return p
@@ -824,6 +844,30 @@ func _geo_head() -> void:
 		var c: Color = base.lerp(sb, clampf(k, 0.0, 1.0) * 0.9)
 		return c.lerp(hairc, burn * 0.8)
 	_loft(skin_m, rings, 28, Transform3D.IDENTITY, head_col, Callable(), _head_deform)
+
+	# Barba completa: cáscara de pelo que sobresale solo donde hay barba (el resto queda hundido
+	# dentro de la piel). Cubre mejillas, patillas, bigote y mentón; deja libres los labios.
+	var bys: Array = []
+	var byy := 0.0
+	while byy < 0.104:
+		bys.append(byy)
+		byy += 0.0055
+	var beard_rings: Array = [_r(-0.004, 0.0, 0.0, -0.05)] + _resample(keys, bys)
+	var beard_deform := func(p: Vector3) -> Vector3:
+		var q := _head_deform(p)
+		var bm := _beard_mask(q)
+		var dir := Vector2(q.x, q.z).normalized()
+		var out := lerpf(-0.016, BEARD_THICK + BEARD_CHIN * bm.y, bm.x)
+		q.x += dir.x * out
+		q.z += dir.y * out
+		q.y -= BEARD_CHIN * 1.3 * bm.y * bm.x
+		return q
+	var beard_col := func(p: Vector3) -> Color:
+		var bm := _beard_mask(p)
+		var jitter := 0.85 + 0.3 * fposmod(sin(p.x * 913.0 + p.y * 571.0 + p.z * 337.0) * 43758.5, 1.0)
+		var hc := Color(hairc.r * jitter * 1.7, hairc.g * jitter * 1.6, hairc.b * jitter * 1.5)
+		return stub.lerp(hc, smoothstep(0.15, 0.7, bm.x))
+	_loft(hair_m, beard_rings, 56, Transform3D.IDENTITY, beard_col, Callable(), beard_deform)
 
 	# Ojos: esclerótica, iris y línea de pestañas; cejas
 	var up_f := Vector3(0, 0, -1)

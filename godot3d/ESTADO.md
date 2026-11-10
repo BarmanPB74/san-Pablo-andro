@@ -19,7 +19,16 @@ Plan gráfico anterior (fases 1-5): `PLAN_GRAFICOS.md`. El plan vigente está en
 - Rendimiento medido en el editor del teléfono: ~51 FPS en el parque, ~78 FPS en la calle.
 - Sin APK todavía (a propósito): se juega desde el editor de Godot en el teléfono.
 
-## Última sesión (10 nov 2026) — Fase 3.4: fluidez y realismo del personaje
+## Última sesión (10 nov 2026) — Fase 3.5: barba y estilo "tinta y papel"
+- Barba completa en Andro: cáscara de pelo con volumen (`_beard_mask`, `BEARD_THICK`, `BEARD_CHIN` en `player_model.gd`):
+  mejillas, patillas, bigote y mentón; los labios quedan libres. Ajustable cambiando esas constantes.
+- Nuevo preset de ambiente `tinta_y_papel` (`look/second_son_environment.gd`): paleta apagada beige-oliva, sombras suaves,
+  contorno de tinta por bordes de luminancia y duotono tinta/papel (shader `post_fx.gdshader`, uniforms `ink_amount`/`paper_amount`;
+  en los otros presets valen 0 y no cuestan nada). Para usarlo: `time_of_day = "tinta_y_papel"` en el nodo Game (inspector).
+- Referencia de arte: ilustración melancólica de tonos apagados que trajo Pablo; solo se tomó la "vibra" (paleta, tinta, papel).
+  No se copió ningún personaje ni se cambiaron proporciones. No medido en teléfono (el post-fx añade 4 lecturas de pantalla).
+
+## Sesión anterior (10 nov 2026) — Fase 3.4: fluidez y realismo del personaje
 - Fluidez: la animación ya no corre a 60 Hz de física sino a cada fotograma de pantalla (`Player._process`). El modelo
   interpola posición, giro y velocidad entre los dos últimos ticks de física (`Engine.get_physics_interpolation_fraction`),
   así en 90/120 Hz no hay saltos. La animación es procedural (no hay "fotogramas" fijos): más fotogramas = evaluarla más seguido.

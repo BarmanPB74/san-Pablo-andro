@@ -9,6 +9,11 @@ uniform float vignette_softness : hint_range(0.05, 1.0) = 0.55;
 uniform vec3 vignette_color : source_color = vec3(0.0, 0.015, 0.02);
 uniform float grain_amount : hint_range(0.0, 0.2) = 0.03;
 uniform float aberration : hint_range(0.0, 0.02) = 0.0025;
+// Estilo "tinta y papel" (ilustración): 0 = apagado (look normal, sin costo extra)
+uniform float ink_amount : hint_range(0.0, 1.0) = 0.0;     // contorno de tinta en bordes de luminancia
+uniform float paper_amount : hint_range(0.0, 1.0) = 0.0;   // mezcla hacia duotono tinta/papel
+uniform vec3 ink_color : source_color = vec3(0.06, 0.055, 0.05);
+uniform vec3 paper_color : source_color = vec3(0.82, 0.79, 0.66);
 
 float hash(vec2 p) {
 	vec3 p3 = fract(vec3(p.xyx) * 0.1031);
@@ -25,6 +30,24 @@ void fragment() {
 	col.r = texture(screen_tex, uv - off).r;
 	col.g = texture(screen_tex, uv).g;
 	col.b = texture(screen_tex, uv + off).b;
+
+	if (ink_amount > 0.001 || paper_amount > 0.001) {
+		float l0 = dot(col, vec3(0.299, 0.587, 0.114));
+		vec2 px = SCREEN_PIXEL_SIZE * 1.3;
+		float lx = dot(texture(screen_tex, uv + vec2(px.x, 0.0)).rgb, vec3(0.299, 0.587, 0.114))
+			- dot(texture(screen_tex, uv - vec2(px.x, 0.0)).rgb, vec3(0.299, 0.587, 0.114));
+		float ly = dot(texture(screen_tex, uv + vec2(0.0, px.y)).rgb, vec3(0.299, 0.587, 0.114))
+			- dot(texture(screen_tex, uv - vec2(0.0, px.y)).rgb, vec3(0.299, 0.587, 0.114));
+		float edge = smoothstep(0.08, 0.26, length(vec2(lx, ly)));
+		// duotono: sombras en tinta, luces en papel; conserva un poco del color original
+		float t = smoothstep(0.0, 0.62, l0);
+		vec3 duo = mix(ink_color, paper_color, pow(t, 0.7));
+		col = mix(col, mix(duo, col, 0.3), paper_amount);
+		// textura de papel: variación suave de baja frecuencia
+		float pn = hash(floor(FRAGCOORD.xy / 3.0)) - 0.5;
+		col *= 1.0 + pn * 0.05 * paper_amount;
+		col = mix(col, ink_color, edge * ink_amount);
+	}
 
 	// grano: más visible en sombras/medios tonos, como película
 	float n = hash(FRAGCOORD.xy + fract(TIME * 7.13) * 917.0) - 0.5;

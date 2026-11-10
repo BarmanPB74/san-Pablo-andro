@@ -43,3 +43,11 @@ func set_params(vignette: float, grain: float, aberration: float,
 	mat.set_shader_parameter("grain_amount", grain)
 	mat.set_shader_parameter("aberration", aberration)
 	mat.set_shader_parameter("vignette_color", vignette_color)
+
+
+## Estilo ilustrado "tinta y papel". ink = contornos (0–1), paper = duotono tinta/papel (0–1).
+func set_ink(ink: float, paper: float) -> void:
+	if mat == null:
+		return
+	mat.set_shader_parameter("ink_amount", ink)
+	mat.set_shader_parameter("paper_amount", paper)

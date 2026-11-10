@@ -10,7 +10,7 @@ extends Node
 ## Solo funciones del renderer Mobile: sin SSR, SSAO, SSIL, SDFGI ni volumetric fog.
 
 const SKY_SHADER := "res://look/sky_clouds.gdshader"
-const PRESET_NAMES: Array[String] = ["overcast_day", "golden_hour", "rainy_night"]
+const PRESET_NAMES: Array[String] = ["overcast_day", "golden_hour", "rainy_night", "tinta_y_papel"]
 
 ## Cada preset: todos los números del look en un solo lugar para calibrar.
 const PRESETS := {
@@ -67,6 +67,26 @@ const PRESETS := {
 		"wetness": 1.0, "rain": 1.0, "reflect": Color(0.2, 0.26, 0.29),
 		"haze": Color(0.06, 0.09, 0.1), "haze_base": 0.6, "haze_top": 0.45, "night": 1.0,
 		"rain_fx": 0.85, "vignette": 0.45, "grain": 0.04, "aberration": 0.0025,
+	},
+	"tinta_y_papel": {
+		# Ilustración melancólica: paleta apagada beige-oliva, sombras suaves, contorno de tinta y grano de papel.
+		"sun_elev": 46.0, "sun_az": -40.0, "sun_color": Color(0.98, 0.95, 0.84), "sun_energy": 0.95,
+		"shadow_opacity": 0.55, "shadow_blur": 3.5,
+		"zenith": Color(0.62, 0.62, 0.52), "horizon": Color(0.80, 0.78, 0.66),
+		"ground": Color(0.3, 0.29, 0.24), "cloud_light": Color(0.88, 0.86, 0.74),
+		"cloud_dark": Color(0.6, 0.58, 0.48), "cloud_cover": 0.55, "sun_glow": 0.15,
+		"sun_disk": 0.0, "silver": 0.3, "sky_energy": 1.0,
+		"amb_color": Color(0.62, 0.6, 0.5), "amb_sky": 0.6, "amb_energy": 1.15,
+		"fog_color": Color(0.78, 0.76, 0.64), "fog_density": 0.006, "fog_sky": 0.5,
+		"fog_height": 1.5, "fog_height_density": 0.03, "fog_scatter": 0.0, "fog_aerial": 0.4,
+		"exposure": 1.55, "white": 6.0,
+		"glow": 0.2, "glow_strength": 0.8, "glow_bloom": 0.0, "glow_threshold": 1.1,
+		"contrast": 1.12, "saturation": 0.38, "brightness": 1.0,
+		"lut_shadow": Color(0.0, 0.0, -0.02), "lut_high": Color(1.04, 1.0, 0.88), "lut_amount": 1.0,
+		"wetness": 0.15, "rain": 0.0, "reflect": Color(0.7, 0.68, 0.58),
+		"haze": Color(0.78, 0.76, 0.64), "haze_base": 0.7, "haze_top": 0.4, "night": 0.0,
+		"rain_fx": 0.0, "vignette": 0.4, "grain": 0.045, "aberration": 0.0,
+		"ink": 0.6, "paper": 0.7,
 	},
 }
 
@@ -292,6 +312,7 @@ func _apply(p: Dictionary) -> void:
 		rain_fx.set_intensity(p.rain_fx)
 	if post_fx:
 		post_fx.set_params(p.vignette, p.grain, p.aberration)
+		post_fx.set_ink(float(p.get("ink", 0.0)), float(p.get("paper", 0.0)))
 
 
 # ---------------------------------------------------------------- LUT 3D
