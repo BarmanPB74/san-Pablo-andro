@@ -418,6 +418,7 @@ uniform vec4 flower_a : source_color = vec4(1.0, 0.8, 0.1, 1.0);
 uniform vec4 flower_b : source_color = vec4(0.95, 0.65, 0.05, 1.0);
 uniform vec4 backlight_col : source_color = vec4(0.42, 0.52, 0.16, 1.0);
 uniform float wind = 1.0;
+uniform float normal_depth : hint_range(0.0, 1.0) = 0.0;
 
 void vertex() {
 	float h = max(VERTEX.y - 2.5, 0.0);
@@ -444,9 +445,12 @@ void fragment() {
 	if (!FRONT_FACING) {
 		NORMAL = -NORMAL;
 	}
+	// 2.1: el mapa de normales de la copa queda apagado (normal_depth = 0). Las normales esféricas del
+	// mesh ya dan la luz suave, y en la cara trasera la base tangente queda invertida respecto a NORMAL,
+	// lo que puede dar parches oscuros en GPU móvil. Para probar con relieve: normal_depth = 0.5.
 	NORMAL_MAP = texture(tex_normal, UV).rgb;
-	NORMAL_MAP_DEPTH = 0.5;
-	BACKLIGHT = mix(backlight_col.rgb, fl * 0.5, leafness * COLOR.a) * COLOR.rgb;
+	NORMAL_MAP_DEPTH = normal_depth;
+	BACKLIGHT = min(mix(backlight_col.rgb, fl * 0.5, leafness * COLOR.a) * COLOR.rgb, vec3(1.0));
 }
 """
 
