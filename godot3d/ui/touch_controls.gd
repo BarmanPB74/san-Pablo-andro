@@ -49,6 +49,8 @@ func _layout() -> void:
 	else:
 		_add_button("jump", Vector2(s.x - 110, s.y - 110), r, "SALTO")
 		_add_button("sprint", Vector2(s.x - 250, s.y - 90), r * 0.8, "CORRER")
+		_add_button("punch", Vector2(s.x - 250, s.y - 215), r * 0.75, "GOLPE")
+		_add_button("crouch", Vector2(s.x - 395, s.y - 130), r * 0.65, "AGACHAR")
 	_add_button("interact", Vector2(s.x - 110, s.y - 380), r * 0.75, "AUTO")
 	_add_button("camera_toggle", Vector2(s.x - 70, 70), r * 0.5, "CAM")
 	_draw_root.queue_redraw()

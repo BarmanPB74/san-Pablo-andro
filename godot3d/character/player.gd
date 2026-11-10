@@ -10,6 +10,8 @@ extends CharacterBody3D
 signal entered_vehicle(vehicle: Node3D)
 signal exited_vehicle(vehicle: Node3D)
 signal stumbled(impact_kmh: float)
+## Un golpe del combo conectó con `body` (idx: 0 jab, 1 cruzado, 2 patada).
+signal punched(body: Node3D, idx: int)
 
 # ---------------- Ajustes de movimiento ----------------
 @export var walk_speed := 1.6
@@ -27,9 +29,17 @@ signal stumbled(impact_kmh: float)
 @export var step_height := 0.36
 @export var hit_speed_kmh := 15.0
 @export var interact_radius := 3.5
+@export var crouch_speed := 1.15
+@export var punch_reach := 1.15        # alcance del golpe (m) medido desde el pecho
+@export var push_speed := 1.5          # rapidez máxima empujando algo pesado
 
 const GRAVITY_MULT := 1.35
 const CAPSULE_RADIUS := 0.3             # caída más "pesada" que la gravedad del mundo
+const CAPSULE_H := 1.78
+const CAPSULE_H_CROUCH := 1.2
+const PUNCH_DUR := [0.34, 0.38, 0.5]    # duración de cada golpe del combo
+const PUNCH_HIT := [0.12, 0.14, 0.2]    # instante en que conecta
+const PUNCH_POWER := [4.5, 5.5, 9.0]    # velocidad (m/s) que recibe un objeto liviano
 
 ## Vehículo actual (VehicleBody3D que cumple la API Vehicle del contrato) o null.
 var current_vehicle: VehicleBody3D = null
@@ -56,6 +66,15 @@ var _hit_area: Area3D
 var _saved_layer := 0
 var _saved_mask := 0
 var _gravity: float = ProjectSettings.get_setting("physics/3d/default_gravity", 9.81)
+var _crouching := false
+var _punch_t := -1.0                   # <0: sin golpear
+var _punch_idx := 0
+var _punch_queued := false
+var _punch_hit_done := false
+var _combo_timer := 0.0                # tiempo restante para encadenar el siguiente golpe
+var _push_t := 0.0                     # >0 mientras empuja un objeto
+var _exit_t := 1.0                     # <0.4: animación de bajar del auto
+var _anchor_y := 1.55
 
 
 func _ready() -> void:
@@ -75,7 +94,7 @@ func _ready() -> void:
 		cs.name = "CollisionShape3D"
 		var cap := CapsuleShape3D.new()
 		cap.radius = CAPSULE_RADIUS
-		cap.height = 1.78
+		cap.height = CAPSULE_H
 		cs.shape = cap
 		cs.position = Vector3(0, 0.89, 0)
 		add_child(cs)
@@ -162,12 +181,19 @@ func _physics_process(delta: float) -> void:
 	model.position.y = _step_smooth
 	model.rotation.y = _facing
 	var hv := Vector2(velocity.x, velocity.z).length()
+	model.punch_t = _punch_t
+	model.punch_idx = _punch_idx
 	model.animate(state, hv, delta)
+	_anchor_y = lerpf(_anchor_y, 1.1 if _crouching else 1.55, 1.0 - exp(-9.0 * delta))
+	_anchor.position.y = _anchor_y
 
 
 func _process_on_foot(delta: float) -> void:
 	var on_floor := is_on_floor()
 	var input := _get_move_input()
+	_exit_t += delta
+	_push_t = maxf(0.0, _push_t - delta)
+	_combo_timer = maxf(0.0, _combo_timer - delta)
 
 	# Ir solo hacia la puerta de un auto (como en GTA)
 	if _approach_vehicle != null:
@@ -193,14 +219,33 @@ func _process_on_foot(delta: float) -> void:
 			target_speed = walk_speed
 		else:
 			target_speed = run_speed
+	_update_crouch(on_floor)
+	if _crouching:
+		target_speed = minf(target_speed, crouch_speed)
+	_update_punch(delta, on_floor)
+	if _punch_t >= 0.0:
+		target_speed = minf(target_speed, 1.0)
+	if _push_t > 0.0:
+		target_speed = minf(target_speed, push_speed)
 
 	if on_floor:
 		_ground_move(delta, input, input_len, target_speed)
-		if Input.is_action_just_pressed("jump") and not _skidding:
-			velocity.y = jump_velocity + _speed * 0.05
-			state = "jump"
-			_air_time = 0.0
-			floor_snap_length = 0.0
+		if Input.is_action_just_pressed("jump") and not _skidding and _punch_t < 0.0:
+			if _crouching:
+				_set_crouch(false)      # primero se levanta; el siguiente toque salta
+			else:
+				velocity.y = jump_velocity + _speed * 0.05
+				state = "jump"
+				_air_time = 0.0
+				floor_snap_length = 0.0
+		# Acciones que mandan sobre el paso: bajar del auto > golpear > empujar
+		if state != "jump":
+			if _exit_t < 0.4:
+				state = "exit_vehicle"
+			elif _punch_t >= 0.0:
+				state = "punch"
+			elif _push_t > 0.0 and _speed < 3.0 and state != "land":
+				state = "push"
 	else:
 		_air_move(delta, input, input_len)
 
@@ -218,6 +263,7 @@ func _process_on_foot(delta: float) -> void:
 	var pre_vel := velocity
 	move_and_slide()
 	_post_move(pre_vel, delta)
+	_handle_push(delta)
 
 	# Interactuar (entrar a vehículos)
 	if Input.is_action_just_pressed("interact"):
@@ -285,6 +331,8 @@ func _accel_for(goal: float) -> float:
 
 func _gait_state() -> String:
 	var hv := Vector2(velocity.x, velocity.z).length()
+	if _crouching:
+		return "crouch" if (hv < 0.25 and _speed < 0.25) else "crouch_walk"
 	if hv < 0.25 and _speed < 0.25:
 		return "idle"
 	if hv < 2.6:
@@ -438,10 +486,144 @@ func stumble_from(impact_velocity: Vector3, kmh := -1.0) -> void:
 	_speed = 0.0
 	_skidding = false
 	_approach_vehicle = null
+	_punch_t = -1.0
+	_set_crouch(false, true)
 	state = "stumble"
 	_stumble_timer = 0.0
 	floor_snap_length = 0.0
 	stumbled.emit(kmh)
+
+
+# =====================================================================
+#  AGACHARSE · GOLPEAR · EMPUJAR
+# =====================================================================
+
+## Alterna el agachado con la acción "crouch". Correr/sprint lo cancela.
+func _update_crouch(on_floor: bool) -> void:
+	if Input.is_action_just_pressed("crouch") and on_floor and _punch_t < 0.0:
+		_set_crouch(not _crouching)
+	elif _crouching and Input.is_action_pressed("sprint"):
+		_set_crouch(false)
+
+
+## Cambia la cápsula entre de pie (1.78 m) y agachado (1.2 m). Para levantarse debe haber espacio
+## encima (rayo contra el mundo); `force` salta esa comprobación (p. ej. al entrar a un auto).
+func _set_crouch(on: bool, force := false) -> void:
+	if on == _crouching:
+		return
+	if not on and not force:
+		var q := PhysicsRayQueryParameters3D.create(global_position + Vector3(0, CAPSULE_H_CROUCH - 0.1, 0),
+			global_position + Vector3(0, CAPSULE_H + 0.05, 0), 1)
+		q.exclude = [get_rid()]
+		if not get_world_3d().direct_space_state.intersect_ray(q).is_empty():
+			return
+	_crouching = on
+	var cs := get_node_or_null("CollisionShape3D") as CollisionShape3D
+	if cs and cs.shape is CapsuleShape3D:
+		var h := CAPSULE_H_CROUCH if on else CAPSULE_H
+		(cs.shape as CapsuleShape3D).height = h
+		cs.position.y = h * 0.5
+
+
+## Combo de 3 golpes (jab, cruzado, patada) con la acción "punch". Pulsar de nuevo hacia el final
+## de un golpe encadena el siguiente; si se deja pasar la ventana, el combo vuelve a empezar.
+func _update_punch(delta: float, on_floor: bool) -> void:
+	if _punch_t < 0.0:
+		if Input.is_action_just_pressed("punch") and on_floor and state != "land":
+			if _crouching:
+				_set_crouch(false)
+			_start_punch(0 if _combo_timer <= 0.0 else (_punch_idx + 1) % 3)
+		return
+	if Input.is_action_just_pressed("punch") and _punch_t > PUNCH_DUR[_punch_idx] * 0.4:
+		_punch_queued = true
+	_punch_t += delta
+	if not _punch_hit_done and _punch_t >= PUNCH_HIT[_punch_idx]:
+		_punch_hit_done = true
+		_punch_hit()
+	if _punch_t >= PUNCH_DUR[_punch_idx]:
+		if _punch_queued and on_floor:
+			_start_punch((_punch_idx + 1) % 3)
+		else:
+			_punch_t = -1.0
+			_combo_timer = 0.45
+
+
+func _start_punch(idx: int) -> void:
+	_punch_idx = idx
+	_punch_t = 0.0
+	_punch_queued = false
+	_punch_hit_done = false
+	_skidding = false
+	# Asistencia de puntería: se orienta hacia el objeto golpeable más cercano delante
+	var fwd := Vector3(-sin(_facing), 0.0, -cos(_facing))
+	var best: Node3D = null
+	var best_d := 2.4
+	for n in get_tree().get_nodes_in_group("props"):
+		if not (n is RigidBody3D):
+			continue
+		var to: Vector3 = (n as Node3D).global_position - global_position
+		to.y = 0.0
+		var d := to.length()
+		if d < best_d and d > 0.05 and fwd.dot(to / d) > 0.5:
+			best_d = d
+			best = n
+	if best != null:
+		var tp := best.global_position - global_position
+		_facing = atan2(-tp.x, -tp.z)
+	_speed = minf(_speed, 1.0)
+
+
+## Daño del golpe: busca cuerpos en una esfera al frente del pecho. Los objetos livianos (conos…)
+## salen despedidos; cualquier cuerpo con `take_hit(dir, power, attacker)` lo recibe (peatones futuros).
+func _punch_hit() -> void:
+	var fwd := Vector3(-sin(_facing), 0.0, -cos(_facing))
+	# Cápsula vertical al frente (cubre desde el piso hasta la cabeza): golpea conos en el piso y cuerpos de pie
+	var sph := CapsuleShape3D.new()
+	sph.radius = 0.42 if _punch_idx < 2 else 0.5
+	sph.height = 1.6
+	var q := PhysicsShapeQueryParameters3D.new()
+	q.shape = sph
+	q.transform = Transform3D(Basis.IDENTITY, global_position + Vector3(0, 0.85, 0) + fwd * punch_reach)
+	q.collision_mask = (1 << 2) | (1 << 3)
+	q.exclude = [get_rid()]
+	var hits := get_world_3d().direct_space_state.intersect_shape(q, 8)
+	for h in hits:
+		var body := h.get("collider") as Node3D
+		if body == null or body == current_vehicle or body is VehicleBody3D:
+			continue
+		var power: float = PUNCH_POWER[_punch_idx]
+		if body.has_method("take_hit"):
+			body.call("take_hit", fwd, power, self)
+		elif body is RigidBody3D:
+			var rb := body as RigidBody3D
+			rb.sleeping = false
+			rb.apply_central_impulse((fwd * power + Vector3.UP * power * 0.35) * minf(rb.mass, 20.0))
+		punched.emit(body, _punch_idx)
+
+
+## Empujar: al avanzar contra un RigidBody (no vehículo) se le transmite el movimiento; si es pesado
+## el jugador se frena y adopta la pose de empujar.
+func _handle_push(_delta: float) -> void:
+	if state == "stumble" or state == "jump" or state == "fall":
+		return
+	var fwd := Vector3(-sin(_facing), 0.0, -cos(_facing))
+	for i in get_slide_collision_count():
+		var c := get_slide_collision(i)
+		var rb := c.get_collider() as RigidBody3D
+		if rb == null or rb is VehicleBody3D:
+			continue
+		var n := c.get_normal()
+		n.y = 0.0
+		if n.length() < 0.1 or _speed < 0.25 or fwd.dot(-n.normalized()) < 0.45:
+			continue
+		rb.sleeping = false
+		# Iguala la velocidad del objeto a la del jugador (vence el rozamiento del piso)
+		var dir := -n.normalized()
+		var tv := maxf(push_speed * 0.85, minf(_speed + 0.5, 4.0)) if rb.mass <= 5.0 else push_speed * 0.85
+		var dv := maxf(0.0, tv - rb.linear_velocity.dot(dir))
+		rb.apply_central_impulse(dir * minf(rb.mass, 60.0) * dv * 0.6)
+		if rb.mass > 5.0:
+			_push_t = 0.25
 
 
 # =====================================================================
@@ -470,6 +652,8 @@ func _try_interact() -> void:
 
 
 func _begin_enter(v: VehicleBody3D) -> void:
+	_punch_t = -1.0
+	_set_crouch(false, true)
 	state = "enter_vehicle"
 	_enter_timer = 0.0
 	_entering_vehicle = v
@@ -492,7 +676,7 @@ func _process_entering(delta: float) -> void:
 		_entering_vehicle = null
 		state = "idle"
 		return
-	if _enter_timer >= 0.45:
+	if _enter_timer >= 0.6:
 		_entering_vehicle = null
 		enter_vehicle(v)
 
@@ -540,7 +724,10 @@ func exit_vehicle() -> void:
 	velocity = v.linear_velocity * 0.3
 	velocity.y = 0.0
 	_speed = 0.0
-	state = "idle"
+	state = "exit_vehicle"
+	_exit_t = 0.0
+	_crouching = false
+	_punch_t = -1.0
 	_was_on_floor = false
 	floor_snap_length = 0.45
 	model.rotation.y = _facing

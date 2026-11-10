@@ -41,6 +41,25 @@ func _ready() -> void:
 				_model(Vector3(-3.75 + i * 1.5, 0, 0), -PI * 0.5, "run", sp, i * TAU / 6.0)
 			cam.position = Vector3(0, 1.0, 9.5)
 			cam.look_at(Vector3(0, 0.9, 0))
+		"actions":
+			# Acciones de la fase 3.3 (perfil): agachado, agachado caminando, empujar, golpes 1-3, subir/bajar del auto
+			var defs := [["crouch", 0.0, 0, 0.0], ["crouch_walk", 1.1, 0, 0.9], ["push", 1.4, 0, 0.9],
+				["punch", 0.0, 0, 0.36], ["punch", 0.0, 1, 0.36], ["punch", 0.0, 2, 0.36],
+				["enter_vehicle", 0.0, 0, 0.3], ["exit_vehicle", 0.0, 0, 0.0]]
+			for i in defs.size():
+				var d: Array = defs[i]
+				var mm := PlayerModel.new()
+				mm.position = Vector3(-4.9 + i * 1.4, 0, 0)
+				mm.rotation.y = -PI * 0.5 + PI
+				add_child(mm)
+				mm.punch_idx = d[2]
+				mm.punch_t = d[3] * [0.34, 0.38, 0.5][d[2]] if d[0] == "punch" else 0.0
+				mm.snap_pose(d[0], d[1], 1.2)
+				if d[0] == "enter_vehicle" or d[0] == "exit_vehicle":
+					for f in 30:
+						mm.animate(d[0], 0.0, 1.0 / 60.0)
+			cam.position = Vector3(0, 1.0, 10.5)
+			cam.look_at(Vector3(0, 0.85, 0))
 		"night":
 			_model(Vector3(-0.6, 0, 0), deg_to_rad(150.0), "idle", 0.0, 0.0)
 			_model(Vector3(0.7, 0, 0), deg_to_rad(-40.0), "idle", 0.0, 0.0)

@@ -19,7 +19,22 @@ Plan gráfico anterior (fases 1-5): `PLAN_GRAFICOS.md`. El plan vigente está en
 - Rendimiento medido en el editor del teléfono: ~51 FPS en el parque, ~78 FPS en la calle.
 - Sin APK todavía (a propósito): se juega desde el editor de Godot en el teléfono.
 
-## Última sesión (10 nov 2026) — Fase 3.2: colegio, figura del parque, fuente/tarima, texturas
+## Última sesión (10 nov 2026) — Fase 3.3: personaje (agacharse, golpear, empujar, correr, subir/bajar del auto)
+- Agacharse (`crouch`: Ctrl/X/B, botón AGACHAR): alterna; cápsula 1.78 → 1.2 m, cámara baja, velocidad 1.15 m/s,
+  no se levanta si hay un techo encima (rayo); correr o saltar lo cancela. Estados nuevos: `crouch`, `crouch_walk`.
+- Golpear (`punch`: J/Q/X, botón GOLPE): combo de 3 (jab, cruzado, patada) encadenando toques; asistencia de puntería hacia
+  el objeto cercano; cápsula de impacto al frente: lanza conos (RigidBody del grupo `props`), llama `take_hit(dir, power,
+  attacker)` en cualquier cuerpo que lo tenga (para peatones futuros) y emite la señal `punched`. No golpea vehículos.
+- Empujar: avanzar contra un RigidBody (no vehículo) lo desplaza; si pesa >5 kg el jugador va a ≤1.5 m/s con pose `push`.
+- Correr: braceo más amplio, codos más cerrados y más inclinación al trotar. Subir al auto: animación de 0.6 s; bajar: nueva
+  animación `exit_vehicle` (0.4 s) en vez de aparecer de golpe.
+- Gráficos: chaqueta y pantalón más claros (gris carbón) para que se lean las formas; poses nuevas en el retrato
+  (`CHAR_SHOT=actions` en `tests/character_portrait.gd`). Sin cambios de malla.
+- Pruebas: `character_logic_test.gd` sección [8] (agacharse, techo bajo, golpe que lanza un cono, combo, empujar caja de 20 kg).
+- Sin probar en el teléfono. Falta: puerta del auto que se abre al entrar, golpes contra peatones (aún no existen),
+  sonido de golpes, malla más detallada (manos, ropa).
+
+## Sesión anterior (10 nov 2026) — Fase 3.2: colegio, figura del parque, fuente/tarima, texturas
 - Colegio "El Sufragio" (`world/props/school.gd`, `_build_school()`): edificio de 4 pisos (39.5 × 13 m) pegado al sur de la
   iglesia, fachada sobre la Cra 39 (x = -51), pañete crema con molduras ocre, portal en arco con puerta de hierro, balcón
   corrido, reja con portón en el antejardín, 2 árboles. La iglesia no cambió. Se quitaron los árboles/bancas viejos de ese

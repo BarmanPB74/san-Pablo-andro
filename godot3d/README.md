@@ -15,6 +15,8 @@ Esta fase incluye solo **personaje, escenario y vehículos**. Todo está constru
 | Cámara | mouse (clic para capturar, Esc libera) · stick der. | arrastrar en la mitad derecha |
 | Correr / sprint | Shift | CORRER |
 | Saltar · freno de mano | Espacio · A | SALTO · MANO |
+| Agacharse (alterna; correr lo cancela) | Ctrl · X · B | AGACHAR |
+| Golpear (combo: jab → cruzado → patada; empujar = caminar contra el objeto) | J · Q · X | GOLPE |
 | Subir / bajar del auto | F o E · Y | AUTO |
 | Acelerar · frenar/reversa (en auto) | W · S | GAS · FRENO |
 | Pito | H | PITO |

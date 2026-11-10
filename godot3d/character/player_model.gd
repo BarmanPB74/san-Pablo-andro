@@ -21,14 +21,14 @@ extends Node3D
 ## - la lleva atrás; en el tronco, x negativo = inclinarse hacia adelante.
 
 # ---------------- Colores (sRGB; van como color de vértice) ----------------
-const C_JACKET := Color(0.165, 0.172, 0.182)
-const C_JACKET_DARK := Color(0.095, 0.1, 0.108)
+const C_JACKET := Color(0.215, 0.225, 0.242)
+const C_JACKET_DARK := Color(0.125, 0.132, 0.145)
 const C_AMBER := Color(0.95, 0.58, 0.14)
 const C_HOODIE := Color(0.07, 0.2, 0.13)
 const C_HOODIE_RIB := Color(0.05, 0.15, 0.1)
 const C_SCARF_GREEN := Color(0.0, 0.43, 0.2)
 const C_SCARF_WHITE := Color(0.92, 0.93, 0.9)
-const C_PANTS := Color(0.055, 0.057, 0.062)
+const C_PANTS := Color(0.095, 0.1, 0.115)
 const C_KNEEPAD := Color(0.14, 0.145, 0.155)
 const C_SHOE := Color(0.9, 0.9, 0.88)
 const C_SOLE := Color(0.97, 0.96, 0.93)
@@ -84,6 +84,13 @@ var _turn_f := 0.0
 var _land_t := 0.0
 var _stumble_t := 0.0
 var _enter_t := 0.0
+var _exit_t := 0.0
+var _crouch_w := 0.0               # peso de la postura agachada (filtrado)
+var _push_w := 0.0                 # peso de la postura de empujar (filtrado)
+
+## Los fija Player: segundos desde que empezó el golpe actual y cuál del combo (0 jab, 1 cruzado, 2 patada).
+var punch_t := 0.0
+var punch_idx := 0
 var _air_t := 0.0
 var _gait_g := 0.0                 # mezcla caminar→correr filtrada
 var _gait_s := 0.0                 # mezcla correr→sprint filtrada
@@ -1119,7 +1126,8 @@ func _geo_foot(sx: float) -> void:
 #  ANIMACIÓN PROCEDURAL
 # =====================================================================
 
-## state: idle | walk | run | sprint | jump | fall | land | stumble | enter_vehicle
+## state: idle | walk | run | sprint | jump | fall | land | stumble | enter_vehicle | exit_vehicle |
+##        crouch | crouch_walk | punch | push
 ## speed: velocidad horizontal real (m/s). delta: paso de tiempo.
 func animate(state: String, speed: float, delta: float) -> void:
 	if not _built or delta <= 0.0:
@@ -1168,13 +1176,29 @@ func animate(state: String, speed: float, delta: float) -> void:
 			_enter_t += delta
 			rate = 9.0
 			_pose_locomotion(t, 0.0, delta)
-			_pose_enter(t)
+			_pose_enter(t, _enter_t)
+		"exit_vehicle":
+			_exit_t += delta
+			rate = 11.0
+			_pose_locomotion(t, 0.0, delta)
+			_pose_enter(t, maxf(0.0, 0.5 - _exit_t * 1.4))
 		_:
 			_air_t = 0.0
 			_pose_locomotion(t, speed, delta)
 			# Inclinación hacia la curva (todo el cuerpo pivota en los pies)
 			var roll := clampf(_turn_f * speed * 0.03, -0.32, 0.32)
 			root_rot.z = roll
+			var crouching := state == "crouch" or state == "crouch_walk"
+			_crouch_w = lerpf(_crouch_w, 1.0 if crouching else 0.0, 1.0 - exp(-10.0 * delta))
+			_push_w = lerpf(_push_w, 1.0 if state == "push" else 0.0, 1.0 - exp(-12.0 * delta))
+			if _crouch_w > 0.01:
+				_add_crouch(t, _crouch_w)
+			if _push_w > 0.01:
+				_add_push(t, _push_w)
+			if state == "punch":
+				rate = 22.0
+				var pr := _pose_punch(t)
+				root_pos += pr
 	if _land_t > 0.0 and state != "stumble":
 		_add_land(t, _land_t)
 
@@ -1207,6 +1231,8 @@ func _on_state_change(prev: String, next: String) -> void:
 		_stumble_t = 0.0
 	if next == "enter_vehicle":
 		_enter_t = 0.0
+	if next == "exit_vehicle":
+		_exit_t = 0.0
 	if next == "jump":
 		_air_t = 0.0
 
@@ -1268,7 +1294,7 @@ func _pose_locomotion(t: Dictionary, speed: float, delta: float) -> void:
 		t["foot_" + sfx] = Vector3(foot * m - (it + ik) * idle, 0.0, -0.03 * side * idle)
 
 	# ---------- Tronco ----------
-	var lean := m * (0.03 + 0.08 * g + 0.16 * s) + accel_lean * (0.4 + 0.6 * m)
+	var lean := m * (0.03 + 0.12 * g + 0.16 * s) + accel_lean * (0.4 + 0.6 * m)
 	var twist := m * lerpf(0.09, 0.16, g)
 	t["hips"] = Vector3(-lean * 0.25, -twist * sin(pl), 0.045 * sin(pl) * m * (1.0 - g) + 0.03 * idle)
 	t["spine"] = Vector3(-lean * 0.4 + 0.015 * breath * idle, twist * 0.6 * sin(pl), -0.02 * idle)
@@ -1281,9 +1307,9 @@ func _pose_locomotion(t: Dictionary, speed: float, delta: float) -> void:
 	for side in [-1, 1]:
 		var sfx := "l" if side < 0 else "r"
 		var p: float = pl if side < 0 else pr
-		var amp_a := lerpf(lerpf(0.32, 0.7, g), 1.05, s)
+		var amp_a := lerpf(lerpf(0.32, 0.85, g), 1.15, s)
 		var arm := -sin(p) * amp_a + 0.08 * g + 0.05 * s - accel_lean * 0.6
-		var elbow := lerpf(lerpf(0.22, 1.35, g), 1.6, s) + 0.18 * maxf(0.0, -sin(p)) * m
+		var elbow := lerpf(lerpf(0.22, 1.6, g), 1.75, s) + 0.22 * maxf(0.0, -sin(p)) * m
 		var out := 0.07 + 0.08 * g * m + 0.03 * breath * idle
 		t["upper_arm_" + sfx] = Vector3(arm * m + 0.04 * idle, 0.0, side * out)
 		t["forearm_" + sfx] = Vector3(elbow * m + 0.14 * idle, 0.0, 0.0)
@@ -1369,9 +1395,9 @@ func _pose_stumble(t: Dictionary) -> Array:
 	return [root_rot, root_pos, 0.0, sit_up]
 
 
-func _pose_enter(t: Dictionary) -> void:
-	# Abre la puerta y se agacha para meterse al auto (≈0.5 s)
-	var e := smoothstep(0.0, 0.35, _enter_t)
+func _pose_enter(t: Dictionary, time: float) -> void:
+	# Abre la puerta y se agacha para meterse al auto (≈0.6 s); al bajar se usa en reversa
+	var e := smoothstep(0.0, 0.4, time)
 	t["upper_arm_l"] = Vector3(1.25 * e, 0, -0.2 * e)
 	t["forearm_l"] = Vector3(0.35 * e, 0, 0)
 	t["upper_arm_r"] = Vector3(0.5 * e, 0, 0.25 * e)
@@ -1383,6 +1409,92 @@ func _pose_enter(t: Dictionary) -> void:
 	t["spine"] = Vector3(-0.35 * e, -0.2 * e, 0)
 	t["chest"] = Vector3(-0.15 * e, 0, 0)
 	t["head"] = Vector3(0.25 * e, 0, 0)
+
+
+## Agachado (rodillas y cadera flexionadas, tronco inclinado): se suma a la pose de locomoción.
+func _add_crouch(t: Dictionary, c: float) -> void:
+	var e := c * c * (3.0 - 2.0 * c)
+	for sfx in ["l", "r"]:
+		t["thigh_" + sfx] += Vector3(0.95 * e, 0, 0)
+		t["shin_" + sfx] += Vector3(-1.75 * e, 0, 0)
+		t["foot_" + sfx] += Vector3(0.8 * e, 0, 0)
+		t["upper_arm_" + sfx] += Vector3(0.3 * e, 0, 0)
+		t["forearm_" + sfx] += Vector3(0.45 * e, 0, 0)
+	t["hips"] += Vector3(-0.1 * e, 0, 0)
+	t["spine"] += Vector3(-0.22 * e, 0, 0)
+	t["chest"] += Vector3(-0.1 * e, 0, 0)
+	t["neck"] += Vector3(0.12 * e, 0, 0)
+	t["head"] += Vector3(0.2 * e, 0, 0)
+
+
+## Empujar un objeto: brazos estirados al frente, cuerpo inclinado, hombros cargados.
+func _add_push(t: Dictionary, w: float) -> void:
+	var e := w * w * (3.0 - 2.0 * w)
+	for side in [-1, 1]:
+		var sfx := "l" if side < 0 else "r"
+		t["upper_arm_" + sfx] = (t["upper_arm_" + sfx] as Vector3).lerp(Vector3(1.4, 0.0, side * 0.12), e)
+		t["forearm_" + sfx] = (t["forearm_" + sfx] as Vector3).lerp(Vector3(0.18, 0.0, 0.0), e)
+		t["hand_" + sfx] = (t["hand_" + sfx] as Vector3).lerp(Vector3(0.3, 0.0, 0.0), e)
+	t["hips"] += Vector3(-0.16 * e, 0, 0)
+	t["spine"] += Vector3(-0.24 * e, 0, 0)
+	t["chest"] += Vector3(-0.1 * e, 0, 0)
+	t["head"] += Vector3(0.28 * e, 0, 0)
+
+
+## Golpe del combo: 0 jab izquierdo, 1 cruzado derecho, 2 patada frontal. Pone los brazos/piernas
+## directamente (guardia + extensión) y devuelve el desplazamiento de root (estocada).
+func _pose_punch(t: Dictionary) -> Vector3:
+	var dur: float = [0.34, 0.38, 0.5][punch_idx]
+	var p := clampf(punch_t / dur, 0.0, 1.0)
+	var ext := smoothstep(0.08, 0.34, p) * (1.0 - smoothstep(0.5, 0.92, p))
+	# postura de guardia (escalonada, rodillas flexionadas)
+	t["thigh_l"] = Vector3(0.32, 0.0, -0.05)
+	t["shin_l"] = Vector3(-0.55, 0.0, 0.0)
+	t["foot_l"] = Vector3(0.23, 0.0, 0.0)
+	t["thigh_r"] = Vector3(-0.22, 0.0, 0.05)
+	t["shin_r"] = Vector3(-0.5, 0.0, 0.0)
+	t["foot_r"] = Vector3(0.0, 0.0, 0.0)
+	t["upper_arm_l"] = Vector3(0.85, 0.0, -0.18)
+	t["forearm_l"] = Vector3(1.55, 0.0, 0.0)
+	t["upper_arm_r"] = Vector3(0.95, 0.0, 0.2)
+	t["forearm_r"] = Vector3(1.6, 0.0, 0.0)
+	t["hand_l"] = Vector3(0.2, 0.0, 0.0)
+	t["hand_r"] = Vector3(0.2, 0.0, 0.0)
+	t["hips"] = Vector3(-0.1, 0.0, 0.0)
+	t["spine"] = Vector3(-0.14, 0.0, 0.0)
+	t["chest"] = Vector3(-0.08, 0.0, 0.0)
+	t["head"] = Vector3(0.18, 0.0, 0.0)
+	var lunge := 0.0
+	match punch_idx:
+		0:   # jab izquierdo: brazo recto a la altura del hombro, el torso gira un poco
+			t["upper_arm_l"] = Vector3(0.85 + 0.65 * ext, 0.0, -0.18 + 0.1 * ext)
+			t["forearm_l"] = Vector3(1.55 - 1.45 * ext, 0.0, 0.0)
+			t["hand_l"] = Vector3(0.2 - 0.2 * ext, 0.0, 0.0)
+			t["spine"] += Vector3(0.0, 0.3 * ext, 0.0)
+			t["chest"] += Vector3(0.0, 0.2 * ext, 0.0)
+			t["hips"] += Vector3(0.0, 0.1 * ext, 0.0)
+			lunge = 0.1 * ext
+		1:   # cruzado derecho: más giro de cadera y hombro
+			t["upper_arm_r"] = Vector3(0.95 + 0.6 * ext, -0.1 * ext, 0.2 - 0.12 * ext)
+			t["forearm_r"] = Vector3(1.6 - 1.5 * ext, 0.0, 0.0)
+			t["hand_r"] = Vector3(0.2 - 0.2 * ext, 0.0, 0.0)
+			t["spine"] += Vector3(-0.06 * ext, -0.5 * ext, 0.0)
+			t["chest"] += Vector3(0.0, -0.3 * ext, 0.0)
+			t["hips"] += Vector3(0.0, -0.3 * ext, 0.0)
+			t["thigh_r"] += Vector3(0.12 * ext, 0.0, 0.0)
+			lunge = 0.16 * ext
+		_:   # patada frontal con la pierna derecha
+			t["thigh_r"] = Vector3(-0.22 + 1.75 * ext, 0.0, 0.05)
+			t["shin_r"] = Vector3(-0.5 + 0.35 * ext, 0.0, 0.0)
+			t["foot_r"] = Vector3(0.0 + 0.5 * ext, 0.0, 0.0)
+			t["thigh_l"] = Vector3(0.32 - 0.15 * ext, 0.0, -0.05)
+			t["shin_l"] = Vector3(-0.55 - 0.25 * ext, 0.0, 0.0)
+			t["upper_arm_l"] += Vector3(0.0, 0.0, -0.5 * ext)
+			t["upper_arm_r"] += Vector3(-0.5 * ext, 0.0, 0.3 * ext)
+			t["spine"] += Vector3(0.25 * ext, 0.0, 0.0)
+			t["hips"] += Vector3(0.1 * ext, 0.0, 0.0)
+			lunge = 0.08 * ext
+	return Vector3(0.0, 0.0, -lunge)
 
 
 ## Fuerza una pose instantánea (útil al reaparecer o para retratos).

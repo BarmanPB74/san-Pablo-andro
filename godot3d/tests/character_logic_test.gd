@@ -231,5 +231,114 @@ func _run() -> void:
 	await _frames(130)
 	_check(player.state != "stumble" and player.is_on_floor(), "recuperado")
 
+	# 8) Fase 3.3: agacharse, golpear (combo) y empujar
+	print("[8] agacharse / golpear / empujar")
+	_release_all()
+	player.global_position = Vector3(60, 0.05, 30)
+	player.velocity = Vector3.ZERO
+	var cam_rig: Node = get_first_node_in_group("camera_rig")
+	var yaw: float = cam_rig.get_yaw() if cam_rig and cam_rig.has_method("get_yaw") else 0.0
+	var fwd8 := Vector3(-sin(yaw), 0.0, -cos(yaw))   # "adelante" según la cámara
+	player.set("_facing", yaw)
+	await _frames(20)
+	var cap := (player.get_node("CollisionShape3D") as CollisionShape3D).shape as CapsuleShape3D
+	await _tap("crouch")
+	await _frames(6)
+	_check(player.state == "crouch" and cap.height < 1.3, "agachado: estado %s, cápsula %.2f" % [player.state, cap.height])
+	Input.action_press("move_forward")
+	await _frames(60)
+	_check(player.state == "crouch_walk" and _hspeed() < 1.4 and _hspeed() > 0.5, "agachado caminando lento (%.2f m/s, %s)" % [_hspeed(), player.state])
+	_release_all()
+	await _frames(30)
+	# techo bajo: no puede levantarse
+	var ceil := StaticBody3D.new()
+	var ccs := CollisionShape3D.new()
+	var cb := BoxShape3D.new()
+	cb.size = Vector3(3, 0.2, 3)
+	ccs.shape = cb
+	ceil.add_child(ccs)
+	scene.add_child(ceil)
+	ceil.global_position = player.global_position + Vector3(0, 1.45, 0)
+	await _frames(3)
+	await _tap("crouch")
+	await _frames(6)
+	_check(player.state.begins_with("crouch"), "bajo un techo de 1.35 m no se levanta (%s)" % player.state)
+	ceil.queue_free()
+	await _frames(3)
+	await _tap("crouch")
+	await _frames(10)
+	_check(player.state == "idle" and cap.height > 1.7, "libre: se levanta (%s, %.2f)" % [player.state, cap.height])
+
+	# golpes: el cono sale despedido; el combo cicla jab → cruzado → patada
+	var cone := RigidBody3D.new()
+	cone.collision_layer = 1 << 3
+	cone.collision_mask = 1 | (1 << 1) | (1 << 2) | (1 << 3)
+	cone.mass = 2.5
+	cone.add_to_group("props")
+	var cshape := CollisionShape3D.new()
+	var csp := SphereShape3D.new()
+	csp.radius = 0.25
+	cshape.shape = csp
+	cone.add_child(cshape)
+	scene.add_child(cone)
+	cone.global_position = player.global_position + Vector3(0, 0.6, 0) + fwd8 * 1.1
+	await _frames(20)
+	var punched_idx: Array[int] = []
+	player.punched.connect(func(_b: Node3D, i: int) -> void: punched_idx.append(i))
+	await _tap("punch")
+	var saw_punch := false
+	for i in 30:
+		await physics_frame
+		saw_punch = saw_punch or player.state == "punch"
+	_check(saw_punch, "estado punch al golpear")
+	_check(punched_idx.size() >= 1 and (cone.linear_velocity.length() > 1.5 or cone.global_position.distance_to(player.global_position) > 2.0),
+		"el golpe lanza el cono (v=%.1f, d=%.2f)" % [cone.linear_velocity.length(), cone.global_position.distance_to(player.global_position)])
+	await _frames(60)
+	# combo: tres toques encadenados recorren jab → cruzado → patada
+	var seen := {}
+	Input.action_press("punch")
+	for f in 140:
+		await physics_frame
+		if f == 2:
+			Input.action_release("punch")
+		if f == 14 or f == 14 + 20:
+			Input.action_press("punch")
+		if f == 16 or f == 16 + 20:
+			Input.action_release("punch")
+		if player.state == "punch":
+			seen[int(player.get("_punch_idx"))] = true
+	_check(seen.has(0) and seen.has(1) and seen.has(2), "combo jab→cruzado→patada (%s)" % [seen.keys()])
+	cone.queue_free()
+	await _frames(80)
+
+	# empujar una caja pesada (20 kg)
+	player.global_position = Vector3(70, 0.05, 30)
+	player.velocity = Vector3.ZERO
+	player.set("_facing", yaw)
+	await _frames(10)
+	var box := RigidBody3D.new()
+	box.collision_layer = 1 << 3
+	box.collision_mask = 1 | (1 << 1) | (1 << 2) | (1 << 3)
+	box.mass = 20.0
+	box.add_to_group("props")
+	var bs := CollisionShape3D.new()
+	var bb := BoxShape3D.new()
+	bb.size = Vector3(0.6, 0.6, 0.6)
+	bs.shape = bb
+	box.add_child(bs)
+	scene.add_child(box)
+	box.global_position = player.global_position + Vector3(0, 0.31, 0) + fwd8 * 1.0
+	await _frames(15)
+	var p0 := box.global_position
+	Input.action_press("move_forward")
+	var saw_push := false
+	for i in 150:
+		await physics_frame
+		saw_push = saw_push or player.state == "push"
+	_release_all()
+	_check(saw_push, "estado push al empujar la caja")
+	_check(box.global_position.distance_to(p0) > 1.0, "la caja avanza empujada (%.2f m)" % box.global_position.distance_to(p0))
+	box.queue_free()
+
 	print("RESULT: ", "PASS" if fails == 0 else "FAIL (%d)" % fails)
 	quit(1 if fails > 0 else 0)

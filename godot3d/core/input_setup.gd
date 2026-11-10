@@ -14,6 +14,8 @@ const ACTIONS := {
 	"interact": [KEY_F, KEY_E],   # entrar / salir de vehículos
 	"camera_toggle": [KEY_C],     # alternar distancia de cámara
 	"horn": [KEY_H],
+	"crouch": [KEY_CTRL, KEY_X],  # a pie: agacharse (alterna)
+	"punch": [KEY_J, KEY_Q],      # a pie: golpear (combo de 3)
 }
 
 const PAD_BUTTONS := {
@@ -23,6 +25,8 @@ const PAD_BUTTONS := {
 	"sprint": JOY_BUTTON_LEFT_STICK,
 	"camera_toggle": JOY_BUTTON_RIGHT_STICK,
 	"horn": JOY_BUTTON_LEFT_SHOULDER,
+	"crouch": JOY_BUTTON_B,
+	"punch": JOY_BUTTON_X,
 }
 
 ## Vector de cámara inyectado por el HUD táctil (arrastre con el dedo).
