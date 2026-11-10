@@ -28,7 +28,7 @@ const C_HOODIE := Color(0.07, 0.2, 0.13)
 const C_HOODIE_RIB := Color(0.05, 0.15, 0.1)
 const C_SCARF_GREEN := Color(0.0, 0.43, 0.2)
 const C_SCARF_WHITE := Color(0.92, 0.93, 0.9)
-const C_PANTS := Color(0.095, 0.1, 0.115)
+const C_PANTS := Color(0.17, 0.178, 0.195)
 const C_KNEEPAD := Color(0.14, 0.145, 0.155)
 const C_SHOE := Color(0.9, 0.9, 0.88)
 const C_SOLE := Color(0.97, 0.96, 0.93)
@@ -791,7 +791,37 @@ func _geo_head() -> void:
 		k *= 1.0 - 0.6 * cheek
 		var burn := clampf((absf(p.x) - 0.058) / 0.012, 0.0, 1.0) * clampf((p.y - 0.06) / 0.04, 0.0, 1.0) \
 			* clampf((0.03 - absf(p.z + 0.005)) / 0.02, 0.0, 1.0)
-		var c: Color = skin.lerp(stub, clampf(k, 0.0, 1.0) * 0.9)
+		var base: Color = skin
+		# Sombreado de piel por zona (color de vértice): da volumen y vida a la cara
+		var fr := clampf((-p.z - 0.03) / 0.05, 0.0, 1.0)          # solo la cara frontal
+		var warm := Color(1.06, 0.9, 0.86)
+		var cool := Color(0.86, 0.82, 0.86)
+		var shade := Color.WHITE
+		for sx in [-1.0, 1.0]:
+			var ex: float = p.x - sx * 0.034
+			var ey: float = p.y - EYE_Y
+			# cuenca del ojo y ojera (más oscura/azulada debajo)
+			var socket := exp(-(ex * ex / 0.0009 + ey * ey / 0.0005))
+			var under := exp(-(ex * ex / 0.0006 + pow(ey + 0.017, 2.0) / 0.00005))
+			shade = shade.lerp(shade * cool, clampf(socket * 0.5 + under * 0.6, 0.0, 0.7) * fr)
+			# rubor de pómulo
+			var cx: float = p.x - sx * 0.05
+			var cy: float = p.y - 0.088
+			shade = shade.lerp(shade * warm, exp(-(cx * cx / 0.0008 + cy * cy / 0.0006)) * 0.55 * fr)
+			# oreja y borde de la oreja más rojizos
+			var ear := clampf((absf(p.x) - 0.078) / 0.012, 0.0, 1.0) * clampf(1.0 - absf(p.y - 0.113) / 0.04, 0.0, 1.0)
+			shade = shade.lerp(shade * Color(1.1, 0.88, 0.84), ear * 0.6)
+		# punta de la nariz y aletas más cálidas
+		var nose := exp(-(p.x * p.x / 0.00018 + pow(p.y - 0.088, 2.0) / 0.00012)) * fr
+		shade = shade.lerp(shade * Color(1.08, 0.88, 0.84), nose * 0.6)
+		# frente un poco más clara y sombra bajo la mandíbula
+		var fore := clampf((p.y - 0.155) / 0.03, 0.0, 1.0) * fr
+		shade = shade.lerp(shade * Color(1.03, 1.02, 0.98), fore * 0.7)
+		var jaw := clampf((0.03 - p.y) / 0.04, 0.0, 1.0)
+		shade = shade.lerp(shade * Color(0.78, 0.72, 0.72), jaw * 0.8)
+		base = Color(skin.r * shade.r, skin.g * shade.g, skin.b * shade.b)
+		var sb := Color(stub.r * shade.r, stub.g * shade.g, stub.b * shade.b)
+		var c: Color = base.lerp(sb, clampf(k, 0.0, 1.0) * 0.9)
 		return c.lerp(hairc, burn * 0.8)
 	_loft(skin_m, rings, 28, Transform3D.IDENTITY, head_col, Callable(), _head_deform)
 
@@ -1302,6 +1332,16 @@ func _pose_locomotion(t: Dictionary, speed: float, delta: float) -> void:
 	t["neck"] = Vector3(lean * 0.35, -twist * 0.2 * sin(pl), 0.0)
 	var look := sin(_time * 0.21) * 0.18 + sin(_time * 0.53) * 0.05
 	t["head"] = Vector3(lean * 0.35 + 0.02 * breath * idle, look * idle - twist * 0.15 * sin(pl), -0.03 * idle)
+	# Movimiento secundario (acción superpuesta): cabeza y hombros reaccionan con retraso
+	# a la aceleración y al giro; la cabeza se estabiliza contra el balanceo del torso.
+	var head_lag := clampf(-_accel_f * 0.012, -0.12, 0.12)
+	var turn_lead := clampf(_turn_f * 0.07, -0.25, 0.25)
+	t["neck"] += Vector3(head_lag * 0.5, turn_lead * 0.4, -turn_lead * 0.15)
+	t["head"] += Vector3(head_lag * 0.6 - 0.02 * m * sin(2.0 * pl + 0.6), turn_lead * 0.6, -turn_lead * 0.2 \
+		+ 0.035 * m * sin(pl) * (1.0 - 0.5 * g))
+	t["chest"] += Vector3(0.012 * m * (1.0 + g) * sin(2.0 * pl + 0.4) + 0.012 * breath * m, 0.0,
+		-0.035 * m * sin(pl) + turn_lead * 0.12)
+	t["spine"] += Vector3(0.0, 0.0, 0.02 * m * sin(pl))
 
 	# ---------- Brazos (contrapeso a las piernas) ----------
 	for side in [-1, 1]:

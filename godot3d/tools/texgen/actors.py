@@ -560,24 +560,25 @@ def gen_ripstop(S=512):
     # rejilla ripstop cada 16 px (9.4 mm), hilos dobles
     gx = np.minimum(xx % 16, 16 - xx % 16)
     gy = np.minimum(yy % 16, 16 - yy % 16)
-    grid = np.maximum(smooth(1.6, 0.4, gx), smooth(1.6, 0.4, gy))
+    grid = np.maximum(smooth(1.1, 0.3, gx), smooth(1.1, 0.3, gy))
     slub = stretched_noise(S, 0.6, 18, 601) * 0.5 + stretched_noise(S, 18, 0.6, 602) * 0.5
     # costura: dos pespuntes paralelos y pliegue de la unión (vertical, en x=256)
     seam_fold = np.exp(-(((xx - 256 + S / 2) % S - S / 2) / 5.0) ** 2)
     seam_st = stitches_line(S, 246, 0, 9, 4, 1.5) + stitches_line(S, 266, 0, 9, 4, 1.5)
     wr = wrinkles(S, 603)
-    height = weave * 0.1 + grid * 0.08 + slub * 0.06 + wr * 0.55 - seam_fold * 0.35 + seam_st * 0.2
+    wf = ridged(S, 7, 605)                      # pliegues finos de uso (codos, cintura)
+    height = weave * 0.1 + grid * 0.035 + slub * 0.06 + wr * 0.55 + wf * 0.22 - seam_fold * 0.35 + seam_st * 0.2
     base = 0.80
-    tone = base * (0.94 + 0.06 * weave) * (1 - grid * 0.03) * (0.96 + 0.06 * slub)
-    tone *= (0.94 + 0.08 * wr) * (1 - seam_fold * 0.18)
+    tone = base * (0.95 + 0.05 * weave) * (1 - grid * 0.012) * (0.96 + 0.06 * slub)
+    tone *= (0.93 + 0.08 * wr) * (0.97 + 0.04 * wf) * (1 - seam_fold * 0.18)
     tone = tone * (1 - seam_st * 0.1)
     albedo = np.dstack([tone * 1.0, tone * 1.0, tone * 1.01])
     # leve desgaste/polvo de uso
     use = smooth(0.55, 0.85, fbm(S, 4, 5, seed=604))
     albedo = lerp(albedo, albedo * srgb(250, 244, 232), use * 0.4)
-    rough = 0.52 + 0.1 * (1 - weave) + grid * 0.06 + use * 0.1 + seam_st * 0.2
-    ao = 1 - seam_fold * 0.35 - (1 - wr) * 0.08
-    return save_pbr(f"{FAM}/cloth_ripstop", albedo, height=height, rough=rough, ao=ao, normal_strength=3.5)
+    rough = 0.46 + 0.1 * (1 - weave) + grid * 0.03 + use * 0.12 + seam_st * 0.2 + 0.08 * (1 - wf)
+    ao = 1 - seam_fold * 0.35 - (1 - wr) * 0.08 - (1 - wf) * 0.05
+    return save_pbr(f"{FAM}/cloth_ripstop", albedo, height=height, rough=rough, ao=ao, normal_strength=3.2)
 
 
 def gen_knit(S=512):
@@ -602,8 +603,9 @@ def gen_knit(S=512):
     fuzz = normalize(ndimage.gaussian_filter(rng.random((S, S)), 0.7, mode="wrap"))
     pill = smooth(0.82, 0.95, fbm(S, 32, 3, seed=702)) * smooth(0.5, 0.8, fbm(S, 4, 4, seed=703))
     wr = wrinkles(S, 704)
-    height = h * 0.45 + fuzz * 0.1 + pill * 0.25 + wr * 0.5 + rowj * 0.04
-    tone = 0.80 * (0.8 + 0.2 * h) * (0.96 + 0.05 * rowj + 0.03 * colj) * (0.95 + 0.06 * fuzz) * (0.94 + 0.08 * wr)
+    wf = ridged(S, 7, 705)
+    height = h * 0.45 + fuzz * 0.12 + pill * 0.25 + wr * 0.5 + wf * 0.2 + rowj * 0.04
+    tone = 0.80 * (0.8 + 0.2 * h) * (0.96 + 0.05 * rowj + 0.03 * colj) * (0.95 + 0.06 * fuzz) * (0.93 + 0.08 * wr) * (0.97 + 0.04 * wf)
     tone = tone * (1 + pill * 0.06)
     albedo = np.dstack([tone, tone, tone])
     rough = 0.92 - h * 0.06 + pill * 0.06
@@ -626,8 +628,9 @@ def gen_twill(S=512):
     slub = normalize(ndimage.gaussian_filter(slub, 0.8, mode="wrap"))
     fade = smooth(0.45, 0.9, fbm(S, 3, 5, seed=802))      # desteñido por uso
     wr = wrinkles(S, 803)
-    height = ridge * 0.35 + cross * 0.06 + slub * 0.1 + wr * 0.55
-    tone = 0.78 * (0.82 + 0.2 * ridge) * (0.95 + 0.07 * slub) * (0.94 + 0.08 * wr)
+    wf = ridged(S, 7, 805)
+    height = ridge * 0.35 + cross * 0.06 + slub * 0.1 + wr * 0.55 + wf * 0.22
+    tone = 0.78 * (0.82 + 0.2 * ridge) * (0.95 + 0.07 * slub) * (0.93 + 0.08 * wr) * (0.97 + 0.04 * wf)
     tone = tone + fade * 0.04 * ridge
     albedo = np.dstack([tone, tone * 1.0, tone * 1.005])
     rough = 0.86 + 0.06 * (1 - ridge) + fade * 0.04
@@ -635,32 +638,55 @@ def gen_twill(S=512):
     return save_pbr(f"{FAM}/cloth_twill", albedo, height=height, rough=rough, ao=ao, normal_strength=3.5)
 
 
-def gen_skin(S=512):
-    """Piel con poros sutiles. 1 tile = 0.12 m (0.23 mm/px). Neutro cálido claro (tintar con el tono)."""
+def gen_skin(S=1024):
+    """Piel v2. 1 tile = 0.12 m (0.12 mm/px a 1024). Neutro cálido claro (se tiñe con el tono).
+    Poros a dos escalas, red de pliegues romboidales, vellosidad, venitas y subdermis rojiza/amarilla."""
     rng = np.random.default_rng(901)
+    k = S // 512
+    # poros: pocos y marcados + muchos finos
     pores = np.zeros((S, S))
-    for _ in range(5200):
+    for _ in range(5200 * k * k):
         y, x = rng.integers(0, S, 2)
         pores[y, x] = 0.6 + 0.4 * rng.random()
-    pores = np.clip(ndimage.gaussian_filter(pores, 0.9, mode="wrap") * 5, 0, 1)
-    # micro arrugas cruzadas (dos direcciones)
-    l1 = stretched_noise(S, 0.7, 10, 902)
-    l2 = stretched_noise(S, 10, 0.7, 903)
-    lines = smooth(0.6, 0.8, np.maximum(l1, l2))
-    cells = fast_worley(S, 260, 904)
+    pores_f = np.clip(ndimage.gaussian_filter(pores, 0.9 * k, mode="wrap") * 5 * k, 0, 1)
+    fine = np.zeros((S, S))
+    for _ in range(26000 * k * k):
+        y, x = rng.integers(0, S, 2)
+        fine[y, x] = 0.4 + 0.6 * rng.random()
+    fine = np.clip(ndimage.gaussian_filter(fine, 0.55 * k, mode="wrap") * 4 * k, 0, 1)
+    # red de pliegues romboidales (dos familias de líneas en diagonal, con ruido)
+    yy, xx = np.mgrid[0:S, 0:S].astype(np.float64)
+    wob = fbm(S, 6, 3, seed=910) * 14 * k
+    d1 = ((xx + yy + wob) % (30 * k)) / (30 * k)
+    d2 = ((xx - yy + wob) % (30 * k)) / (30 * k)
+    l1 = np.exp(-((d1 - 0.5) / 0.035) ** 2)
+    l2 = np.exp(-((d2 - 0.5) / 0.035) ** 2)
+    fade_l = smooth(0.35, 0.75, fbm(S, 4, 4, seed=911))
+    net = np.maximum(l1, l2) * fade_l
+    lines = smooth(0.6, 0.8, np.maximum(stretched_noise(S, 0.7 * k, 10 * k, 902), stretched_noise(S, 10 * k, 0.7 * k, 903)))
+    cells = fast_worley(S, 260 * k * k, 904)
     blot = fbm(S, 3, 5, seed=905)
-    red = smooth(0.5, 0.85, fbm(S, 6, 4, seed=906))
+    red = smooth(0.45, 0.85, fbm(S, 6, 4, seed=906))
+    yel = smooth(0.5, 0.85, fbm(S, 5, 4, seed=912))
     freckle = smooth(0.86, 0.95, fbm(S, 48, 2, seed=907)) * 0.6
-    height = 0.6 + cells * 0.12 - pores * 0.2 - lines * 0.08 + fbm(S, 64, 2, seed=908) * 0.05
+    # venitas tenues (azulado/violeta) y capilares
+    vein = np.exp(-((fbm(S, 5, 3, seed=913) - 0.5) / 0.018) ** 2) * smooth(0.4, 0.7, fbm(S, 3, 3, seed=914))
+    hair = ndimage.gaussian_filter(rng.random((S, S)), 0.5 * k, mode="wrap")
+    hair = smooth(0.62, 0.7, normalize(hair)) * smooth(0.4, 0.8, fbm(S, 8, 3, seed=915))
+    height = 0.6 + cells * 0.12 - pores_f * 0.22 - fine * 0.08 - lines * 0.08 - net * 0.14 \
+        + fbm(S, 64, 2, seed=908) * 0.05 + hair * 0.03
     base = srgb(236, 214, 200)
     albedo = np.broadcast_to(base, (S, S, 3)).copy()
-    albedo *= (0.95 + 0.06 * blot)[..., None]
-    albedo = lerp(albedo, albedo * srgb(255, 236, 230), red * 0.35)     # rubor/capilares
-    albedo = lerp(albedo, albedo * srgb(224, 204, 190), freckle * 0.4)
-    albedo *= (1 - pores * 0.08)[..., None]
-    rough = 0.5 + 0.12 * fbm(S, 4, 4, seed=909) + pores * 0.15 + lines * 0.05
-    ao = 1 - pores * 0.25
-    return save_pbr(f"{FAM}/skin", albedo, height=height, rough=rough, ao=ao, normal_strength=2.0)
+    albedo *= (0.93 + 0.1 * blot)[..., None]
+    albedo = lerp(albedo, albedo * srgb(255, 232, 226), red * 0.45)       # rubor / capilares
+    albedo = lerp(albedo, albedo * srgb(250, 244, 214), yel * 0.25)       # matices amarillentos
+    albedo = lerp(albedo, albedo * srgb(224, 204, 190), freckle * 0.45)   # pecas
+    albedo = lerp(albedo, albedo * srgb(226, 226, 236), vein * 0.28)      # venas
+    albedo *= (1 - pores_f * 0.10 - fine * 0.035 - net * 0.05)[..., None]
+    albedo *= (1 - hair * 0.04)[..., None]
+    rough = 0.46 + 0.14 * fbm(S, 4, 4, seed=909) + pores_f * 0.15 + lines * 0.05 + net * 0.06 - 0.05 * red
+    ao = 1 - pores_f * 0.25 - net * 0.1
+    return save_pbr(f"{FAM}/skin", albedo, height=height, rough=rough, ao=ao, normal_strength=2.6)
 
 
 def gen_sneaker(S=512):

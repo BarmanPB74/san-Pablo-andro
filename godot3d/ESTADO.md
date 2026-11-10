@@ -19,7 +19,18 @@ Plan gráfico anterior (fases 1-5): `PLAN_GRAFICOS.md`. El plan vigente está en
 - Rendimiento medido en el editor del teléfono: ~51 FPS en el parque, ~78 FPS en la calle.
 - Sin APK todavía (a propósito): se juega desde el editor de Godot en el teléfono.
 
-## Última sesión (10 nov 2026) — Fase 3.3: personaje (agacharse, golpear, empujar, correr, subir/bajar del auto)
+## Última sesión (10 nov 2026) — Fase 3.4: fluidez y realismo del personaje
+- Fluidez: la animación ya no corre a 60 Hz de física sino a cada fotograma de pantalla (`Player._process`). El modelo
+  interpola posición, giro y velocidad entre los dos últimos ticks de física (`Engine.get_physics_interpolation_fraction`),
+  así en 90/120 Hz no hay saltos. La animación es procedural (no hay "fotogramas" fijos): más fotogramas = evaluarla más seguido.
+- Movimiento secundario (`_pose_locomotion`): cabeza y cuello reaccionan con retraso a aceleración y giro, la cabeza se
+  estabiliza contra el balanceo del torso, hombros con contra-rotación y respiración al caminar.
+- Texturas: piel v2 1024 px (poros a 2 escalas, red de pliegues, vellosidad, venitas, rubor y matices; normal_scale 0.85);
+  cara con color de vértice (ojeras/cuencas, rubor de pómulo, nariz y orejas más cálidas, sombra bajo la mandíbula);
+  ripstop con rejilla más fina y tenue + pliegues finos de uso (también en buzo y cargo); pantalón un poco más claro.
+- Pruebas: `character_logic_test`, `integration_test`, `all_spawns_drive_test` PASS. No medido en teléfono (solo lavapipe).
+
+## Sesión anterior (10 nov 2026) — Fase 3.3: personaje (agacharse, golpear, empujar, correr, subir/bajar del auto)
 - Agacharse (`crouch`: Ctrl/X/B, botón AGACHAR): alterna; cápsula 1.78 → 1.2 m, cámara baja, velocidad 1.15 m/s,
   no se levanta si hay un techo encima (rayo); correr o saltar lo cancela. Estados nuevos: `crouch`, `crouch_walk`.
 - Golpear (`punch`: J/Q/X, botón GOLPE): combo de 3 (jab, cruzado, patada) encadenando toques; asistencia de puntería hacia

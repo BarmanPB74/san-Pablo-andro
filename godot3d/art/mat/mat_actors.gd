@@ -138,7 +138,7 @@ static func cargo_twill(tint := Color.WHITE, uv_scale := Vector3(2.0, 1.6, 1.0))
 ## Piel con poros sutiles y variación (neutro cálido claro). tile_m = 0.12.
 ## Pasar el tono como tint (p. ej. PlayerModel.SKIN_TONE o STUBBLE_TONE). Default para la cabeza (SphereMesh r~0.1).
 static func skin(tint := Color.WHITE, uv_scale := Vector3(5.0, 2.5, 1.0)) -> Material:
-	return TexMat.pbr(DIR + "skin", {"triplanar": false, "uv_scale": uv_scale, "tint": tint, "normal_scale": 0.6})
+	return TexMat.pbr(DIR + "skin", {"triplanar": false, "uv_scale": uv_scale, "tint": tint, "normal_scale": 0.85})
 
 
 ## Tenis: cuero sintético perforado arriba (v 0..0.64), goma de suela abajo (v 0.66..1). tile_m = 0.25 en u.

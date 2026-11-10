@@ -59,6 +59,15 @@ var _approach_vehicle: VehicleBody3D = null
 var _approach_timer := 0.0
 var _entering_vehicle: VehicleBody3D = null
 var _step_smooth := 0.0                # compensación visual al subir escalones
+# Interpolación visual: la física corre a 60 Hz pero la pantalla (p. ej. 120 Hz) se
+# redibuja más seguido. El modelo se anima y se desplaza entre ticks para que no "salte".
+var _vp_prev := Vector3.ZERO
+var _vp_cur := Vector3.ZERO
+var _vf_prev := 0.0
+var _vf_cur := 0.0
+var _vh_prev := 0.0
+var _vh_cur := 0.0
+var _vp_ready := false
 var _was_on_floor := true
 var _air_time := 0.0
 var _anchor: Marker3D
@@ -164,6 +173,7 @@ func is_in_vehicle() -> bool:
 func _physics_process(delta: float) -> void:
 	if current_vehicle != null:
 		_process_in_vehicle()
+		_vp_ready = false
 		return
 
 	match state:
@@ -176,16 +186,42 @@ func _physics_process(delta: float) -> void:
 
 	_check_vehicle_hits()
 
-	# Animación
-	_step_smooth = lerpf(_step_smooth, 0.0, 1.0 - exp(-12.0 * delta))
-	model.position.y = _step_smooth
-	model.rotation.y = _facing
+	# Muestras para la interpolación visual (ver _process)
 	var hv := Vector2(velocity.x, velocity.z).length()
-	model.punch_t = _punch_t
-	model.punch_idx = _punch_idx
-	model.animate(state, hv, delta)
+	if not _vp_ready or global_position.distance_squared_to(_vp_cur) > 4.0:
+		_vp_prev = global_position
+		_vf_prev = _facing
+		_vh_prev = hv
+		_vp_ready = true
+	else:
+		_vp_prev = _vp_cur
+		_vf_prev = _vf_cur
+		_vh_prev = _vh_cur
+	_vp_cur = global_position
+	_vf_cur = _facing
+	_vh_cur = hv
 	_anchor_y = lerpf(_anchor_y, 1.1 if _crouching else 1.55, 1.0 - exp(-9.0 * delta))
 	_anchor.position.y = _anchor_y
+
+
+## Animación a la frecuencia de la pantalla: interpola posición, giro y velocidad entre
+## los dos últimos ticks de física y avanza los pasos con el delta real del fotograma.
+func _process(delta: float) -> void:
+	if current_vehicle != null or not _vp_ready or not visible:
+		return
+	var dt := 1.0 / float(Engine.physics_ticks_per_second)
+	var a := clampf(Engine.get_physics_interpolation_fraction(), 0.0, 1.0)
+	_step_smooth = lerpf(_step_smooth, 0.0, 1.0 - exp(-12.0 * delta))
+	var off := (_vp_prev - _vp_cur) * (1.0 - a)
+	model.position = Vector3(0.0, _step_smooth, 0.0) + global_transform.basis.inverse() * off
+	model.rotation.y = lerp_angle(_vf_prev, _vf_cur, a)
+	var hv := lerpf(_vh_prev, _vh_cur, a)
+	var pt := _punch_t
+	if pt >= 0.0:
+		pt = maxf(0.0, pt - (1.0 - a) * dt)
+	model.punch_t = pt
+	model.punch_idx = _punch_idx
+	model.animate(state, hv, delta)
 
 
 func _process_on_foot(delta: float) -> void:
@@ -713,6 +749,7 @@ func exit_vehicle() -> void:
 	current_vehicle = null
 	global_position = pos + Vector3.UP * 0.05
 	_facing = v.global_rotation.y
+	_vp_ready = false
 	visible = true
 	collision_layer = _saved_layer
 	collision_mask = _saved_mask
