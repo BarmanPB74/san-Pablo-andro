@@ -27,6 +27,14 @@ const Z_MAX: float = 262.0
 const CHUNKS: int = 2
 const SEED: int = 1955
 const MAX_SHOP_LABELS: int = 46
+# Parque de Boston (F3.2): ochava de las esquinas y plazoletas. Ajustables sin tocar nada más.
+const PARK_CUT: float = 7.0                       # cateto de la ochava en la línea de jardineras (31 m)
+const PARK_K: float = 62.0 - PARK_CUT             # en coords de cuadrante la ochava es u + v = PARK_K
+const PARK_OUT_K: float = PARK_K + 3.0 * 1.41421356   # misma ochava en el borde de la manzana (±34)
+const PLZ_C: float = 21.0                         # distancia del centro de cada plazoleta a la estatua
+const PLZ_R: float = 7.5                          # radio de la plazoleta
+const PLZ_W := Vector2(-PLZ_C, 0.0)               # plazoleta oeste (lado iglesia, Cra 39): fuente
+const PLZ_N := Vector2(0.0, -PLZ_C)               # plazoleta norte (Calle 55): tarima
 
 const CARRERAS := [43, 42, 41, 40, 39, 38, 37, 36]  # de oeste a este
 const CALLES := [58, 57, 56, 55, 54, 53, 52]        # de norte a sur
@@ -92,6 +100,7 @@ func _ready() -> void:
 	_build_markings()
 	_build_park()
 	_build_church()
+	_build_school()
 	_build_theatre()
 	_build_blocks()
 	_build_poles_and_cables()
@@ -347,7 +356,7 @@ func _build_park() -> void:
 		for sz: float in [-1.0, 1.0]:
 			for p in spots:
 				var jitter := Vector2(_rng.randf_range(-1.5, 1.5), _rng.randf_range(-1.5, 1.5))
-				var q: Vector2 = (p + jitter) * Vector2(sx, sz)
+				var q: Vector2 = _p2park_keep_tree((p + jitter) * Vector2(sx, sz))
 				var kind := 0
 				var roll := _rng.randf()
 				if roll < 0.15:
@@ -357,18 +366,24 @@ func _build_park() -> void:
 				_tree(Vector3(q.x, walk_y(q.x) + 0.35, q.y), _rng.randf_range(1.1, 1.5), kind)
 	# Estatua ecuestre sobre pedestal escalonado.
 	_statue()
-	# Fase 3: pila (fuente) y tarima redonda en las dos esquinas libres de la plaza central, y el león
-	# de piedra echado al pie del pedestal (mira hacia el oeste, como en las fotos).
-	ParkPlaza.build_fountain(self, Vector3(-8.0, walk_y(-8.0), 8.0))
-	ParkPlaza.build_stage(self, Vector3(8.0, walk_y(8.0), -8.0))
+	# Fase 3.2: la pila (fuente) en la plazoleta del lado de la iglesia (oeste, Cra 39) y la tarima redonda
+	# en la plazoleta del lado de la Calle 55 (norte); el león echado al pie del pedestal (mira al oeste).
+	ParkPlaza.build_fountain(self, Vector3(PLZ_W.x, walk_y(PLZ_W.x), PLZ_W.y))
+	ParkPlaza.build_stage(self, Vector3(PLZ_N.x, walk_y(PLZ_N.x), PLZ_N.y))
 	ParkPlaza.build_lion(self, Vector3(0.0, 0.0, 2.1), PI * 0.5)
 	# Bancas: de madera contra los muros de la plaza mirando a la estatua; de granito en los senderos,
-	# arrimadas al bordillo y mirando al centro del sendero. Canecas junto a ellas.
+	# arrimadas al bordillo y mirando al centro del sendero. Canecas junto a ellas. Los senderos oeste
+	# y norte terminan en plazoleta: allí las bancas van en corro alrededor de la fuente / la tarima.
+	var ai := 0
 	for ang: float in [0.0, PI * 0.5, PI, PI * 1.5]:
 		var b := Basis(Vector3.UP, ang)
 		for u in [-7.0, 7.0]:
 			var p := b * Vector3(u, 0, 11.45)
 			_bench(Transform3D(b * Basis(Vector3.UP, PI), Vector3(p.x, walk_y(p.x), p.z)))
+		var plz_arm := ai == 2 or ai == 3   # norte (PI) y oeste (3PI/2)
+		ai += 1
+		if plz_arm:
+			continue
 		var k := 1
 		for d in [17.0, 25.0]:
 			var p2 := b * Vector3(2.05, 0, d)
@@ -378,6 +393,22 @@ func _build_park() -> void:
 		_p2park_bin(Transform3D(b * Basis(Vector3.UP, PI), Vector3(pb.x, walk_y(pb.x), pb.z)))
 		var pb2 := b * Vector3(2.0, 0, 21.0)
 		_p2park_bin(Transform3D(b * Basis(Vector3.UP, -PI * 0.5), Vector3(pb2.x, walk_y(pb2.x), pb2.z)))
+	for sp in [[PLZ_W, Vector2(1, 0)], [PLZ_N, Vector2(0, 1)]]:
+		var pc: Vector2 = sp[0]
+		var ax: Vector2 = sp[1]
+		var pp := Vector2(-ax.y, ax.x)
+		var kb := 1
+		for deg in [55.0, 125.0, 235.0, 305.0]:
+			var ph := deg_to_rad(deg)
+			var rel := ax * cos(ph) + pp * sin(ph)
+			var bp := pc + rel * 5.0
+			_bench(Transform3D(Basis(Vector3.UP, atan2(-rel.x, -rel.y)), Vector3(bp.x, walk_y(bp.x), bp.y)), kb)
+			kb = 3 - kb
+		for deg in [90.0, 270.0]:
+			var ph2 := deg_to_rad(deg)
+			var rel2 := ax * cos(ph2) + pp * sin(ph2)
+			var bb := pc + rel2 * 6.4
+			_p2park_bin(Transform3D(Basis(Vector3.UP, atan2(-rel2.x, -rel2.y)), Vector3(bb.x, walk_y(bb.x), bb.y)))
 	# Faroles del parque (linterna en los senderos, globo en las esquinas de la plaza).
 	var lamp_pos: Array = []
 	for d in [16.0, 27.0]:
@@ -471,86 +502,251 @@ func _p2park_col_line(a: Vector2, b: Vector2, h: float, w: float) -> void:
 	_col_box(Transform3D(bas, Vector3(c.x, walk_y(c.x) + h * 0.5, c.y)), size)
 
 
-## Jardineras en L: tapa de pasto a +0.35 (misma huella de siempre, ver README_mapa "Jardineras del parque"),
-## muros de pizarra de 0.30 × 0.45, reja baja verde y bordillo hacia los senderos hexagonales.
+## Jardineras del parque (F3.2): una por cuadrante, polígono en L con ochava (chaflán) en la esquina
+## exterior y, en los cuadrantes del lado oeste (fuente) y norte (tarima), una muesca circular que
+## abre la plazoleta. Tapa de pasto a +0.35, muro de pizarra de 0.30 × 0.45, reja baja verde y
+## bordillo hacia los senderos.
 func _p2park_planters() -> void:
+	for sx: float in [-1.0, 1.0]:
+		for sz: float in [-1.0, 1.0]:
+			_p2park_planter(_p2park_l_poly(Vector2(sx, sz)))
+
+
+## Puntos de un arco (centro c, radio r) de a0 a a1 (rad), sin los extremos.
+func _p2park_arc(c: Vector2, r: float, a0: float, a1: float, n: int) -> Array:
+	var out: Array = []
+	for i in range(1, n):
+		var a := lerpf(a0, a1, float(i) / n)
+		out.append(c + Vector2(cos(a), sin(a)) * r)
+	return out
+
+
+## Polígono de la jardinera del cuadrante m (±1, ±1) en coordenadas de mundo.
+## Cada elemento: [punto, ¿reja y bordillo en la arista que sale de ese punto?].
+func _p2park_l_poly(m: Vector2) -> Array:
+	var r := PLZ_R
+	var w := sqrt(r * r - 2.5 * 2.5)
+	var pts: Array = []
+	pts.append([Vector2(12.0, 2.5), true])
+	if m.x < 0.0:   # muesca de la plazoleta oeste (fuente): centro (u=PLZ_C, v=0)
+		pts.append([Vector2(PLZ_C - w, 2.5), true])
+		for p: Vector2 in _p2park_arc(Vector2(PLZ_C, 0.0), r, PI - asin(2.5 / r), asin(2.5 / r), 10):
+			pts.append([p, true])
+		pts.append([Vector2(PLZ_C + w, 2.5), true])
+	pts.append([Vector2(31.0, 2.5), true])
+	pts.append([Vector2(31.0, PARK_K - 31.0), true])
+	pts.append([Vector2(PARK_K - 31.0, 31.0), true])
+	pts.append([Vector2(2.5, 31.0), true])
+	if m.y < 0.0:   # muesca de la plazoleta norte (tarima): centro (u=0, v=PLZ_C)
+		var al := asin(w / r)
+		pts.append([Vector2(2.5, PLZ_C + w), true])
+		for p: Vector2 in _p2park_arc(Vector2(0.0, PLZ_C), r, al, -al, 10):
+			pts.append([p, true])
+		pts.append([Vector2(2.5, PLZ_C - w), true])
+	pts.append([Vector2(2.5, 12.0), false])
+	pts.append([Vector2(12.0, 12.0), false])
+	for e in pts:
+		e[0] = (e[0] as Vector2) * m
+	return pts
+
+
+func _p2park_planter(pts: Array) -> void:
 	var wall := ParkFurniture.planter_wall()
 	var fence := ParkFurniture.fence_segment()
 	var curb := ParkFurniture.path_curb()
 	var t := ParkFurniture.WALL_T * 0.5
-	for sx: float in [-1.0, 1.0]:
-		for sz: float in [-1.0, 1.0]:
-			var m := Vector2(sx, sz)
-			for r in [[12.0, 31.0, 2.5, 31.0], [2.5, 12.0, 12.0, 31.0]]:
-				var xa: float = sx * r[0]
-				var xb: float = sx * r[1]
-				var za: float = sz * r[2]
-				var zb: float = sz * r[3]
-				_tilted_top(MatGround.pasto(), minf(xa, xb), maxf(xa, xb), minf(za, zb), maxf(za, zb), 0.35, true, false)
-			# Bordes: [inicio, fin, normal hacia dentro, ¿reja y bordillo?]
-			var edges := [
-				[Vector2(2.5, 12), Vector2(12, 12), Vector2(0, 1), false],
-				[Vector2(12, 2.5), Vector2(12, 12), Vector2(1, 0), false],
-				[Vector2(12, 2.5), Vector2(31, 2.5), Vector2(0, 1), true],
-				[Vector2(31, 2.5), Vector2(31, 31), Vector2(-1, 0), true],
-				[Vector2(2.5, 31), Vector2(31, 31), Vector2(0, -1), true],
-				[Vector2(2.5, 12), Vector2(2.5, 31), Vector2(1, 0), true],
-			]
-			for e in edges:
-				var n: Vector2 = e[2] * m
-				var a: Vector2 = e[0] * m + n * t
-				var b: Vector2 = e[1] * m + n * t
-				place_mesh("park_wall", wall, _p2park_line(a, b, 0.0, a.distance_to(b)))
-				var fenced: bool = e[3]
-				_p2park_col_line(a, b, ParkFurniture.WALL_H + (ParkFurniture.FENCE_H if fenced else 0.0), ParkFurniture.WALL_T)
-				if fenced:
-					var ca: Vector2 = e[0] * m - n * 0.08
-					var cb: Vector2 = e[1] * m - n * 0.08
-					place_mesh("park_curb", curb, _p2park_line(ca, cb, 0.0, ca.distance_to(cb)), false)
-			# Esquina entrante (12, 12).
-			var cc := Vector2(12.0 + t, 12.0 + t) * m
-			place_mesh("park_wall_corner", ParkFurniture.planter_corner(), Transform3D(Basis.IDENTITY, Vector3(cc.x, walk_y(cc.x), cc.y)))
-			# Rejas sobre el eje de los muros (los tramos encadenan postes en las esquinas).
-			var runs := [
-				[Vector2(12 + t, 2.5 + t), Vector2(31 - t, 2.5 + t)],
-				[Vector2(31 - t, 2.5 + t), Vector2(31 - t, 31 - t)],
-				[Vector2(2.5 + t, 31 - t), Vector2(31 - t, 31 - t)],
-				[Vector2(2.5 + t, 12 + t), Vector2(2.5 + t, 31 - t)],
-			]
-			for rn in runs:
-				var a: Vector2 = rn[0] * m
-				var b: Vector2 = rn[1] * m
-				var l := a.distance_to(b)
-				var cnt := maxi(1, roundi(l / ParkFurniture.FENCE_LEN))
-				var s := l / (cnt * ParkFurniture.FENCE_LEN)
-				for i in cnt:
-					var p := a.lerp(b, float(i) / cnt)
-					place_mesh("park_fence", fence, _p2park_line(p, b, ParkFurniture.WALL_H, s))
-			var pe := Vector2(31 - t, 31 - t) * m
-			place_mesh("park_fence_post", ParkFurniture.fence_post(), Transform3D(Basis.IDENTITY, Vector3(pe.x, walk_y(pe.x) + ParkFurniture.WALL_H, pe.y)))
+	var n := pts.size()
+	var poly := PackedVector2Array()
+	var cen := Vector2.ZERO
+	for e in pts:
+		poly.append(e[0])
+		cen += e[0] as Vector2
+	cen /= n
+	var area := 0.0
+	for i in n:
+		var a0: Vector2 = poly[i]
+		var b0: Vector2 = poly[(i + 1) % n]
+		area += a0.x * b0.y - b0.x * a0.y
+	var ori := signf(area)
+	# Tapa de pasto (triangulada, con colisión).
+	var idx := Geometry2D.triangulate_polygon(poly)
+	var st := _st(MatGround.pasto(), Vector3(cen.x, 0, cen.y), false)
+	var nt := Vector3(-SLOPE, 1.0, 0.0).normalized()
+	for k in range(0, idx.size(), 3):
+		var tri: Array = []
+		for j in 3:
+			var q: Vector2 = poly[idx[k + j]]
+			tri.append(Vector3(q.x, SLOPE * q.x + 0.35, q.y))
+		_tri(st, tri[0], tri[1], tri[2], nt)
+		_col_tri(tri[0], tri[1], tri[2], nt)
+	# Direcciones, normales hacia dentro y puntos de inglete (cruce de los ejes de los muros).
+	var dirs: Array[Vector2] = []
+	var nin: Array[Vector2] = []
+	for i in n:
+		var d: Vector2 = (poly[(i + 1) % n] - poly[i]).normalized()
+		dirs.append(d)
+		nin.append(Vector2(-d.y, d.x) * ori)
+	var mit: Array[Vector2] = []
+	for i in n:
+		var n1: Vector2 = nin[(i + n - 1) % n]
+		var n2: Vector2 = nin[i]
+		mit.append(poly[i] + (n1 + n2) * t / (1.0 + n1.dot(n2)))
+	for i in n:
+		var a: Vector2 = poly[i]
+		var b: Vector2 = poly[(i + 1) % n]
+		var fenced: bool = pts[i][1]
+		var wa := a + nin[i] * t
+		var wb := b + nin[i] * t
+		var l := a.distance_to(b)
+		place_mesh("park_wall", wall, _p2park_line(wa, wb, 0.0, l))
+		var h := ParkFurniture.WALL_H + (ParkFurniture.FENCE_H if fenced else 0.0)
+		if absf(dirs[i].x) > 0.999 or absf(dirs[i].y) > 0.999:
+			_p2park_col_line(wa, wb, h, ParkFurniture.WALL_T)
+		else:
+			_p2park_col_dir(wa, wb, h, ParkFurniture.WALL_T)
+		if not fenced:
+			continue
+		var ca := a - nin[i] * 0.08
+		var cb := b - nin[i] * 0.08
+		place_mesh("park_curb", curb, _p2park_line(ca, cb, 0.0, ca.distance_to(cb)), false)
+		var s0: Vector2 = mit[i]
+		var s1: Vector2 = mit[(i + 1) % n]
+		var fl := s0.distance_to(s1)
+		var cnt := maxi(1, roundi(fl / ParkFurniture.FENCE_LEN))
+		var sc := fl / (cnt * ParkFurniture.FENCE_LEN)
+		for j in cnt:
+			var p := s0.lerp(s1, float(j) / cnt)
+			place_mesh("park_fence", fence, _p2park_line(p, s1, ParkFurniture.WALL_H, sc))
+		var next_fenced: bool = pts[(i + 1) % n][1]
+		if not next_fenced:
+			place_mesh("park_fence_post", ParkFurniture.fence_post(), Transform3D(Basis.IDENTITY, Vector3(s1.x, walk_y(s1.x) + ParkFurniture.WALL_H, s1.y)))
+	# Pilares en las esquinas donde los muros no se encuentran de frente (reentrantes y ochavas).
+	for i in n:
+		var d1: Vector2 = dirs[(i + n - 1) % n]
+		var d2: Vector2 = dirs[i]
+		var turn := rad_to_deg(absf(d1.angle_to(d2)))
+		var convex := d1.cross(d2) * ori > 0.0
+		if turn < 20.0 or (convex and turn > 80.0):
+			continue
+		var cc: Vector2 = mit[i]
+		place_mesh("park_wall_corner", ParkFurniture.planter_corner(),
+			Transform3D(Basis(Vector3.UP, atan2(-d2.y, d2.x)), Vector3(cc.x, walk_y(cc.x), cc.y)))
 
 
-## Pisos del parque sobre la losa de la manzana: plaza en espina de pescado, senderos hexagonales,
-## bordillos en la boca de los senderos y en el borde con el andén perimetral.
+## Caja de colisión a lo largo de a→b con cualquier dirección (sin inclinación).
+func _p2park_col_dir(a: Vector2, b: Vector2, h: float, w: float) -> void:
+	var c := (a + b) * 0.5
+	var d := Vector3(b.x - a.x, 0, b.y - a.y)
+	var l := d.length()
+	d /= l
+	_col_box(Transform3D(Basis(d, Vector3.UP, d.cross(Vector3.UP)), Vector3(c.x, walk_y(c.x) + h * 0.5, c.y)), Vector3(l, h, w))
+
+
+func _col_tri(a: Vector3, b: Vector3, c: Vector3, n: Vector3) -> void:
+	if (b - a).cross(c - a).dot(n) > 0.0:
+		var t := b
+		b = c
+		c = t
+	_col_faces.append_array([a, b, c])
+
+
+## Polígono plano sobre el piso inclinado (y = SLOPE·x + off), triangulado.
+func _tilted_poly(mat: Material, poly: PackedVector2Array, off: float) -> void:
+	var idx := Geometry2D.triangulate_polygon(poly)
+	var cen := Vector2.ZERO
+	for p in poly:
+		cen += p
+	cen /= poly.size()
+	var st := _st(mat, Vector3(cen.x, 0, cen.y), false)
+	var n := Vector3(-SLOPE, 1.0, 0.0).normalized()
+	for k in range(0, idx.size(), 3):
+		var v: Array = []
+		for j in 3:
+			var q: Vector2 = poly[idx[k + j]]
+			v.append(Vector3(q.x, SLOPE * q.x + off, q.y))
+		_tri(st, v[0], v[1], v[2], n)
+
+
+## ¿El punto de mundo p cae dentro de alguna plazoleta (con margen)?
+func _p2park_in_plz(p: Vector2, margin: float) -> bool:
+	return p.distance_to(PLZ_W) < PLZ_R + margin or p.distance_to(PLZ_N) < PLZ_R + margin
+
+
+## Árboles: fuera de las plazoletas y de las ochavas.
+func _p2park_keep_tree(q: Vector2) -> Vector2:
+	for c: Vector2 in [PLZ_W, PLZ_N]:
+		var d := q - c
+		if d.length() < PLZ_R + 1.6:
+			q = c + (d.normalized() if d.length() > 0.01 else Vector2(1, 0)) * (PLZ_R + 1.6)
+	var s := absf(q.x) + absf(q.y)
+	if s > PARK_K - 3.0:
+		q *= (PARK_K - 3.0) / s
+	return q
+
+
+## Pisos del parque sobre la losa de la manzana: plaza en espina de pescado (±12), adoquín hexagonal
+## en senderos y anillo, ochavas de concreto en las 4 esquinas de la manzana, pisos de laja de las
+## plazoletas (fuente y tarima) y bordillos.
 func _p2park_pavers() -> void:
 	var hb := MatPaving.herringbone_pavers()
 	var hx := MatPaving.hex_pavers()
 	var off := 0.012
+	var c := PARK_OUT_K - 34.0
 	_tilted_top(hb, -12.0, 12.0, -12.0, 12.0, off, false, false)
+	# Adoquín hexagonal: dos franjas N y S con las esquinas cortadas, y dos laterales.
 	for s: float in [-1.0, 1.0]:
-		_tilted_top(hx, -2.5, 2.5, minf(12.0 * s, 31.0 * s), maxf(12.0 * s, 31.0 * s), off, false, false)
-		_tilted_top(hx, minf(12.0 * s, 31.0 * s), maxf(12.0 * s, 31.0 * s), -2.5, 2.5, off, false, false)
-		_tilted_top(hx, -34.0, 34.0, minf(31.0 * s, 34.0 * s), maxf(31.0 * s, 34.0 * s), off, false, false)
-		_tilted_top(hx, minf(31.0 * s, 34.0 * s), maxf(31.0 * s, 34.0 * s), -31.0, 31.0, off, false, false)
+		_tilted_poly(hx, PackedVector2Array([Vector2(-c, -34.0 * s), Vector2(c, -34.0 * s), Vector2(34.0, -c * s),
+			Vector2(34.0, -12.0 * s), Vector2(-34.0, -12.0 * s), Vector2(-34.0, -c * s)]), off)
+		_tilted_top(hx, minf(12.0 * s, 34.0 * s), maxf(12.0 * s, 34.0 * s), -12.0, 12.0, off, false, false)
+	# Ochavas: la esquina de la manzana se corta y el andén de concreto la rellena.
+	var conc := MatPaving.sidewalk_concrete()
 	var curb := ParkFurniture.path_curb()
+	for sx: float in [-1.0, 1.0]:
+		for sz: float in [-1.0, 1.0]:
+			_tilted_poly(conc, PackedVector2Array([Vector2(34.0 * sx, c * sz), Vector2(c * sx, 34.0 * sz), Vector2(34.0 * sx, 34.0 * sz)]), off)
+			var da := Vector2(34.0 * sx, c * sz)
+			var db := Vector2(c * sx, 34.0 * sz)
+			place_mesh("park_curb", curb, _p2park_line(da, db, 0.0, da.distance_to(db)), false)
+	# Bordillos: boca de cada sendero y borde con el andén perimetral (cortado en las ochavas).
+	var ce := c - 0.08
 	for s: float in [-1.0, 1.0]:
-		# boca de cada sendero (cambio de espina de pescado a hexagonal)
 		place_mesh("park_curb", curb, _p2park_line(Vector2(-2.5, 12.0 * s), Vector2(2.5, 12.0 * s), 0.0, 5.0), false)
 		place_mesh("park_curb", curb, _p2park_line(Vector2(12.0 * s, -2.5), Vector2(12.0 * s, 2.5), 0.0, 5.0), false)
-		# borde con el andén perimetral
 		var e := 33.92 * s
-		place_mesh("park_curb", curb, _p2park_line(Vector2(-34.0, e), Vector2(34.0, e), 0.0, 68.0), false)
-		place_mesh("park_curb", curb, _p2park_line(Vector2(e, -34.0), Vector2(e, 34.0), 0.0, 68.0), false)
+		place_mesh("park_curb", curb, _p2park_line(Vector2(-ce, e), Vector2(ce, e), 0.0, 2.0 * ce), false)
+		place_mesh("park_curb", curb, _p2park_line(Vector2(e, -ce), Vector2(e, ce), 0.0, 2.0 * ce), false)
+	_p2park_plazoleta(PLZ_W, Vector2(1, 0))
+	_p2park_plazoleta(PLZ_N, Vector2(0, 1))
+
+
+## Piso de laja de una plazoleta circular (anillo entre la fuente/tarima y las jardineras) con bordillo
+## de granito en los dos tramos de arco que cruzan el sendero. `axis` = dirección del sendero.
+func _p2park_plazoleta(c: Vector2, axis: Vector2) -> void:
+	var mat := MatStone.laja_plaza()
+	var r0 := 3.3
+	var r1 := PLZ_R + 0.1
+	var st := _st(mat, Vector3(c.x, 0, c.y), false)
+	var n := Vector3(-SLOPE, 1.0, 0.0).normalized()
+	var segs := 48
+	for i in segs:
+		var a0 := TAU * i / segs
+		var a1 := TAU * (i + 1) / segs
+		var pts: Array = []
+		for pr: Array in [[a0, r0], [a1, r0], [a1, r1], [a0, r1]]:
+			var q := c + Vector2(cos(pr[0]), sin(pr[0])) * float(pr[1])
+			pts.append(Vector3(q.x, SLOPE * q.x + 0.022, q.y))
+		_quad(st, pts[0], pts[1], pts[2], pts[3], n)
+	var curb := ParkFurniture.path_curb()
+	var base := axis.angle()
+	var th0 := asin(2.5 / PLZ_R)
+	for side: float in [0.0, PI]:
+		var a_start := base + side - th0
+		var a_end := base + side + th0
+		var steps := 5
+		for i in steps:
+			var p0 := c + Vector2.from_angle(lerpf(a_start, a_end, float(i) / steps)) * PLZ_R
+			var p1 := c + Vector2.from_angle(lerpf(a_start, a_end, float(i + 1) / steps)) * PLZ_R
+			place_mesh("park_curb", curb, _p2park_line(p0, p1, 0.0, p0.distance_to(p1)), false)
 
 
 ## Caneca de parque (poste hacia -Z local).
@@ -612,10 +808,23 @@ func _build_church() -> void:
 	# Faroles flanqueando la escalinata.
 	_park_lamp(Vector3(cx + 3.0, walk_y(cx + 3.0), cz - 10.5), false)
 	_park_lamp(Vector3(cx + 3.0, walk_y(cx + 3.0), cz + 10.5), false)
-	# Árboles y bancas en la acera de la Cra 39 al sur de la iglesia (frente al colegio).
-	for pz: float in [2.0, 14.0]:
-		_tree(Vector3(-52.5, walk_y(-52.5), pz), _rng.randf_range(0.9, 1.2), 0)
-		_bench(Transform3D(Basis(Vector3.UP, PI * 0.5), Vector3(-49.0, walk_y(-49.0) + 0.02, pz + 5.0)))
+
+
+# ------------------------------------------------------------------ colegio (F3.2)
+func _build_school() -> void:
+	# Colegio pegado al sur de la iglesia, de cara a la Cra 39 (fotos de referencia). Marco local de School:
+	# fachada a -Z local, igual que Church. Con Basis(UP, -PI/2): local (x, y, z) → mundo (ox - z, y, oz + x).
+	var ox := -51.0
+	var oz := 13.75
+	var xf := Transform3D(Basis(Vector3.UP, -PI * 0.5), Vector3(ox, walk_y(-46.5) + 0.12, oz))
+	_excl.append(Rect2(-67.0, -6.6, 22.0, 41.0))
+	School.build(self, xf)
+	# Dos árboles en el antejardín del colegio.
+	for pz: float in [3.0, 24.5]:
+		_tree(Vector3(-48.4, walk_y(-48.4), pz), _rng.randf_range(0.9, 1.2), 0)
+	# Estado del generador tal como quedaba tras la iglesia antes de la fase 3.2: el resto del barrio
+	# (edificios, árboles de calle) no cambia aunque el parque o el colegio consuman otros números.
+	_rng.state = 6053169988512982555
 
 
 # ------------------------------------------------------------------ teatro (La Playa con Cra 40)
@@ -1209,9 +1418,12 @@ func _p2plants_park() -> void:
 			var P := func(u: float, v: float, yaw: float) -> Transform3D:
 				var w := Vector2(u, v) * m
 				return _p2plants_sheared(Transform3D(Basis(Vector3.UP, yaw), Vector3(w.x, walk_y(w.x) + top, w.y)))
-			# Setos detrás de la reja perimetral (u = 30.25 y v = 30.25), con hueco en la esquina exterior.
+			# Setos detrás de la reja perimetral (u = 30.25, v = 30.25 y la ochava), con hueco en las esquinas.
 			var hv := 0
-			for run in [[Vector2(30.25, 3.3), Vector2(30.25, 29.6)], [Vector2(3.3, 30.25), Vector2(29.6, 30.25)]]:
+			var kk := PARK_K - 1.3   # ochava del seto (un poco hacia dentro)
+			for run in [[Vector2(30.25, 3.3), Vector2(30.25, kk - 30.25)],
+					[Vector2(30.25, kk - 30.25), Vector2(kk - 30.25, 30.25)],
+					[Vector2(3.3, 30.25), Vector2(kk - 30.25, 30.25)]]:
 				var a: Vector2 = run[0]
 				var b: Vector2 = run[1]
 				var l := a.distance_to(b)
@@ -1225,14 +1437,20 @@ func _p2plants_park() -> void:
 					hv += 1
 				var cw := (a + b) * 0.5 * m
 				var cy := walk_y(cw.x) + top + 0.45
-				var hs := Vector3(l, 0.9, 0.7) if absf(along.x) > 0.5 else Vector3(0.7, 0.9, l)
-				var hb := Basis(Vector3.BACK, atan(SLOPE)) if absf(along.x) > 0.5 else Basis.IDENTITY
-				add_col_box(Transform3D(hb, Vector3(cw.x, cy, cw.y)), hs)
-			# Macizos al pie de los árboles (los que no quedan contra el seto).
+				if absf(along.x) > 0.999 or absf(along.y) > 0.999:
+					var hs := Vector3(l, 0.9, 0.7) if absf(along.x) > 0.5 else Vector3(0.7, 0.9, l)
+					var hb := Basis(Vector3.BACK, atan(SLOPE)) if absf(along.x) > 0.5 else Basis.IDENTITY
+					add_col_box(Transform3D(hb, Vector3(cw.x, cy, cw.y)), hs)
+				else:
+					var ax3 := Vector3(along.x, 0, along.y)
+					add_col_box(Transform3D(Basis(ax3, Vector3.UP, ax3.cross(Vector3.UP)), Vector3(cw.x, cy, cw.y)), Vector3(l, 0.9, 0.7))
+			# Macizos al pie de los árboles (los que no quedan contra el seto ni en una plazoleta).
 			for sp in [Vector2(20, 8), Vector2(17, 25.5), Vector2(7, 23), Vector2(22, 14), Vector2(9, 16), Vector2(15.5, 5.2)]:
 				var mix := r.randi() % 3
-				_p2plants_place("pbed_%d" % mix, Plants.garden_bed(3.2, 2.2, mix),
-					P.call(sp.x, sp.y, r.randf_range(-0.3, 0.3)))
+				var yb := r.randf_range(-0.3, 0.3)
+				if _p2park_in_plz(sp * m, 2.2):
+					continue
+				_p2plants_place("pbed_%d" % mix, Plants.garden_bed(3.2, 2.2, mix), P.call(sp.x, sp.y, yb))
 			# Hiedra en los bordes que dan a los senderos y a la plaza (franja de 1.2 m).
 			var ivy_runs := [
 				[Vector2(12.6, 3.45), Vector2(29.4, 3.45), true],    # junto al sendero E-O
@@ -1249,26 +1467,39 @@ func _p2plants_park() -> void:
 					var c2 := a2.lerp(b2, (i + 0.5) / cnt)
 					var iv := (q + i) % 3
 					var along_u: bool = ir[2]
+					if _p2park_in_plz(c2 * m, 1.5):
+						continue
 					_p2plants_place("ivy_%d" % iv, Plants.ivy_patch(4.2, 1.2, iv),
 						P.call(c2.x, c2.y, 0.0 if along_u else PI * 0.5).scaled_local(Vector3(l2 / (cnt * 4.2), 1, 1)), false)
 			# Palmas pequeñas en macolla y una palma alta.
 			for sp2 in [Vector2(5.0, 14.6), Vector2(25.0, 9.8), Vector2(13.6, 28.4)]:
 				var v := r.randi() % Plants.SMALL_PALM_VARIANTS
-				_p2plants_place("spalm_%d" % v, Plants.small_palm(v), P.call(sp2.x, sp2.y, r.randf() * TAU))
+				var yw := r.randf() * TAU
+				if _p2park_in_plz(sp2 * m, 1.5):
+					continue
+				_p2plants_place("spalm_%d" % v, Plants.small_palm(v), P.call(sp2.x, sp2.y, yw))
 			var tp := Vector2(13.6, 20.0) * m
 			var tb := Vector3(tp.x, walk_y(tp.x) + top - 0.05, tp.y)
 			var tv := q % Plants.TALL_PALM_VARIANTS
-			_p2plants_place("palm_%d" % tv, Plants.tall_palm(tv), Transform3D(Basis(Vector3.UP, r.randf() * TAU), tb))
-			add_col_cyl(tb + Vector3(0, 1.5, 0), 0.2, 3.0)
+			var tyaw := r.randf() * TAU
+			if not _p2park_in_plz(tp, 1.2):
+				_p2plants_place("palm_%d" % tv, Plants.tall_palm(tv), Transform3D(Basis(Vector3.UP, tyaw), tb))
+				add_col_cyl(tb + Vector3(0, 1.5, 0), 0.2, 3.0)
 			# Agaves junto a la esquina de la plaza y matas de pasto alto al pie del seto.
 			for sp3 in [Vector2(4.2, 13.9), Vector2(5.6, 13.6), Vector2(13.8, 4.6)]:
 				var av := r.randi() % Plants.AGAVE_VARIANTS
-				_p2plants_place("agave_%d" % av, Plants.agave(av), P.call(sp3.x, sp3.y, r.randf() * TAU))
+				var ayaw := r.randf() * TAU
+				if _p2park_in_plz(sp3 * m, 1.0):
+					continue
+				_p2plants_place("agave_%d" % av, Plants.agave(av), P.call(sp3.x, sp3.y, ayaw))
 			for i in 8:
 				var gu := r.randf_range(4.0, 28.0)
 				var gp := Vector2(gu, 29.4) if i % 2 == 0 else Vector2(29.4, gu)
 				var gv := r.randi() % Plants.GRASS_VARIANTS
-				_p2plants_place("grass_%d" % gv, Plants.grass_tuft(gv), P.call(gp.x, gp.y, r.randf() * TAU), false)
+				var gyaw := r.randf() * TAU
+				if gp.x + gp.y > PARK_K - 1.8 or _p2park_in_plz(gp * m, 0.6):
+					continue
+				_p2plants_place("grass_%d" % gv, Plants.grass_tuft(gv), P.call(gp.x, gp.y, gyaw), false)
 			q += 1
 
 

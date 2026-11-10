@@ -19,7 +19,28 @@ Plan gráfico anterior (fases 1-5): `PLAN_GRAFICOS.md`. El plan vigente está en
 - Rendimiento medido en el editor del teléfono: ~51 FPS en el parque, ~78 FPS en la calle.
 - Sin APK todavía (a propósito): se juega desde el editor de Godot en el teléfono.
 
-## Última sesión (10 nov 2026) — Fase 3: pulir parque y zona
+## Última sesión (10 nov 2026) — Fase 3.2: colegio, figura del parque, fuente/tarima, texturas
+- Colegio "El Sufragio" (`world/props/school.gd`, `_build_school()`): edificio de 4 pisos (39.5 × 13 m) pegado al sur de la
+  iglesia, fachada sobre la Cra 39 (x = -51), pañete crema con molduras ocre, portal en arco con puerta de hierro, balcón
+  corrido, reja con portón en el antejardín, 2 árboles. La iglesia no cambió. Se quitaron los árboles/bancas viejos de ese
+  andén. `_rng.state` se fija al final de `_build_school()` para que el resto del barrio no cambie.
+- Figura del parque: la manzana ya no es un cuadrado. Las 4 esquinas tienen **ochava** (`PARK_CUT = 7` m en la línea de
+  jardineras; el borde de la manzana se corta en `PARK_OUT_K` y se rellena con andén de concreto + bordillo diagonal).
+  Jardineras ahora son polígonos (`_p2park_l_poly` / `_p2park_planter`): tapa triangulada, muro, reja con inglete,
+  pilares en esquinas oblicuas. Setos, hiedra, palmas y árboles se adaptaron a la ochava y a las plazoletas.
+- Fuente y tarima movidas a **plazoletas circulares** (`PLZ_R = 7.5`, a `PLZ_C = 21` m de la estatua): fuente al OESTE
+  (lado iglesia, Cra 39) en (-21, 0); tarima al NORTE (Calle 55) en (0, -21). Cada plazoleta abre una muesca circular en las
+  jardineras vecinas, piso de laja irregular, bordillo en los arcos sobre el sendero, 4 bancas de granito en corro, 2 canecas.
+  Si todavía se ven mal puestas: cambiar `PLZ_W` / `PLZ_N` / `PLZ_C` / `PLZ_R` / `PARK_CUT` (constantes al inicio de
+  `boston_district.gd`); todo lo demás se recalcula.
+- Texturas: nuevo set `stone/laja_irregular` (lajas grandes grises con juntas de tierra y pasto, `MatStone.laja_plaza()`);
+  `pizarra_lajas` regenerada con lajas alargadas más irregulares y bordes despostillados. Generador: `tools/texgen/stone.py`
+  (ahora con `course_layout()` por si se quiere cantería apilada).
+- NO probado en el teléfono (Adreno): solo con lavapipe. El contorno exacto del parque real no se pudo verificar (sin acceso a
+  mapas): la ochava y las posiciones de las plazoletas son mi mejor lectura de las fotos.
+- Siguiente: más juego (peatones, tráfico, misiones) y 2.3 edificios del fondo.
+
+## Sesión anterior (fase 3)
 - Manchas negras del follaje: causa hallada = celda 3 del atlas (hoja ancha) casi negra × AO de vértice. Arreglo:
   `tools/texgen/foliage_lift.py` (gamma 0.62 en esa celda; correr después de foliage.py, es idempotente) + piso de albedo
   en `LEAF_SHADER` (`world/props/trees.gd`). Verificado con el renderer Mobile real por software (lavapipe, ver abajo).

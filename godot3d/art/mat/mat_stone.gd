@@ -15,6 +15,12 @@ static func pizarra(wet := false) -> Material:
 	return TexMat.pbr(BASE + "pizarra_lajas", {"tile_m": 1.5, "rough_add": -0.35 if wet else 0.0})
 
 
+## LAJA de piedra gris en piezas grandes irregulares con juntas anchas de tierra/musgo: piso de las
+## plazoletas del Parque de Boston (fuente y tarima). tile_m = 3.0.
+static func laja_plaza(wet := false) -> Material:
+	return TexMat.pbr(BASE + "laja_irregular", {"tile_m": 3.0, "rough_add": -0.3 if wet else 0.0})
+
+
 ## GRANITO gris claro moteado, acabado abujardado. Bancas, bordes de jardinera, bordillos,
 ## escalones (ref. 1). tile_m = 1.0.
 static func granito(wet := false) -> Material:

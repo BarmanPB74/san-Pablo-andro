@@ -16,9 +16,10 @@
 ## Lugares
 | Lugar | Posición |
 |---|---|
-| Parque de Boston | manzana x ∈ [-34, 34], z ∈ [-34, 34] (Cra 38–39, Cl 54–55). Plaza central 24×24 m, caminos en cruz, 4 jardineras en L elevadas 0.35 m, ~36 árboles (incl. guayacanes amarillos/rosados), 16 bancas, 12 faroles (6 con OmniLight cálida sin sombra), 5 carritos de comida, placas de nomenclatura en las 4 esquinas. |
+| Parque de Boston | manzana x ∈ [-34, 34], z ∈ [-34, 34] (Cra 38–39, Cl 54–55). Plaza central 24×24 m, caminos en cruz, 4 jardineras en L elevadas 0.35 m con ochava en las esquinas y 2 plazoletas circulares (fuente al oeste en (-21, 0), tarima al norte en (0, -21)), ~36 árboles (incl. guayacanes amarillos/rosados), 16 bancas, 12 faroles (6 con OmniLight cálida sin sombra), 5 carritos de comida, placas de nomenclatura en las 4 esquinas. |
 | Monumento a Córdova | (0,0,0), mira al sur (+Z). `world/props/monument.gd`: figura de pie en bronce oscuro (2.5 m, casaca con faldones, sable, brazo derecho alzado) sobre pedestal de mármol blanco hasta y = 4.28 (gradas, dado con placa "JOSÉ MARÍA CÓRDOVA", cuerpo esbelto), seto redondo (r 2.45–3.75), bordillo de granito y reja verde (r 4.15). Colisión: cilindro r 4.2 + caja del pedestal. |
 | Iglesia del Sufragio | Cuadra entre Cra 39 y Cra 40, sobre la Cl 55: al oeste de la Cra 39, centro (x = -52, z = -20), fachada sobre la Cra 39 mirando al **este**, hacia el parque; nave larga hacia el oeste. Nave 18×42 m, dos torres de ~36 m con campanario y remate piramidal de piedra con pináculos, pórtico con arquivoltas sobre columnillas, rosetón con tracería, ajimeces, arquillos lombardos, reloj en la torre oriental, ábside con contrafuertes, escalinata de granito de 6 peldaños (mallas en `world/props/church.gd`; colisiones en `_build_church`). Sin plazuela propia: la escalinata da a la acera de la Cra 39. |
+| Colegio El Sufragio | Pegado al sur de la iglesia, de cara a la Cra 39: x ∈ [-64, -51], z ∈ [-6, 33.5], 4 pisos (`world/props/school.gd`, `_build_school()`); antejardín con reja y portón de 4.6 m, balcón corrido sobre el portal, rótulo "COLEGIO EL SUFRAGIO". |
 | Teatro (representa al Pablo Tobón Uribe) | Al sur de La Playa, junto a la Cra 40: x ∈ [-112, -60], z ∈ [222, 258], marquesina con aviso "TEATRO". |
 | Obras con conos | Cl 55 frente a la cuadra de la iglesia (x -100…-89) y Cra 38 (z -70…-77). |
 
@@ -64,3 +65,13 @@ los bordes hacia la plaza (z = 12 con x < 12, x = 12 con z < 12) son solo muro d
 Pisos: plaza |x|,|z| < 12 en espina de pescado; senderos en cruz (ancho 5 m) y anillo 31–34 en adoquín hexagonal,
 con bordillo de concreto al pie de las rejas, en la boca de los senderos y en el borde con el andén (±34).
 Bancas de granito en los senderos (x ≈ ±2.05, d = 17/25), de madera en la plaza; faroles a x ≈ −2.0 (d = 16/27) y en (±11.6, ±11.6).
+
+### Fase 3.2: ochava y plazoletas
+La huella de arriba es la de F2-06; en la fase 3.2 cambió así (constantes al inicio de `boston_district.gd`):
+- Cada L se corta en la esquina exterior por la ochava `u + v = PARK_K` (`PARK_K = 62 - PARK_CUT`, `PARK_CUT = 7`), con el mismo
+  corte en el borde de la manzana (`PARK_OUT_K`) relleno de concreto. Los setos siguen la ochava a 1.3 m hacia dentro.
+- Plazoletas circulares de radio `PLZ_R = 7.5` centradas a `PLZ_C = 21` m de la estatua: oeste `PLZ_W = (-21, 0)` (fuente) y
+  norte `PLZ_N = (0, -21)` (tarima). En los cuadrantes de ese lado la jardinera tiene una muesca circular (reja y muro siguen
+  el arco). Nada se planta a menos de `PLZ_R + ~1.5` del centro. Piso de laja (`MatStone.laja_plaza()`).
+- Los senderos oeste y norte no llevan bancas de granito/caneca a lo largo: van en corro (r = 5 m, ángulos 55/125/235/305°) en la plazoleta.
+- Plantas: `_p2plants_park()` salta macizos, hiedra, palmas, agaves y pasto que caigan dentro de una plazoleta (`_p2park_in_plz`).

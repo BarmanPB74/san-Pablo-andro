@@ -162,6 +162,41 @@ def stamp_pebbles(size: int, seed: int, r_px=(12, 24), tries=4000, gap=2.5):
     return h, ids, ids >= 0
 
 
+def course_layout(size: int, seed: int, h_px=(34, 78), w_px=(70, 210), warp_px=14.0, warp_seed=0):
+    """Hiladas horizontales de piezas rectangulares de ancho/alto variable (cantería apilada), con bordes
+    ondulados por warp. Tileable. Devuelve (edge_dist_px, id): edge = distancia al borde de la pieza."""
+    rng = np.random.default_rng(seed)
+    S = size
+    hs = []
+    while sum(hs) < S:
+        hs.append(rng.uniform(*h_px))
+    hs = np.array(hs) * (S / np.sum(hs))
+    ys = np.concatenate([[0.0], np.cumsum(hs)])
+    yy, xx = np.mgrid[0:S, 0:S].astype(np.float64)
+    if warp_px > 0:
+        yy = yy + (fbm(S, 4, 5, seed=warp_seed) - 0.5) * warp_px
+        xx = xx + (fbm(S, 4, 5, seed=warp_seed + 1) - 0.5) * warp_px
+    yw = np.mod(yy, S)
+    ids = np.zeros((S, S), dtype=np.int64)
+    edge = np.full((S, S), 1e9)
+    pid = 0
+    for r in range(len(hs)):
+        y0, y1 = ys[r], ys[r + 1]
+        rowm = (yw >= y0) & (yw < y1)
+        ws = []
+        while sum(ws) < S:
+            ws.append(rng.uniform(*w_px))
+        ws = np.array(ws) * (S / np.sum(ws))
+        cum = np.concatenate([[0.0], np.cumsum(ws)])
+        xl = np.mod(xx - rng.uniform(0, S), S)
+        k = np.clip(np.searchsorted(cum, xl, side="right") - 1, 0, len(ws) - 1)
+        e = np.minimum.reduce([xl - cum[k], cum[k + 1] - xl, yw - y0, y1 - yw])
+        ids = np.where(rowm, pid + k, ids)
+        edge = np.where(rowm, e, edge)
+        pid += len(ws)
+    return edge, ids
+
+
 def save(name, albedo, height, rough, metal=0.0, ao=None, nstrength=4.0):
     paths = save_pbr(f"{OUT}/{name}", np.clip(albedo, 0, 1), height=height, rough=np.clip(rough, 0.02, 1),
                      metal=metal, ao=ao, normal_strength=nstrength)
@@ -171,8 +206,10 @@ def save(name, albedo, height, rough, metal=0.0, ao=None, nstrength=4.0):
 
 # ============================================================ 1. pizarra en lajas
 def pizarra_lajas(S=1024):
-    # 1.5 m: ~8 lajas por lado -> 18 cm promedio, bordes irregulares por warp
-    f1, edge, ids = voronoi(S, 8, seed=11, jitter=0.95, warp_px=30, warp_seed=21)
+    # 1.5 m (683 px/m): lajas irregulares algo alargadas en horizontal (~25 x 14 cm), asentadas en hiladas
+    # sueltas como el enchape de las jardineras de la foto; bordes ondulados y despostillados.
+    f1, edge, ids = voronoi(S, 11, seed=11, jitter=0.95, warp_px=34, warp_seed=21, aspect=1.9)
+    edge = edge + 4.0 * (fbm(S, 24, 4, seed=22) - 0.5)
     # junta de mortero 0.8-1.6 cm (683 px/m -> ~5-11 px de ancho total)
     jw = 2.5 + 8.0 * fbm(S, 5, 4, seed=31) ** 1.6
     mort = 1 - smoothstep(jw * 0.55, jw, edge)
@@ -436,6 +473,43 @@ def canto_rodado(S=512):
     return save("canto_rodado", alb, height, rough, ao=ao, nstrength=6.0)
 
 
+# ============================================================ 7. laja irregular de plazoleta
+def laja_irregular(S=1024):
+    # 3.0 m (341 px/m): lajas grandes (40-80 cm) de piedra gris cálido, juntas de 2-4 cm con tierra y pasto ralo
+    f1, edge, ids = voronoi(S, 5, seed=61, jitter=0.9, warp_px=46, warp_seed=71)
+    jw = 4.0 + 8.0 * fbm(S, 6, 4, seed=72) ** 1.5
+    joint = 1 - smoothstep(jw * 0.5, jw, edge)
+    rnd = cell_rand(ids, 62, 4)
+    micro = fbm(S, 48, 5, seed=73)
+    grain = fbm(S, 160, 3, seed=74)
+    bevel = smoothstep(jw * 0.6, jw * 3.0 + 8, edge)
+    yy, xx = np.mgrid[0:S, 0:S].astype(np.float64) / S
+    tilt = (rnd[..., 1] - 0.5) * 0.4 * (xx - 0.5) + (rnd[..., 2] - 0.5) * 0.4 * (yy - 0.5)
+    h_slab = 0.62 + 0.07 * micro + 0.025 * grain + 0.10 * rnd[..., 3] + tilt
+    h_slab = h_slab * (0.62 + 0.38 * bevel)
+    h_joint = 0.30 + 0.10 * fbm(S, 40, 4, seed=75)
+    height = normalize(mix(h_slab, h_joint, joint))
+    # color: gris cálido con variación fuerte por laja (beige, gris azulado, rosado), manchas y desgaste
+    base = 0.40 + 0.20 * rnd[..., 0]
+    mac = fbm(S, 3, 5, seed=76)
+    v = base * (0.86 + 0.28 * mac) * (0.92 + 0.16 * micro) * (0.96 + 0.08 * grain)
+    warm = (rnd[..., 1] - 0.5) * 0.10
+    slab = np.stack([v * (1.0 + warm + 0.04), v * (1.0 + 0.5 * warm), v * (0.94 - warm)], -1)
+    stain = smoothstep(0.55, 0.85, fbm(S, 7, 5, seed=77))
+    slab = lerp(slab, slab * np.array([0.78, 0.80, 0.78]), stain[..., None] * 0.7)
+    lichen = smoothstep(0.62, 0.9, fbm(S, 20, 5, seed=78)) * (1 - bevel * 0.6)
+    slab = lerp(slab, np.array([0.34, 0.38, 0.22]), lichen[..., None] * 0.35)
+    soil_v = 0.20 + 0.08 * fbm(S, 30, 4, seed=79)
+    soil = np.stack([soil_v * 1.05, soil_v * 0.95, soil_v * 0.78], -1)
+    grass = smoothstep(0.52, 0.8, fbm(S, 36, 5, seed=80)) * joint
+    soil = lerp(soil, np.array([0.17, 0.26, 0.09]), grass[..., None] * 0.85)
+    alb = lerp(slab, soil, joint[..., None])
+    alb = alb * (1 - 0.16 * smoothstep(0.45, 0.85, fbm(S, 3, 5, seed=81))[..., None])
+    rough = mix(0.74 + 0.16 * micro, 0.95, joint)
+    ao = ao_from_height(height, 7, 1.3) * (1 - 0.35 * joint)
+    return save("laja_irregular", alb, height, rough, ao=np.clip(ao, 0, 1), nstrength=5.5)
+
+
 SETS = {
     "pizarra_lajas": pizarra_lajas,
     "granito_abujardado": granito_abujardado,
@@ -443,6 +517,7 @@ SETS = {
     "sillar_arenisca": sillar_arenisca,
     "bronce_patina": bronce_patina,
     "canto_rodado": canto_rodado,
+    "laja_irregular": laja_irregular,
 }
 
 if __name__ == "__main__":
