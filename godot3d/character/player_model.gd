@@ -46,6 +46,8 @@ static var C_LIP := Color(0.52, 0.32, 0.27)
 static var SKIN_TONE := Color(0.76, 0.62, 0.52)  # piel clara, algo pálida (en plastilina: beige mate)
 # Modo plastilina (ClayStyle.enabled): cabeza y manos grandes, ojos saltones, bufanda tejida a rayas.
 const CLAY_HEAD_K := 1.6
+const CLAY_HEAD_SY := 1.13     # F9 (ref. 68107): cabeza más alta que ancha; estira en y desde el mentón
+const CLAY_HEAD_S := Vector3(CLAY_HEAD_K, CLAY_HEAD_K * CLAY_HEAD_SY, CLAY_HEAD_K)
 const CLAY_HAND_K := 1.28
 # Paleta de plastilina = la del adaptador "arcilla gótica" (character/gothic_clay_adapter.gd)
 const C_CLAY_SKIN := Color(0.64, 0.62, 0.59)   # arcilla pálida "blanco sucio/hueso" (lámina)
@@ -64,9 +66,9 @@ const ARM_K := 1.1              # brazos 10 % más largos
 const STUBBLE_TONE := Color(0.4, 0.29, 0.23)    # barba de pocos días
 
 # Longitudes de los segmentos (m)
-const THIGH_LEN := 0.46
-const SHIN_LEN := 0.41
-const HIPS_HEIGHT := 1.01
+const THIGH_LEN := 0.43        # F9 (68107): piernas −3 cm cada tramo (≈3.8 cabezas; pie sigue en y=0)
+const SHIN_LEN := 0.38
+const HIPS_HEIGHT := 0.95
 const HEAD_Y := 0.93          # escala vertical de la cabeza
 const EYE_Y := 0.134          # altura de los ojos en el pivote head
 
@@ -146,12 +148,12 @@ func _build() -> void:
 	# F8 (video 68105): abrigo gris carbón neutro (algo amarillo en albedo para compensar la luz morada), chaleco café oscuro, botones negros, pantalón casi negro
 	C_SUIT = Color(0.30, 0.30, 0.245) if clay else Color(0.06, 0.06, 0.068)
 	C_SUIT_LAPEL = Color(0.225, 0.225, 0.185) if clay else Color(0.035, 0.035, 0.042)
-	C_TROUSER = Color(0.2, 0.2, 0.16) if clay else Color(0.06, 0.06, 0.068)
+	C_TROUSER = Color(0.33, 0.328, 0.205) if clay else Color(0.06, 0.06, 0.068)    # F9: carbón neutro (albedo cálido contra la luz morada)
 	C_SHIRT = C_SUIT if clay else Color(0.86, 0.86, 0.83)
-	C_VEST = Color(0.34, 0.31, 0.2) if clay else C_SHIRT
+	C_VEST = Color(0.42, 0.36, 0.215) if clay else C_SHIRT    # F9: suéter café de punto (68107, se ve ≈#4D3730)
 	C_BUTTON = Color(0.11, 0.11, 0.11) if clay else Color(0.03, 0.03, 0.035)   # botones negros pequeños
 	C_HAIR = Color(0.27, 0.25, 0.25) if clay else Color(0.045, 0.035, 0.03)
-	C_DRESS_SHOE = Color(0.3, 0.22, 0.17) if clay else Color(0.035, 0.035, 0.04)  # botines de cuero café
+	C_DRESS_SHOE = Color(0.36, 0.33, 0.1) if clay else Color(0.035, 0.035, 0.04)  # F9: derby de cuero café oscuro
 	C_LIP = Color(0.42, 0.2, 0.2) if clay else Color(0.52, 0.32, 0.27)          # rojo apagado (labio inferior)
 	root = _pivot("root", self, Vector3.ZERO)
 	hips = _pivot("hips", root, Vector3(0, HIPS_HEIGHT, 0))
@@ -231,8 +233,9 @@ func _dress_piece(nm: String, origin: Vector3, builder: Callable, parent: Node3D
 	var mesh := _bake("piece_" + (cache_key if cache_key != "" else nm), builder)
 	var pv := Node3D.new()
 	pv.name = nm
-	pv.position = origin * k
-	pv.scale = Vector3.ONE * k
+	var sv := CLAY_HEAD_S if parent == null else Vector3.ONE * k    # piezas de la cabeza: misma escala que su malla
+	pv.position = origin * sv
+	pv.scale = sv
 	pv.set_meta("base_pos", pv.position)
 	var mi := MeshInstance3D.new()
 	mi.name = "Mesh"
@@ -254,7 +257,7 @@ func _dress(pivot: Node3D, key: String, builder: Callable) -> void:
 	mi.name = "Mesh"
 	mi.mesh = mesh
 	if clay and key.begins_with("head"):
-		mi.scale = Vector3.ONE * CLAY_HEAD_K
+		mi.scale = CLAY_HEAD_S
 	elif clay and key.begins_with("hand"):
 		mi.scale = Vector3.ONE * CLAY_HAND_K
 	pivot.add_child(mi)
@@ -694,47 +697,70 @@ func _geo_chest() -> void:
 	var clay := ClayStyle.enabled
 	# Semiancho de la abertura (V) en cada altura: ancha arriba, estrecha abajo
 	var hw := func(y: float) -> float:
-		if clay:    # F8: franja estrecha de chaleco hasta la cintura
-			return 0.034 + 0.03 * clampf((y + 0.05) / 0.33, 0.0, 1.0)
+		if clay:    # F9 (68107): abrigo ABIERTO, el suéter ocupa el tercio central del pecho y se abre un poco abajo
+			return 0.07 + 0.012 * clampf((-0.04 - y) / 0.25, 0.0, 1.0) - 0.006 * clampf((y - 0.17) / 0.08, 0.0, 1.0)
 		return 0.03 + 0.04 * clampf((y + 0.1) / 0.38, 0.0, 1.0) if y > -0.1 else 0.03
-	var y_open := -0.24 if clay else -0.29
+	var y_open := -0.33 if clay else -0.29
 	_loft(tw, rings, 26, Transform3D.IDENTITY, func(p: Vector3) -> Color:
 		if not clay and p.z < -0.02 and p.y > y_open and absf(p.x) < hw.call(p.y):
 			return cw
 		return csuit)
 	var up_f := Vector3(0, 0, -1)
-	if clay:    # F8: chaleco como pieza sobre el pecho (bordes nítidos) y cantos del abrigo a cada lado
-		var vp := PackedVector3Array()
-		var vw: Array = []
-		for i in 8:
-			var y := lerpf(0.255, y_open, float(i) / 7.0)
-			vp.append(_on_surf(keys, 0.0, y, true, 0.0015))
-			vw.append(float(hw.call(y)))
-		_tube(tw, vp, vw, 0.004, 10, up_f, cv, true, 6.0)
+	if clay:    # F9: suéter de punto como concha fina pegada al pecho (bordes nítidos) y cantos del abrigo a cada lado
+		var y_rib := y_open + 0.045
+		var ys := [0.255, 0.19, 0.12, 0.05, -0.02, -0.09, -0.16, -0.23, y_rib + 0.003, y_rib - 0.003, y_open]
+		var NR := ys.size()
+		var NC := 9
+		var sp := PackedVector3Array()
+		for i in NR + 2:
+			var y: float = ys[clampi(i - 1, 0, NR - 1)]
+			var cap := i == 0 or i == NR + 1
+			var w: float = float(hw.call(y)) + 0.006
+			for j in NC:      # cara exterior (izq → der) y vuelta por dentro (der → izq)
+				var x := lerpf(-w, w, float(j) / float(NC - 1))
+				sp.append(_on_surf(keys, x, y, true, 0.003 if cap else 0.0055))
+			for j in NC:
+				var x := lerpf(w, -w, float(j) / float(NC - 1))
+				sp.append(_on_surf(keys, x, y, true, 0.003 if cap else 0.0005))
+		_grid(_knit(), sp, NR + 2, NC * 2, Transform3D.IDENTITY, func(p: Vector3) -> Color:
+			return cv.darkened(0.16) if p.y < y_rib else cv)     # elástico del borde, algo más oscuro
 		for sx in [-1.0, 1.0]:
 			var ep := PackedVector3Array()
 			for i in 8:
-				var y := lerpf(0.2, y_open - 0.06, float(i) / 7.0)
+				var y := lerpf(0.2, y_open, float(i) / 7.0)
 				ep.append(_on_surf(keys, sx * float(hw.call(y)), y, true, 0.003))
 			_tube(tw, ep, 0.009, 0.005, 6, up_f, csuit)
 	# Solapas: siguen los bordes de la V desde el cuello hasta la cintura
 	for sx in [-1.0, 1.0]:
 		var pts := PackedVector3Array()
-		var y_lap := 0.12 if clay else -0.1     # F8: solapa corta (video 68105)
-		for i in 7:
-			var y := lerpf(0.275, y_lap, float(i) / 6.0)
-			var x: float = sx * (float(hw.call(y)) + 0.012 * (1.0 - float(i) / 6.0))
-			pts.append(_on_surf(keys, x, y, true, 0.004))
-		_tube(tw, pts, [0.012, 0.022, 0.026, 0.024, 0.02, 0.014, 0.008], 0.007, 6, up_f, cl)
+		var y_lap := 0.12 if clay else -0.1
+		if clay:    # F9 (68107): solapa con muesca (cuello corto arriba + solapa ancha que baja hasta medio pecho)
+			y_lap = -0.03
+			var cpts := PackedVector3Array()
+			for i in 3:
+				var y := lerpf(0.278, 0.222, float(i) / 2.0)
+				cpts.append(_on_surf(keys, sx * (float(hw.call(y)) + 0.016), y, true, 0.004))
+			_tube(tw, cpts, [0.011, 0.015, 0.017], 0.007, 6, up_f, cl)
+			for i in 7:
+				var t := float(i) / 6.0
+				var y := lerpf(0.205, y_lap, t)
+				pts.append(_on_surf(keys, sx * (float(hw.call(y)) + 0.026 * (1.0 - t) + 0.004), y, true, 0.004))
+			_tube(tw, pts, [0.028, 0.029, 0.026, 0.022, 0.017, 0.012, 0.007], 0.007, 6, up_f, cl)
+		else:
+			for i in 7:
+				var y := lerpf(0.275, y_lap, float(i) / 6.0)
+				var x: float = sx * (float(hw.call(y)) + 0.012 * (1.0 - float(i) / 6.0))
+				pts.append(_on_surf(keys, x, y, true, 0.004))
+			_tube(tw, pts, [0.012, 0.022, 0.026, 0.024, 0.02, 0.014, 0.008], 0.007, 6, up_f, cl)
 		if not clay:    # bolsillo con solapa en la cadera (en arcilla va en los faldones)
 			_tube(tw, _surf_path(keys, Vector2(0.075 * sx, -0.11), Vector2(0.16 * sx, -0.115), true, 0.003, 4),
 				0.006, 0.004, 5, up_f, cl)
-		elif sx > 0.0:  # botonadura: borde derecho de la abertura (a la izquierda de quien mira)
-			for y in [0.1, -0.03, -0.155, -0.28]:
-				var bx: float = float(hw.call(y)) + 0.009
-				_ellip(tw, _on_surf(keys, bx, y, true, 0.004), Vector3(0.0085, 0.0085, 0.0038), cb, Vector3.ZERO, 8, 4)
+		elif sx > 0.0:  # F9: un solo botón a la cintura en el canto derecho (a la izquierda de quien mira)
+			var by := -0.24
+			_ellip(tw, _on_surf(keys, float(hw.call(by)) + 0.022, by, true, 0.005), Vector3(0.009, 0.009, 0.004), cb, Vector3.ZERO, 8, 4)
 	# Bolsillito de pecho (ribete)
-	_tube(tw, _surf_path(keys, Vector2(-0.14, 0.14), Vector2(-0.085, 0.145), true, 0.003, 4), 0.004, 0.003, 5, up_f, cl)
+	var pk := [Vector2(-0.165, 0.115), Vector2(-0.118, 0.12)] if clay else [Vector2(-0.14, 0.14), Vector2(-0.085, 0.145)]   # F9: fuera de la solapa ancha
+	_tube(tw, _surf_path(keys, pk[0], pk[1], true, 0.003, 4), 0.004, 0.003, 5, up_f, cl)
 	# Cuello del saco por detrás y a los lados
 	var coll := PackedVector3Array()
 	for i in 9:
@@ -743,7 +769,7 @@ func _geo_chest() -> void:
 		coll.append(Vector3(sin(ang) * rr, 0.262, cos(ang) * (rr + 0.004) + 0.004))
 	_tube(tw, coll, 0.018, 0.016, 6, Vector3(0, 1, 0), cl)
 	# Botones de la camisa (o del chaleco) y cuello
-	for i in (3 if clay else 5):
+	for i in (0 if clay else 5):    # F9: el suéter de punto no lleva botones
 		var y := lerpf(0.2 if clay else 0.235, -0.14, float(i) / (2.0 if clay else 4.0))
 		_ellip(tw, _on_surf(keys, 0.0, y, true, 0.003), Vector3(0.0045, 0.0045, 0.0025), cv.darkened(0.45) if clay else cb, Vector3.ZERO, 8, 4)
 	var collar := [
@@ -753,7 +779,10 @@ func _geo_chest() -> void:
 		_rr(0.296, 0.058, 0.057, 0.06, 0.002, 2.1),
 		_rr(0.3, 0.056, 0.055, 0.058, 0.002, 2.0),
 		_r(0.301, 0.0, 0.0, 0.002)]
-	_loft(tw, collar, 18, Transform3D.IDENTITY, _c(C_TROUSER) if clay else cw)    # cuello alto negro en arcilla
+	if clay:    # F9: cuello alto del suéter café (68107), de punto
+		_loft(_knit(), collar, 18, Transform3D.IDENTITY, cv.darkened(0.08))
+	else:
+		_loft(tw, collar, 18, Transform3D.IDENTITY, cw)
 	if ClayStyle.enabled:
 		_clay_scarf(keys)
 		_clay_satchel(keys)
@@ -975,21 +1004,28 @@ func _geo_head() -> void:
 	var nose := PackedVector3Array()
 	var nra: Array = []
 	var nrb: Array = []
-	var nys := [0.148, 0.128, 0.106, 0.092, 0.087]      # F3: punta redondeada y algo levantada
-	var nout := [0.0, 0.007, 0.017, 0.026, 0.026]
-	var nw := [0.0058, 0.0066, 0.0079, 0.0104, 0.0088]
-	for i in 5:
-		nose.append(Vector3(0, nys[i], _head_z(0.0, nys[i], keys) - nout[i] + 0.006))
+	# Ref. 68107: nariz larga y RECTA (perfil en línea desde el entrecejo), punta redondeada algo rosada.
+	# nys = alturas; nfz = línea frontal del perfil (z absoluta); nrb = semigrosor; nw = semiancho.
+	# (nrb crece hacia abajo: la parte trasera del tubo toca la cara → cuña de perfil, sin hueco bajo la punta)
+	var nys := [0.152, 0.132, 0.112, 0.097, 0.089, 0.0815, 0.0775]
+	var nfz := [-0.1075, -0.1155, -0.1235, -0.1295, -0.1325, -0.1265, -0.1135]
+	var nrbv := [0.005, 0.0085, 0.0125, 0.0155, 0.017, 0.0145, 0.0083]
+	var nw := [0.0055, 0.006, 0.0074, 0.0094, 0.012, 0.009, 0.0064]
+	for i in 7:
+		nose.append(Vector3(0, nys[i], float(nfz[i]) + float(nrbv[i])))
 		nra.append(nw[i])
-		nrb.append(0.005 + 0.003 * float(i) / 4.0)
-	_tube(skin_m, nose, nra, nrb, 8, up_f, skin)
+		nrb.append(nrbv[i])
+	var nose_tip := Vector3(0.0, 0.089, -0.127)
+	var pinkc := Color(skin.r, skin.g * 0.93, skin.b * 0.91)   # punta #CBA89F
+	var nose_col := func(p: Vector3) -> Color:
+		return skin.lerp(pinkc, clampf(1.0 - (p - nose_tip).length() / 0.022, 0.0, 1.0))
+	_tube(skin_m, nose, nra, nrb, 10, up_f, nose_col)
 	for sx in [-1.0, 1.0]:
-		var az := _head_z(0.012 * sx, 0.09, keys)
-		_ellip(skin_m, Vector3(0.0125 * sx, 0.0885, az - 0.004), Vector3(0.0072, 0.0058, 0.0082), skin,
+		_ellip(skin_m, Vector3(0.0094 * sx, 0.0858, -0.1115), Vector3(0.0064, 0.0057, 0.011), nose_col,
 			Vector3(0, 0.3 * sx, 0), 8, 5)
-		if ClayStyle.enabled:    # fosa nasal: punto oscuro bajo el ala
-			_ellip(skin_m, Vector3(0.0062 * sx, 0.0842, _head_z(0.0, 0.087, keys) - 0.0215), Vector3(0.0026, 0.0017, 0.0026),
-				_c(SKIN_TONE * 0.55), Vector3.ZERO, 6, 4)
+		if ClayStyle.enabled:    # fosa nasal: punto oscuro bajo la punta
+			_ellip(skin_m, Vector3(0.0056 * sx, 0.0793, -0.1155), Vector3(0.0026, 0.0016, 0.003),
+				_c(Color(SKIN_TONE.r * 0.5, SKIN_TONE.g * 0.4, SKIN_TONE.b * 0.42)), Vector3.ZERO, 6, 4)
 	# Labios
 	var lipc := _c(C_LIP)
 	for k in (0 if ClayStyle.enabled else 2):     # en arcilla la boca son piezas aparte (F5)
@@ -1117,18 +1153,18 @@ func _geo_hand(sx: float) -> void:
 
 
 # ---------------------------------------------------------------------
-#  Piernas: pantalón de vestir entubado y zapatos negros
+#  Piernas: pantalón de vestir recto (F9, 68107: pernera algo holgada, pliegue sobre el zapato) y zapatos café
 # ---------------------------------------------------------------------
 
 static func _thigh_rings() -> Array:
 	return _sc([
 		_r(0.07, 0.09, 0.095),
-		_r(0.0, 0.098, 0.1, 0.004, 2.0, 0.012),
-		_r(-0.1, 0.094, 0.094, 0.0, 2.0, 0.01),
-		_r(-0.2, 0.086, 0.085, 0.0, 2.0, 0.008),
-		_r(-0.3, 0.076, 0.077, 0.0, 2.0, 0.01),
-		_r(-0.38, 0.069, 0.071, 0.0, 2.0, 0.015),
-		_r(-0.45, 0.064, 0.066, 0.0, 2.0, 0.012),
+		_r(0.0, 0.096, 0.1, 0.004, 2.0, 0.012),
+		_r(-0.1, 0.09, 0.092, 0.0, 2.0, 0.01),
+		_r(-0.2, 0.084, 0.086, 0.0, 2.0, 0.01),
+		_r(-0.3, 0.079, 0.081, 0.0, 2.0, 0.012),
+		_r(-0.38, 0.076, 0.078, 0.0, 2.0, 0.016),
+		_r(-0.45, 0.074, 0.076, 0.0, 2.0, 0.012),
 	], THIGH_LEN / 0.43, 0.8, 0.84)
 
 
@@ -1141,71 +1177,76 @@ func _geo_thigh(sx: float) -> void:
 	var crease := PackedVector3Array()
 	for yy in [0.02, -0.12, -0.25, -0.36]:
 		crease.append(_on_surf(keys, 0.0, yy * ky, true, 0.0008))
-	_tube(tw, crease, 0.003, 0.0014, 4, Vector3(0, 0, -1), _c(C_TROUSER * 1.5))
+	_tube(tw, crease, 0.003, 0.0014, 4, Vector3(0, 0, -1), _c(C_TROUSER * 1.12))
 
 
 func _geo_shin(_sx: float) -> void:
 	var ky := SHIN_LEN / 0.38
 	var rings := _sc([
 		_r(0.06, 0.0, 0.0),
-		_r(0.055, 0.058, 0.06),
-		_r(0.0, 0.068, 0.07, -0.002, 2.0, 0.015),
-		_r(-0.08, 0.063, 0.066, 0.006, 2.0, 0.008),
-		_r(-0.18, 0.058, 0.062, 0.006, 2.0, 0.006),
-		_r(-0.27, 0.055, 0.057, 0.0, 2.0, 0.008),
-		_r(-0.34, 0.056, 0.058, 0.0, 2.0, 0.012),
-		_r(-0.372, 0.056, 0.058, -0.002),
-		_r(-0.376, 0.0, 0.0, -0.002),
+		_r(0.055, 0.066, 0.068),
+		_r(0.0, 0.075, 0.077, -0.002, 2.0, 0.015),
+		_r(-0.08, 0.074, 0.076, 0.002, 2.0, 0.008),
+		_r(-0.18, 0.073, 0.075, 0.002, 2.0, 0.006),
+		_r(-0.27, 0.073, 0.075, 0.0, 2.0, 0.008),
+		_rr(-0.33, 0.074, 0.077, 0.075, -0.001, 2.0, 0.01),
+		# pliegue suave (quiebre) y ruedo inclinado: adelante descansa sobre el empeine, atrás tapa el talón
+		_rr(-0.36, 0.078, 0.085, 0.078, -0.004, 2.0, 0.022, 0.0, -0.12),
+		_rr(-0.385, 0.079, 0.084, 0.08, -0.006, 2.0, 0.016, 0.0, -0.25),
+		_rr(-0.398, 0.078, 0.082, 0.079, -0.006, 2.0, 0.01, 0.0, -0.25),
+		_rr(-0.4, 0.0, 0.0, 0.0, -0.006, 2.0, 0.0, 0.0, -0.25),
 	], ky, 0.8, 0.84)
 	_loft(_twill(), rings, 16, Transform3D.IDENTITY, _c(C_TROUSER))
 	var crease := PackedVector3Array()
 	for yy in [0.03, -0.1, -0.22, -0.34]:
 		crease.append(_on_surf(rings.slice(1, 8), 0.0, yy * ky, true, 0.0008))
-	_tube(_twill(), crease, 0.003, 0.0014, 4, Vector3(0, 0, -1), _c(C_TROUSER * 1.5))
+	_tube(_twill(), crease, 0.003, 0.0014, 4, Vector3(0, 0, -1), _c(C_TROUSER * 1.12))
 
 
 func _geo_foot(sx: float) -> void:
 	# El loft corre a lo largo del pie (+y del loft = hacia la punta, -Z del pivote).
+	# F9 (68107): derby/botín bajo de cuero café, punta redondeada, suela fina oscura; ~0.28 m de largo,
+	# talón bajo (el ruedo del pantalón lo tapa por detrás y descansa sobre el empeine).
 	var xf := Transform3D(Basis(Vector3(1, 0, 0), -PI * 0.5), Vector3.ZERO)
 	# [avance, semiancho, alto inferior, alto superior]
 	var prof := [
-		[-0.086, 0.03, -0.071, 0.015],
-		[-0.072, 0.044, -0.073, 0.045],
-		[-0.04, 0.048, -0.073, 0.052],
-		[0.0, 0.05, -0.073, 0.048],
-		[0.04, 0.053, -0.073, 0.022],
-		[0.09, 0.055, -0.073, -0.005],
-		[0.14, 0.053, -0.071, -0.024],
-		[0.178, 0.045, -0.069, -0.038],
-		[0.198, 0.032, -0.067, -0.048],
+		[-0.074, 0.03, -0.083, -0.042],
+		[-0.064, 0.042, -0.084, -0.036],
+		[-0.035, 0.048, -0.084, -0.026],
+		[0.0, 0.05, -0.084, 0.006],
+		[0.04, 0.052, -0.084, -0.004],
+		[0.08, 0.054, -0.084, -0.02],
+		[0.12, 0.054, -0.084, -0.036],
+		[0.155, 0.049, -0.083, -0.047],
+		[0.178, 0.037, -0.082, -0.055],
 	]
-	var rings: Array = [_r(-0.09, 0.0, 0.0, -0.03)]
+	var rings: Array = [_r(-0.078, 0.0, 0.0, -0.064)]
 	for q in prof:
 		var bot: float = q[2]
 		var top: float = q[3]
 		# frente del anillo (-z local del loft) = abajo tras rotar
 		rings.append(_rr(q[0], q[1], (top - bot) * 0.5, (top - bot) * 0.5, (top + bot) * 0.5, 2.6))
-	rings.append(_r(0.206, 0.0, 0.0, -0.058))
+	rings.append(_r(0.189, 0.0, 0.0, -0.07))
 	var cs := _c(C_DRESS_SHOE)
-	var shoe_col := func(_p: Vector3) -> Color:
-		return cs
+	var shoe_col := func(p: Vector3) -> Color:    # puntera algo más clara (cuero lustrado)
+		return cs.lerp(cs * 1.22, smoothstep(0.08, 0.17, -p.z))
 	var shoe_uv := func(p: Vector3, _uv: Vector2) -> Vector2:
 		return Vector2(-p.z / 0.25, 0.8 + 0.1 * p.x)
 	_loft(_sole(), rings, 16, xf, shoe_col, shoe_uv)
-	# Suela gruesa: entresuela + suela de goma con perfil (escalón) y puntera levantada
+	# Suela fina oscura (vira + suela) con la puntera apenas levantada
 	var sole_rings := func(bot: float, top: float, grow: float, inset: float) -> Array:
-		var out: Array = [_r(-0.094 + inset, 0.0, 0.0, 0.5 * (bot + top))]
-		for q in [[-0.09, 0.034], [-0.075, 0.05], [-0.04, 0.054], [0.03, 0.057], [0.1, 0.061], [0.16, 0.057],
-				[0.195, 0.044], [0.212, 0.026]]:
+		var out: Array = [_r(-0.08 + inset, 0.0, 0.0, 0.5 * (bot + top))]
+		for q in [[-0.077, 0.032], [-0.067, 0.046], [-0.035, 0.051], [0.03, 0.054], [0.09, 0.058], [0.14, 0.056],
+				[0.172, 0.045], [0.188, 0.028]]:
 			var f: float = q[0]
-			var lift := 0.012 * pow(clampf((f - 0.12) / 0.09, 0.0, 1.0), 2.0) + 0.004 * clampf((-0.06 - f) / 0.03, 0.0, 1.0)
+			var lift := 0.008 * pow(clampf((f - 0.12) / 0.07, 0.0, 1.0), 2.0) + 0.002 * clampf((-0.05 - f) / 0.03, 0.0, 1.0)
 			out.append(_rr(f, float(q[1]) + grow - inset, (top - bot) * 0.5, (top - bot) * 0.5, (top + bot) * 0.5 + lift, 5.0))
-		out.append(_r(0.217 - inset, 0.0, 0.0, 0.5 * (bot + top) + 0.012))
+		out.append(_r(0.193 - inset, 0.0, 0.0, 0.5 * (bot + top) + 0.009))
 		return out
-	_loft(_sole(), sole_rings.call(-0.09, -0.064, 0.006, 0.0), 14, xf, _c(C_DRESS_SHOE * 1.3), func(p: Vector3, _uv: Vector2) -> Vector2:
-		return Vector2(-p.z / 0.25, clampf((-0.064 - p.y) / 0.026, 0.0, 1.0)))
-	_loft(_sole(), sole_rings.call(-0.1, -0.088, 0.004, 0.003), 12, xf, _c(C_DRESS_SHOE * 1.8), func(p: Vector3, _uv: Vector2) -> Vector2:
-		return Vector2(-p.z / 0.25, 0.4 + clampf((-0.088 - p.y) / 0.012, 0.0, 1.0) * 0.6))
+	_loft(_sole(), sole_rings.call(-0.092, -0.081, 0.004, 0.0), 14, xf, _c(C_DRESS_SHOE * 0.62), func(p: Vector3, _uv: Vector2) -> Vector2:
+		return Vector2(-p.z / 0.25, clampf((-0.081 - p.y) / 0.011, 0.0, 1.0)))
+	_loft(_sole(), sole_rings.call(-0.1, -0.091, 0.003, 0.002), 12, xf, _c(C_DRESS_SHOE * 0.42), func(p: Vector3, _uv: Vector2) -> Vector2:
+		return Vector2(-p.z / 0.25, 0.4 + clampf((-0.091 - p.y) / 0.009, 0.0, 1.0) * 0.6))
 
 
 # =====================================================================
@@ -1612,23 +1653,58 @@ func snap_pose(state: String, speed: float, phase := 0.0) -> void:
 
 ## Ojo de muñeco de plastilina: globo blanco grande que sobresale, pupila pequeña negra,
 ## párpado superior de piel que cae un poco (mirada cansada) y ceja gruesa encima.
-## Ojera: rollito de arcilla más oscuro (malva) bajo el ojo. Queda en la malla de la cabeza (no se anima).
+## Ojera (ref. 68107): párpado inferior hinchado (rollo malva) que abraza el globo por abajo y los lados,
+## banda ancha más oscura (gris morado) por fuera y sombra suave sobre el párpado superior.
+## Queda en la malla de la cabeza (no se anima). Los rollos siguen el borde donde el globo sale de la piel.
 func _clay_eye_bag(skin_m: Material, ex: float, _sx: float, ez: float) -> void:
-	var up_f := Vector3(0, 0, -1)
 	var c := _eye_center(ex, ez)
-	var bag := PackedVector3Array()
-	for i in 5:
-		var t := float(i) / 4.0
-		var a := lerpf(-1.05, 1.05, t)
-		bag.append(c + Vector3(sin(a) * 0.0285, -cos(a) * 0.0275, -0.0045 - 0.004 * cos(a)))
-	_tube(skin_m, bag, [0.0035, 0.006, 0.007, 0.006, 0.0035], 0.0035, 6, up_f, _c(Color(0.46, 0.40, 0.42)))   # ojera morada/marrón (#5B4653 de la lámina, sin magenta)
+	var keys := _head_keys()
+	var sk := SKIN_TONE
+	# (la luz morada y la sombra cambian mucho el tono en esta zona: albedos calibrados midiendo capturas)
+	# banda ancha gris morada bajo el ojo y párpado inferior hinchado pegado al globo
+	_bag_ring(skin_m, c, keys, 1.25, 0.0052, 0.0072, 0.0013, false, _c(Color(sk.r * 0.735, sk.g * 0.7, sk.b * 0.675)))   # #5B4646
+	_bag_ring(skin_m, c, keys, 1.75, 0.0004, 0.0058, 0.0038, true, _c(Color(sk.r * 0.75, sk.g * 0.73, sk.b * 0.715)))    # #8C716E
+	# sombra suave sobre el párpado superior: pliegue donde el párpado sale de la piel
+	_bag_ring(skin_m, c, keys, 1.1, 0.0026, 0.0036, 0.0012, false, _c(Color(sk.r * 0.8, sk.g * 0.76, sk.b * 0.74)), PI)   # #7C5E5B
+
+
+## Arco de ojera alrededor de la parte baja del ojo (a ∈ [−amax, amax], 0 = abajo), a `off` del borde del globo.
+## w = semiancho radial (se afina en las puntas), d = semigrosor; on_eye: se pega al globo (rollo), si no a la piel.
+func _bag_ring(mat: Material, c: Vector3, keys: Array, amax: float, off: float, w: float, d: float, on_eye: bool, col: Color,
+		a0 := 0.0) -> void:
+	var path := PackedVector3Array()
+	var ws: Array = []
+	var n := 11
+	for i in n:
+		var t := float(i) / float(n - 1)
+		var a := a0 + lerpf(-amax, amax, t)
+		var rim := _eye_rim(c, a, keys)
+		var p := rim + Vector3(sin(a) * off, -cos(a) * off, 0.0)
+		p.z = (rim.z - 0.0014) if on_eye else minf(_head_z(p.x, p.y, keys) - d * 0.7, rim.z + 0.004)   # sin colas hacia la sien
+		path.append(p)
+		ws.append(lerpf(w * 0.3, w, pow(sin(PI * t), 0.6)))
+	_tube(mat, path, ws, d, 8, Vector3(0, 0, -1), col)
+
+
+## Punto del borde donde el globo (dirección a; 0 = abajo) entra en la piel de la cuenca.
+func _eye_rim(c: Vector3, a: float, keys: Array) -> Vector3:
+	var p := Vector3.ZERO
+	for i in 14:
+		var rho := 0.5 + 0.05 * float(i)
+		p.x = c.x + sin(a) * EYE_R.x * rho
+		p.y = c.y - cos(a) * EYE_R.y * rho
+		var ze := c.z - EYE_R.z * sqrt(maxf(0.0, 1.0 - rho * rho))
+		p.z = _head_z(p.x, p.y, keys)
+		if ze >= p.z - 0.0005:
+			return p
+	return p
 
 
 ## Centro del globo ocular (hundido en la cuenca: sobresale menos que antes).
 func _eye_center(ex: float, ez: float) -> Vector3:
-	return Vector3(ex * 1.06, EYE_Y - 0.002, ez + 0.001)
+	return Vector3(ex * 1.06, EYE_Y - 0.002, ez + 0.0035)   # ref. 68107: de perfil asoma poco más que la ceja
 
-const EYE_R := Vector3(0.028, 0.028, 0.017)    # radios del globo ocular
+const EYE_R := Vector3(0.0262, 0.0258, 0.0168)  # radios del globo ocular (ref. 68107: ancho ≈ 0.65 × distancia entre pupilas)
 const MOUTH_Y := 0.0555                          # altura del centro de la boca
 const TEETH := Color(0.72, 0.70, 0.64)
 
@@ -1676,9 +1752,20 @@ func _geo_mouth(id: int) -> void:
 	var lc_up := _c(C_LIP * 0.92)
 	var my := MOUTH_Y
 	match id:
-		1:   # neutro: labios de arcilla ligeramente bajos, comisuras algo caídas
-			_lip(keys, sm, lc_up, 0.022, func(t: float) -> float: return my + 0.0045 + 0.001 * sin(t * PI) - 0.0012 * absf(2.0 * t - 1.0), 0.0029, 0.0024, 0.002)
-			_lip(keys, sm, lc, 0.022, func(t: float) -> float: return my - 0.0025 - 0.0008 * sin(t * PI) - 0.0006 * absf(2.0 * t - 1.0), 0.0036, 0.0032, 0.002)
+		1:   # neutro (ref. 68107): sonrisa suave y cerrada: línea curva hacia arriba, labio inferior rosado tenue, hoyuelos
+			var sk := SKIN_TONE
+			var crease := _c(Color(0.47, 0.35, 0.26))                          # línea de la boca: se ve #653E3B (medido)
+			var pinklip := _c(Color(sk.r * 0.89, sk.g * 0.8, sk.b * 0.72))      # labio inferior #AA857E (medido)
+			_lip(keys, sm, pinklip, 0.0205, func(t: float) -> float: return my - 0.0042 + 0.0036 * pow(2.0 * t - 1.0, 2.0), 0.0024, 0.0021, 0.0011, 9)
+			_lip(keys, sm, crease, 0.0275, func(t: float) -> float: return my - 0.0014 + 0.005 * pow(2.0 * t - 1.0, 2.0), 0.0015, 0.001, 0.0007, 11)
+			for sx in [-1.0, 1.0]:      # hoyuelos: paréntesis cortos en las comisuras
+				var dimple := PackedVector3Array()
+				for i in 4:
+					var u := float(i) / 3.0
+					var dx: float = sx * (0.0292 + 0.0028 * sin(u * PI))
+					var dy := my + 0.0058 - 0.0085 * u
+					dimple.append(Vector3(dx, dy, _head_z(dx, dy, keys) + 0.0002))
+				_tube(sm, dimple, 0.001, 0.0008, 5, Vector3(0, 0, -1), _c(Color(sk.r * 0.74, sk.g * 0.62, sk.b * 0.62)))
 		2:   # asombrado: "O" abierta con interior oscuro
 			_mouth_cavity(keys, my, 0.0105, 0.0145)
 			var ring := PackedVector3Array()
@@ -1713,7 +1800,7 @@ func _build_face_pieces() -> void:
 		var c := _eye_center(ex, ez)
 		_dress_piece("eye_" + sfx, c, _geo_eyeball.bind(c, sx))
 		_dress_piece("lid_" + sfx, c, _geo_lid.bind(c))
-		var bo := Vector3(ex * 1.08, EYE_Y + 0.04, ez - 0.012)
+		var bo := Vector3(sx * 0.04, _brow_y(0.5), _head_z(sx * 0.04, _brow_y(0.5), keys) - 0.003)   # centro de la ceja
 		_dress_piece("brow_" + sfx, bo, _geo_brow.bind(ex, ez, sx))
 	# Boca (F5): 5 piezas cacheadas, una visible a la vez
 	var mo := Vector3(0.0, MOUTH_Y, _head_z(0.0, MOUTH_Y, keys))
@@ -1726,41 +1813,59 @@ func _build_face_pieces() -> void:
 	_build_coat_skirt()
 
 
-## Globo ocular: esclerótica gris-blanca, iris oscuro, pupila y UN solo brillo (esfera de plástico sin vida).
+## Globo ocular (ref. 68107): esclerótica blanco roto SIN iris, pupila negra pequeña casi centrada y un brillo de cristal.
+const C_CLAY_SCLERA := Color(0.585, 0.635, 0.645)   # albedo frío: la luz del preset lo calienta → blanco roto #BCBBB9 (medido)
+
+func _eye_front(c: Vector3, off: Vector2) -> Vector3:     # punto de la superficie frontal del globo
+	var q := 1.0 - pow(off.x / EYE_R.x, 2.0) - pow(off.y / EYE_R.y, 2.0)
+	return c + Vector3(off.x, off.y, -EYE_R.z * sqrt(maxf(q, 0.0)))
+
 func _geo_eyeball(c: Vector3, sx: float) -> void:
 	var em := _eye()
-	_ellip(em, c, EYE_R, _c(C_CLAY_EYE), Vector3.ZERO, 14, 8)
-	var g := Vector3(-0.003 * sx, -0.001, 0.0)       # la mirada cae un poco hacia adentro
-	_ellip(em, c + g + Vector3(0, 0, -0.0163), Vector3(0.0108, 0.0108, 0.0024), _c(Color(0.2, 0.17, 0.17)), Vector3.ZERO, 10, 4)
-	_ellip(em, c + g + Vector3(0, 0, -0.0176), Vector3(0.0058, 0.0058, 0.0016), _c(GothicClayAdapter.PUPIL), Vector3.ZERO, 8, 4)
-	_ellip(em, c + Vector3(0.0065, 0.0045, -0.0162), Vector3(0.0029, 0.0029, 0.0011), _c(Color(0.95, 0.95, 0.97)), Vector3.ZERO, 8, 4)
+	_ellip(em, c, EYE_R, _c(C_CLAY_SCLERA), Vector3.ZERO, 16, 10)
+	var g := Vector2(-0.0018 * sx, -0.0004)            # la mirada apenas hacia adentro
+	_ellip(em, _eye_front(c, g) + Vector3(0, 0, 0.0004), Vector3(0.0054, 0.0054, 0.0013), _c(GothicClayAdapter.PUPIL), Vector3.ZERO, 10, 4)
+	_ellip(em, _eye_front(c, Vector2(0.0078, 0.0072)) + Vector3(0, 0, 0.0003), Vector3(0.0036, 0.0027, 0.0008),
+		_c(Color(0.78, 0.78, 0.8)), Vector3(0, 0, 0.5), 8, 4)
 
 
-## Párpado superior: casquete grueso de arcilla que gira en el centro del ojo (rotation.x < 0 lo baja).
-## Reposo: el borde queda a ≈ 68° desde la vertical (párpado pesado, mirada cansada).
+## Párpado superior: casquete fino de piel malva que gira en el centro del ojo (rotation.x < 0 lo baja).
+## Reposo (ref. 68107): ojo bien abierto. Casquete de 76° con el polo inclinado 0.35 rad hacia atrás: el borde
+## queda a ≈ 56° de la vertical por delante (algo más bajo en las esquinas) y al cerrarse cubre todo el globo.
 func _geo_lid(c: Vector3) -> void:
 	var sm := _skin()
-	var col := _c(SKIN_TONE * 0.93)
+	var col := _c(Color(SKIN_TONE.r * 0.84, SKIN_TONE.g * 0.8, SKIN_TONE.b * 0.81))   # se ve #AF918D (medido)
 	var m := 16
-	var rows: Array = [[0.0, 1.05], [0.35, 1.045], [0.7, 1.045], [0.95, 1.045], [1.1, 1.05], [1.17, 1.1], [1.23, 1.075], [1.32, 0.985]]
+	var rows: Array = [[0.0, 1.06], [0.4, 1.055], [0.8, 1.055], [1.09, 1.06], [1.2, 1.095], [1.27, 1.08], [1.32, 1.0]]
+	var tilt := Basis(Vector3(1, 0, 0), 0.35)
 	var P := PackedVector3Array()
 	for r in rows:
 		var ph: float = r[0]
 		var k: float = r[1]
 		for j in m:
 			var th := TAU * float(j) / float(m)
-			P.append(c + Vector3(EYE_R.x * k * sin(ph) * sin(th), EYE_R.y * k * cos(ph), -EYE_R.z * k * sin(ph) * cos(th)))
+			var u := tilt * Vector3(sin(ph) * sin(th), cos(ph), -sin(ph) * cos(th))
+			P.append(c + Vector3(EYE_R.x * u.x, EYE_R.y * u.y, EYE_R.z * u.z) * k)
 	_grid(sm, P, rows.size(), m, Transform3D.IDENTITY, col)
 
 
-## Ceja gruesa de plastilina, un poco caída hacia afuera (pieza propia: sube, baja e inclina).
-func _geo_brow(ex: float, ez: float, sx: float) -> void:
+## Ceja (ref. 68107): rollo grueso de plastilina casi negra en arco suave; extremo interior romo,
+## exterior afinado y algo caído. Sigue la frente (pieza propia: sube, baja e inclina).
+const C_BROW := Color(0.33, 0.32, 0.27)    # se ve casi negro neutro (#2A2929, medido: el material de pelo oscurece mucho)
+
+func _brow_y(t: float) -> float:
+	return EYE_Y + 0.0415 + 0.006 * sin(t * PI * 0.9) - 0.011 * t * t
+
+func _geo_brow(_ex: float, _ez: float, sx: float) -> void:
+	var keys := _head_keys()
 	var brow := PackedVector3Array()
-	for i in 4:
-		var t := float(i) / 3.0
-		var bx: float = ex * 1.08 + sx * lerpf(-0.02, 0.022, t)
-		brow.append(Vector3(bx, EYE_Y + 0.04 + 0.005 * sin(t * PI) - 0.007 * t, ez - 0.012))
-	_tube(_hair(), brow, [0.0075, 0.0085, 0.0075, 0.005], 0.005, 6, Vector3(0, 0, -1), _c(C_HAIR * 0.8))
+	for i in 6:
+		var t := float(i) / 5.0
+		var bx: float = sx * lerpf(0.0175, 0.062, t)
+		var by := _brow_y(t)
+		brow.append(Vector3(bx, by, _head_z(bx, by, keys) - 0.0016))
+	_tube(_hair(), brow, [0.0056, 0.006, 0.0058, 0.005, 0.0039, 0.0026], [0.0042, 0.0044, 0.0042, 0.0038, 0.0032, 0.0024],
+		8, Vector3(0, 0, -1), _c(C_BROW))
 
 
 ## Cara por pasos (stop-motion). blink: 0 abierto, 1 entrecerrado, 2 cerrado.
@@ -1768,9 +1873,13 @@ func _geo_brow(ex: float, ez: float, sx: float) -> void:
 func set_face(blink: int, gaze := Vector2.ZERO, brow_l := 0.0, brow_r := 0.0) -> void:
 	if _pieces.is_empty():
 		return
-	var rx: float = [0.0, -0.55, -1.2][clampi(blink, 0, 2)]
+	var rx: float = [0.0, -0.62, -1.6][clampi(blink, 0, 2)]    # el párpado de reposo es más alto (ojo abierto)
+	# el globo es achatado en z: al cerrar se estira el casquete en su z local (que al girar queda vertical) para taparlo entero
+	var sz: float = [1.0, 1.12, 1.55][clampi(blink, 0, 2)]
 	for sfx in ["l", "r"]:
-		(_pieces["lid_" + sfx] as Node3D).rotation = Vector3(rx, 0.0, 0.0)
+		var lid: Node3D = _pieces["lid_" + sfx]
+		lid.rotation = Vector3(rx, 0.0, 0.0)
+		lid.scale = Vector3(lid.scale.x, lid.scale.x, lid.scale.x * sz)
 		(_pieces["eye_" + sfx] as Node3D).rotation = Vector3(gaze.y, -gaze.x, 0.0)
 		var b: Node3D = _pieces["brow_" + sfx]
 		var v: float = brow_l if sfx == "l" else brow_r
@@ -1779,90 +1888,112 @@ func set_face(blink: int, gaze := Vector2.ZERO, brow_l := 0.0, brow_r := 0.0) ->
 
 
 ## Oreja de arcilla: concha, hélix, antihélix y lóbulo (alrededor de eo; ek = escala; sx = lado).
+## Ref. 68107: orejas medianas (≈ 0.058 de alto sin escalar), redondeadas, piel con interior rosado.
 func _clay_ear(skin_m: Material, eo: Vector3, sx: float, ek: float, skin: Color) -> void:
-	var rot := Vector3(0.0, -0.5 * sx, 0.14 * sx)
-	var ec := eo + Vector3(0.006 * sx, 0, 0)
-	_ellip(skin_m, ec, Vector3(0.0105, 0.04, 0.028) * ek, skin, rot, 12, 7)
-	# hélix: aro que sube por delante, rodea la parte alta y cae por detrás
+	var k := ek * 0.74                                   # 26 % más pequeñas que antes
+	var sk := Color(skin.r, skin.g * 0.95, skin.b * 0.94)            # borde algo más rosado
+	var pink := Color(skin.r * 0.86, skin.g * 0.66, skin.b * 0.67)   # interior rosado
+	var rot := Vector3(0.0, -0.5 * sx, 0.12 * sx)
+	var ec := eo + Vector3(0.005 * sx, 0.0, 0.0)
+	_ellip(skin_m, ec, Vector3(0.0095, 0.04, 0.03) * k, sk, rot, 12, 7)
+	# hélix: aro redondeado que sube por delante, rodea la parte alta y cae por detrás
 	var helix := PackedVector3Array()
 	for i in 9:
-		var t := lerpf(deg_to_rad(215.0), deg_to_rad(-35.0), float(i) / 8.0)
-		helix.append(eo + Vector3(0.0105 * sx, 0.0, 0.0) + Vector3(0.0, sin(t) * 0.037, cos(t) * 0.025 - 0.001) * ek)
-	_tube(skin_m, helix, 0.0048 * ek, 0.0048 * ek, 6, Vector3(sx, 0, 0), skin)
-	# antihélix: arco interior más corto
+		var t := lerpf(deg_to_rad(215.0), deg_to_rad(-40.0), float(i) / 8.0)
+		helix.append(eo + Vector3(0.0092 * sx, 0.0, 0.0) + Vector3(0.0, sin(t) * 0.037, cos(t) * 0.027 - 0.001) * k)
+	_tube(skin_m, helix, 0.0056 * k, 0.0056 * k, 6, Vector3(sx, 0, 0), sk)
+	# antihélix: arco interior más corto, rosado claro
 	var anti := PackedVector3Array()
 	for i in 6:
 		var t := lerpf(deg_to_rad(200.0), deg_to_rad(-10.0), float(i) / 5.0)
-		anti.append(eo + Vector3(0.0092 * sx, 0.004, 0.0) + Vector3(0.0, sin(t) * 0.022, cos(t) * 0.014) * ek)
-	_tube(skin_m, anti, 0.0032 * ek, 0.0032 * ek, 5, Vector3(sx, 0, 0), skin)
-	# concha: hueco oscuro al centro
-	_ellip(skin_m, eo + Vector3(0.0105 * sx, 0.002, 0.0015), Vector3(0.0035, 0.011, 0.008) * ek, skin.darkened(0.28), rot, 8, 5)
+		anti.append(eo + Vector3(0.0085 * sx, 0.004 * k, 0.0) + Vector3(0.0, sin(t) * 0.022, cos(t) * 0.015) * k)
+	_tube(skin_m, anti, 0.0036 * k, 0.0036 * k, 5, Vector3(sx, 0, 0), sk.lerp(pink, 0.4))
+	# concha: hueco rosado al centro
+	_ellip(skin_m, eo + Vector3(0.0098 * sx, 0.002 * k, 0.0015 * k), Vector3(0.0035, 0.013, 0.01) * k, sk.lerp(pink, 0.7), rot, 8, 5)
 	# lóbulo
-	_ellip(skin_m, eo + Vector3(0.0075 * sx, -0.039 * ek, 0.007), Vector3(0.0072, 0.0095, 0.0095) * ek, skin, Vector3.ZERO, 8, 5)
+	_ellip(skin_m, eo + Vector3(0.0062 * sx, -0.035 * k, 0.006 * k), Vector3(0.0078, 0.0105, 0.011) * k, sk, Vector3.ZERO, 8, 5)
 
 
-## Bufanda (lámina #042). En la malla del pecho quedan las dos vueltas al cuello y el nudo; las dos colas son
-## piezas con cadena de pivotes (_build_scarf_tails) que reaccionan con retraso a la aceleración y al giro.
-## Colores de la lámina: verde marchito #2B452B, blanco sucio #B2ACA0, óxido #8C5A3E en las puntas.
-## Los albedos se calibran midiendo capturas (el render los sube): ver ANDRO_CONTEXTO §5.
-const SCARF_G := Color(0.095, 0.17, 0.1)
-const SCARF_W := Color(0.58, 0.585, 0.57)
-const SCARF_RUST := Color(0.4, 0.25, 0.18)
-const STRIPE_W := [0.55, 0.34, 0.7, 0.4, 0.5, 0.3, 0.8, 0.36]     # anchos irregulares: verde, blanco, verde…
+## Bufanda (referencia 68107). En la malla del pecho queda la vuelta gruesa al cuello (sin nudo visible); las dos
+## colas son piezas con cadena de pivotes (_build_scarf_tails) que cuelgan por delante y reaccionan al movimiento.
+## Color que se VE en la referencia: verde hierba ≈ #3E7F3A, blanco crema ≈ #D0CDBC (rayas regulares).
+## Los albedos se calibran midiendo capturas (el render los cambia): ver ANDRO_CONTEXTO §5.
+const SCARF_G := Color(0.355, 0.462, 0.335)
+const SCARF_W := Color(0.595, 0.615, 0.58)
+const SCARF_RUST := Color(0.4, 0.25, 0.18)    # solo la variante corta/rota
+const STRIPE_W := [0.026, 0.019]     # rayas regulares (unidades del pecho, a lo largo de la bufanda): verde, blanco
 const SCARF_VARIANTS := ["clasica", "torcida", "corta_rota", "flecos_largos"]
 
-## Color de la raya en la posición u (unidades de ancho): ancho irregular, un poco de desgaste.
+## Color de la raya en la posición u (distancia a lo largo de la bufanda, unidades del pecho).
 static func _stripe_col(u: float, p: Vector3) -> Color:
-	var total := 0.0
-	for w in STRIPE_W:
-		total += float(w)
-	var v := fposmod(u, total)
-	var white := false
-	for w in STRIPE_W:
-		if v < float(w):
-			break
-		v -= float(w)
-		white = not white
-	var jit := 0.92 + 0.16 * fposmod(sin(p.x * 913.0 + p.y * 571.0 + p.z * 337.0) * 43758.5, 1.0)
+	var per := float(STRIPE_W[0]) + float(STRIPE_W[1])
+	var white := fposmod(u, per) >= float(STRIPE_W[0])
+	var jit := 0.95 + 0.1 * fposmod(sin(p.x * 913.0 + p.y * 571.0 + p.z * 337.0) * 43758.5, 1.0)
 	var c := SCARF_W if white else SCARF_G
 	return _c(Color(c.r * jit, c.g * jit, c.b * jit))
 
 
-func _clay_scarf(keys: Array) -> void:
+## Parámetros t (0..1) para un tramo de bufanda que va de u0 a u0 + length: cada borde de raya lleva dos filas
+## de vértices muy juntas (±eps) para que el cambio de color sea nítido, más una fila a mitad de cada raya.
+static func _stripe_ts(u0: float, length: float, eps := 0.0007) -> PackedFloat32Array:
+	var per := float(STRIPE_W[0]) + float(STRIPE_W[1])
+	var bounds: Array[float] = []
+	var k := floorf(u0 / per) - 1.0
+	while k * per < u0 + length + per:
+		for b in [k * per, k * per + float(STRIPE_W[0])]:
+			var t := (float(b) - u0) / length
+			if t > eps / length * 2.0 and t < 1.0 - eps / length * 2.0:
+				bounds.append(t)
+		k += 1.0
+	var ts := PackedFloat32Array([0.0])
+	var e := eps / length
+	for t in bounds:
+		var last := ts[ts.size() - 1]
+		ts.append((last + t - e) * 0.5)
+		ts.append(t - e)
+		ts.append(t + e)
+	ts.append((ts[ts.size() - 1] + 1.0) * 0.5)
+	ts.append(1.0)
+	return ts
+
+
+func _clay_scarf(_keys: Array) -> void:
 	var km := _knit()
-	var total := 0.0
-	for w in STRIPE_W:
-		total += float(w)
-	# vuelta alrededor del cuello (ligeramente caída hacia adelante)
-	var ring := PackedVector3Array()
-	for i in 41:
-		var a := TAU * float(i) / 40.0
-		ring.append(Vector3(sin(a) * 0.098, 0.262 + 0.012 * cos(a) - 0.014 * maxf(-cos(a), 0.0), cos(a) * 0.092 + 0.004))
-	_tube(km, ring, 0.032, 0.026, 10, Vector3(0, 1, 0), func(p: Vector3) -> Color:
-		return _stripe_col((atan2(p.x, p.z) / TAU + 0.5) * total * 2.0, p), false)
-	# segunda vuelta más baja y floja
-	var ring2 := PackedVector3Array()
-	for i in 41:
-		var a := TAU * float(i) / 40.0
-		ring2.append(Vector3(sin(a) * 0.104, 0.236 - 0.02 * maxf(-cos(a), 0.0), cos(a) * 0.098 + 0.004))
-	_tube(km, ring2, 0.028, 0.022, 10, Vector3(0, 1, 0), func(p: Vector3) -> Color:
-		return _stripe_col((atan2(p.x, p.z) / TAU + 0.5) * total * 2.0 + 1.3, p), false)
-	# nudo entrelazado al frente: dos bultos de lana cruzados
-	var kc := _on_surf(keys, -0.006, 0.224, true, 0.027)
-	_ellip(km, kc, Vector3(0.036, 0.027, 0.026), func(p: Vector3) -> Color:
-		return _stripe_col((p.x * 0.5 + p.y) / 0.03, p), Vector3(0.0, 0.0, 0.35), 12, 7)
-	_ellip(km, kc + Vector3(0.024, -0.015, 0.004), Vector3(0.026, 0.02, 0.02), func(p: Vector3) -> Color:
-		return _stripe_col((p.x * 0.5 - p.y) / 0.03 + 1.0, p), Vector3(0.0, 0.0, -0.6), 10, 6)
+	var per := float(STRIPE_W[0]) + float(STRIPE_W[1])
+	var cz := 0.004
+	# Vuelta gruesa y abultada (rollo a rayas, se ve también de espalda): alta atrás, cae hacia el pecho.
+	# La segunda vuelta es solo el arco delantero, pegado debajo (bulto de lana doble); sus puntas entran en la primera.
+	# Las rayas cruzan el rollo; filas de vértices dobles en cada borde para que no se difuminen.
+	# [rx, rz, y0, inclinación, caída delante, radio radial, radio vertical, fase, arco desde, arco hasta]
+	for r in [[0.1, 0.094, 0.274, 0.012, 0.016, 0.036, 0.04, 0.0, 0.0, 1.0],
+			[0.106, 0.1, 0.25, 0.012, 0.03, 0.03, 0.03, 0.4, 0.28, 0.72]]:
+		var rx: float = r[0]
+		var rz: float = r[1]
+		var y0: float = r[2]
+		var tilt: float = r[3]
+		var droop: float = r[4]
+		var circ := TAU * sqrt((rx * rx + rz * rz) * 0.5)
+		var L := float(maxi(roundi(circ / per), 1)) * per
+		var ph: float = float(r[7]) * per
+		var f0: float = r[8]
+		var f1: float = r[9]
+		var ring := PackedVector3Array()
+		for t in _stripe_ts(ph + f0 * L, (f1 - f0) * L, 0.0012):
+			var a := TAU * lerpf(f0, f1, t)
+			ring.append(Vector3(sin(a) * rx, y0 + tilt * cos(a) - droop * maxf(-cos(a), 0.0), cos(a) * rz + cz))
+		_tube(km, ring, r[5], r[6], 12, Vector3(0, 1, 0), func(p: Vector3) -> Color:
+			return _stripe_col(fposmod(atan2(p.x / rx, (p.z - cz) / rz) / TAU, 1.0) * L + ph, p), f1 - f0 < 0.99)
 
 
-## Puntos de articulación de una cola (espacio del pecho). tail 0 = larga (izquierda), 1 = corta (derecha).
+## Puntos de articulación de una cola (espacio del pecho). tail 0 = larga (+X: a la izquierda de quien mira),
+## 1 = un poco más corta (−X). Salen de debajo de la vuelta del cuello y bajan casi paralelas hasta la cintura.
 func _scarf_joints(keys: Array, variant: int, tail: int) -> PackedVector3Array:
 	var short := variant == 2
-	var y_end: float = [-0.12, -0.03][tail] if not short else [-0.05, 0.07][tail]
-	var x0: float = [-0.03, 0.035][tail]
-	var x1: float = [-0.048, 0.06][tail]
+	var y_end: float = [-0.125, -0.105][tail] if not short else [-0.05, -0.025][tail]
+	var x0: float = [0.048, -0.046][tail]
+	var x1: float = [0.064, -0.06][tail]
 	var nseg: int = [4, 3][tail]
-	return _surf_path(keys, Vector2(x0, 0.226), Vector2(x1, y_end), true, 0.032 - 0.007 * float(tail), nseg + 1)
+	return _surf_path(keys, Vector2(x0, 0.25), Vector2(x1, y_end), true, 0.03, nseg + 1)
 
 
 ## Una pieza (segmento) de cola. seg 0..n-1; el último lleva los flecos.
@@ -1871,8 +2002,12 @@ func _geo_scarf_seg(variant: int, tail: int, seg: int) -> void:
 	var keys := _blazer_rings()
 	var J := _scarf_joints(keys, variant, tail)
 	var n := J.size() - 1
-	var y_top := J[0].y
-	var y_len := maxf(y_top - J[n].y, 0.05)
+	# longitud de arco: las rayas se miden a lo largo de la cola; la fase deja una raya verde justo encima de los flecos
+	var cum := PackedFloat32Array([0.0])
+	for i in n:
+		cum.append(cum[i] + J[i].distance_to(J[i + 1]))
+	var l_tot := cum[n]
+	var u_off := float(STRIPE_W[0]) * 0.5 - l_tot
 	var a := J[seg]
 	var b := J[seg + 1]
 	var dirv := (b - a).normalized()
@@ -1881,25 +2016,39 @@ func _geo_scarf_seg(variant: int, tail: int, seg: int) -> void:
 	var up := Vector3(0, 0, -1)
 	if variant == 1:    # torcida: la tira gira sobre su eje
 		up = up.rotated(dirv, 0.7 * float(seg) * (1.0 if tail == 0 else -1.0))
-	var wd := func(s: float) -> float: return lerpf(0.036, 0.026, s) - (0.004 if tail == 1 else 0.0)
-	var mid := a.lerp(b, 0.5)
-	var path := PackedVector3Array([a - dirv * (0.0 if seg == 0 else 0.004), mid, b + dirv * (0.0 if seg == n - 1 else 0.004)])
+	var wd := func(s: float) -> float: return lerpf(0.044, 0.04, s)
+	var ext0 := 0.012 if seg == 0 else 0.004    # arriba se mete bajo la vuelta del cuello; entre piezas, solape
+	var ext1 := 0.0 if seg == n - 1 else 0.004
+	var la := cum[seg] - ext0
+	var lb := cum[seg + 1] + ext1
+	var path := PackedVector3Array()
+	var ra: Array = []
+	var rb: Array = []
+	for t in _stripe_ts(la + u_off, lb - la):
+		var s := lerpf(la, lb, t)
+		path.append(a + dirv * (s - cum[seg]))
+		ra.append(wd.call(lerpf(s0, s1, clampf((s - cum[seg]) / maxf(cum[seg + 1] - cum[seg], 1e-4), 0.0, 1.0))))
+		rb.append(0.011)
 	var col := func(p: Vector3) -> Color:
-		var c := _stripe_col((y_top - p.y) / 0.042 + float(tail) * 0.8, p)
-		var rust := smoothstep(0.8, 1.0, (y_top - p.y) / y_len)
-		if variant == 2:
-			rust = smoothstep(0.55, 0.9, (y_top - p.y) / y_len)
-		return c.lerp(_c(SCARF_RUST), rust * 0.85)
-	_tube(km, path, [wd.call(s0), wd.call((s0 + s1) * 0.5), wd.call(s1)], [0.009, 0.009, 0.008], 8, up, col, true, 3.0)
-	if seg == n - 1:    # flecos
-		var nf := 10 if variant == 3 else (3 if variant == 2 else 5)
-		var fl := 0.05 if variant == 3 else (0.016 if variant == 2 else 0.024)
-		var half: float = float(wd.call(1.0)) * 0.8
+		var s := cum[seg] + (p - a).dot(dirv)
+		var c := _stripe_col(s + u_off, p)
+		if variant == 2:    # corta/rota: algo de desgaste en la punta
+			c = c.lerp(_c(SCARF_RUST), smoothstep(0.6, 1.0, s / l_tot) * 0.5)
+		return c
+	_tube(km, path, ra, rb, 8, up, col, true, 3.0)
+	if seg == n - 1:    # flecos: verdes y algunos blancos, gruesos y bien visibles
+		var nf := 10 if variant == 3 else (4 if variant == 2 else 7)
+		var fl := 0.07 if variant == 3 else (0.02 if variant == 2 else 0.042)
+		var half: float = float(wd.call(1.0)) * 0.86
+		var side := dirv.cross(up).normalized()
 		for f in nf:
-			var fx := b.x + lerpf(-half, half, float(f) / float(maxi(nf - 1, 1)))
-			var len_f := fl * (0.7 + 0.5 * fposmod(sin(float(f) * 12.9898 + float(tail) * 4.0) * 43758.5, 1.0))
-			_tube(km, PackedVector3Array([Vector3(fx, b.y + 0.004, b.z), Vector3(fx + 0.002 * sin(float(f)), b.y - len_f, b.z - 0.004)]),
-				0.0042, 0.0042, 4, Vector3(0, 0, -1), _c(SCARF_RUST.lerp(SCARF_W if f % 2 == 0 else SCARF_G, 0.45)))
+			var fo := b + side * lerpf(-half, half, float(f) / float(maxi(nf - 1, 1)))
+			var len_f := fl * (0.85 + 0.25 * fposmod(sin(float(f) * 12.9898 + float(tail) * 4.0) * 43758.5, 1.0))
+			var fc := _c(SCARF_W if f % 3 == 1 else SCARF_G)
+			if variant == 2:
+				fc = fc.lerp(_c(SCARF_RUST), 0.4)
+			_tube(km, PackedVector3Array([fo - dirv * 0.006, fo + dirv * len_f + side * 0.002 * sin(float(f) * 2.3)
+				+ Vector3(0, 0, -0.003)]), 0.0052, 0.0048, 5, up, fc)
 
 
 ## Cuelga las colas (cadena de pivotes hija del pecho) de la variante pedida. Mallas cacheadas.
@@ -1969,10 +2118,9 @@ func _geo_coat_skirt(sx: float) -> void:
 	var tw := _twill()
 	var cs := _c(C_SUIT)
 	var cl := _c(C_SUIT_LAPEL)
-	var cb := _c(C_BUTTON)
-	var k := 1.02 if sx > 0.0 else 1.0           # la mitad derecha monta sobre la izquierda al frente
-	var a0 := -0.16 if sx > 0.0 else 0.0
-	var a1 := PI - 0.025                          # abertura trasera
+	var k := 1.02 if sx > 0.0 else 1.0
+	var a0 := 0.42                                # F9 (68107): abrigo abierto al frente (se ve el pantalón)
+	var a1 := PI + 0.03 if sx > 0.0 else PI - 0.01    # abertura trasera (F9: cerrada en reposo, la derecha monta)
 	var K := 12
 	var th := 0.008
 	var P := PackedVector3Array()
@@ -1986,25 +2134,20 @@ func _geo_coat_skirt(sx: float) -> void:
 	var hem_y: float = float(SKIRT_ROWS[SKIRT_ROWS.size() - 1][0])
 	_grid(tw, P, rows.size(), K * 2, Transform3D.IDENTITY, func(p: Vector3) -> Color:
 		return cs.lerp(cl, 0.5 * smoothstep(hem_y + 0.03, hem_y, p.y)))   # dobladillo gastado
-	# bolsillo con solapa
+	# bolsillo con solapa (F9: a la altura del borde del suéter, como en 68107); sin botones en el faldón abierto
+	var y_p := -0.055
 	var r_p: Array = SKIRT_ROWS[3]
+	for ri in SKIRT_ROWS.size() - 1:
+		var r0: Array = SKIRT_ROWS[ri]
+		var r1: Array = SKIRT_ROWS[ri + 1]
+		if y_p <= float(r0[0]) and y_p >= float(r1[0]):
+			var t: float = (float(r0[0]) - y_p) / (float(r0[0]) - float(r1[0]))
+			r_p = [y_p, lerpf(r0[1], r1[1], t), lerpf(r0[2], r1[2], t), lerpf(r0[3], r1[3], t)]
 	var flap := PackedVector3Array()
 	for j in 5:
-		var q := _skirt_pt(r_p, lerpf(0.42, 0.98, float(j) / 4.0), sx, -0.004, k)
+		var q := _skirt_pt(r_p, lerpf(0.62, 1.12, float(j) / 4.0), sx, -0.004, k)
 		flap.append(q + Vector3(0, 0.004, 0))
-	_tube(tw, flap, 0.016, 0.006, 6, Vector3(0, 1, 0), cl)
-	# botones que siguen la botonadura del pecho (solo en la mitad derecha)
-	if sx > 0.0:
-		for y in [-0.12, -0.24]:
-			var row := [y, 0.0, 0.0, 0.0]
-			for ri in SKIRT_ROWS.size() - 1:
-				var r0: Array = SKIRT_ROWS[ri]
-				var r1: Array = SKIRT_ROWS[ri + 1]
-				if y <= float(r0[0]) and y >= float(r1[0]):
-					var t: float = (float(r0[0]) - y) / (float(r0[0]) - float(r1[0]))
-					row = [y, lerpf(r0[1], r1[1], t), lerpf(r0[2], r1[2], t), lerpf(r0[3], r1[3], t)]
-			var bp := _skirt_pt(row, asin(0.038 / float(row[1])), sx, -0.003, k)
-			_ellip(tw, bp, Vector3(0.0085, 0.0085, 0.0038), cb, Vector3.ZERO, 8, 4)
+	_tube(tw, flap, 0.02, 0.006, 6, Vector3(0, 1, 0), cl)
 
 
 func _build_coat_skirt() -> void:
@@ -2053,9 +2196,7 @@ func _clay_satchel(keys: Array) -> void:
 	for front in ([true, false] if SATCHEL_ON else []):
 		var path := _surf_path(keys, Vector2(0.12, 0.25), Vector2(-0.165, -0.25), front, 0.008, 14)
 		_tube(lm, path, 0.016, 0.006, 6, Vector3(0, 0, -1.0 if front else 1.0), cs, false, 3.0)
-	if not SATCHEL_ON:
-		_tube(tw, _surf_path(keys, Vector2(-0.135, 0.12), Vector2(-0.085, 0.123), true, 0.006, 4), 0.005, 0.003, 5,
-			Vector3(0, 0, -1), _c(Color(0.62, 0.42, 0.18)))
+	if not SATCHEL_ON:    # F9 (68107): sin vivo ocre; el bolsillo de pecho es el ribete oscuro de _geo_chest
 		return
 	# remate de la correa sobre el hombro
 	_tube(lm, PackedVector3Array([_on_surf(keys, 0.12, 0.25, true, 0.008), Vector3(0.125, 0.285, 0.0),
@@ -2076,135 +2217,241 @@ func _clay_satchel(keys: Array) -> void:
 		Vector3(0, 0, -1), _c(Color(0.62, 0.42, 0.18)))
 
 
-## Cabello gótico despeinado (lámina asset #044-B), pieza aparte de la cabeza (F6). Casquete + mechones gruesos y
-## aplanados en 3 capas (frente, sienes, nuca), volumen asimétrico (más a la derecha), remolino en la coronilla y
-## puntas con polvo mate #78716C. Colores: base #1C1A1A, medios #322E2E, sombra #241F1C.
-## Variantes (hoja): 0 clásico, 1 viento/acción, 2 mojado/aplastado, 3 extra caótico.
+## Cabello de la referencia 68107 (12-nov-2026): un BLOQUE de arcilla casi negra y mate en tupé/flat-top alto.
+## Arriba 5 rollos de bordes redondeados alineados de lado a lado (de frente: ladrillos con surcos, en dos pisos:
+## bloque alto que sobresale + bloque bajo sobre la frente) que corren de la frente a la coronilla; por detrás bajan
+## 7 franjas verticales hasta la nuca. Lados cortos pegados al cráneo y peinados hacia atrás (surcos de peine),
+## patilla corta delante de la oreja; la oreja queda libre. Línea de pelo recta y alta: no tapa las cejas. Sin púas.
+## Variantes: 0 clásico (la referencia), 1 viento (rollos echados hacia atrás), 2 mojado (aplastado y más oscuro),
+## 3 caótico (rollos desalineados). Se ve ≈ #1E1C1C–#3A3838: el albedo HAIR_BLOCK se calibra midiendo (§5).
 const HAIR_VARIANTS := ["clasico", "viento", "mojado", "caotico"]
 const HAIR_ORIGIN := Vector3(0.0, 0.125, 0.0)    # el pelo gira/oscila alrededor de aquí
+const HAIR_BLOCK := Color(0.41, 0.41, 0.38)      # albedo del bloque (medido: luces ≈ #3D383C, medios casi negros)
 
 func _geo_hair(variant: int) -> void:
 	var hair_m := _hair()
-	var hairc := _c(C_HAIR)
-	var hk := [
-		_rr(0.128, 0.079, 0.094, 0.104, 0.0, 2.3, 0.0, 0.0, -0.58),
-		_rr(0.13, 0.085, 0.1, 0.112, 0.0, 2.3, 0.02, 0.0, -0.55),
-		_rr(0.155, 0.087, 0.101, 0.113, 0.002, 2.3, 0.02, 0.0, -0.4),
-		_rr(0.18, 0.087, 0.098, 0.112, 0.004, 2.3, 0.025, 0.0, -0.25),
-		_rr(0.205, 0.083, 0.093, 0.106, 0.006, 2.3, 0.03, 0.0, -0.12),
-		_rr(0.226, 0.07, 0.08, 0.092, 0.006, 2.2, 0.03),
-		_rr(0.241, 0.046, 0.054, 0.066, 0.006, 2.0),
-		_r(0.246, 0.0, 0.0, 0.006),
-	]
-	var fade := hairc.lerp(_c(SKIN_TONE * 0.75), 0.3)
-	_loft(hair_m, [_r(0.2, 0.0, 0.0)] + hk, 24, Transform3D.IDENTITY, func(p: Vector3) -> Color:
-		return fade.lerp(hairc, clampf((p.y - 0.13 + 0.25 * p.z) / 0.05, 0.0, 1.0)))
-	# parámetros por variante
-	var count_k := 1.0
-	var len_k := 1.0
-	var rnd_k := 1.0
-	var grav_k := 1.0
-	var wide_k := 1.0
-	var wind := Vector3.ZERO
+	var keys := _head_keys()
+	var top_y: float = float(keys[keys.size() - 1]["y"])
+	var h_k := 1.0       # altura del tupé (1 = referencia)
+	var lean := 0.0      # rollos echados hacia atrás (viento)
+	var jit := 0.0       # desorden (caótico)
+	var dk := 1.0        # oscurecido (mojado)
 	match variant:
 		1:
-			len_k = 1.2
-			grav_k = 0.1
-			wind = Vector3(0.1, 0.1, 0.95)       # barrido hacia atrás
+			lean = 0.6
+			h_k = 0.85
 		2:
-			count_k = 0.8
-			len_k = 0.55
-			rnd_k = 0.35
-			grav_k = 3.0
-			wide_k = 1.35
+			h_k = 0.45
+			dk = 0.8
 		3:
-			count_k = 1.5
-			len_k = 1.2
-			rnd_k = 1.5
+			jit = 1.0
+			h_k = 1.06
 	var rng := RandomNumberGenerator.new()
-	rng.seed = 44 + variant * 101
-	var dark := Color(0.28, 0.26, 0.26)
-	var mid := Color(0.38, 0.35, 0.35)
-	var dust := Color(0.47, 0.44, 0.42)
-	var C := Vector3(0.0, 0.128, 0.004)
-	var R := Vector3(0.092, 0.122, 0.114)
-	# [cantidad, theta_min, theta_max, phi_min, phi_max, tipo]  (phi 0 = frente, 90 = derecha, 180 = nuca)
-	var zones := [
-		[8, 0.0, 26.0, -180.0, 180.0, "top"],
-		[6, 8.0, 22.0, -180.0, 180.0, "swirl"],
-		[16, 30.0, 62.0, -180.0, 180.0, "mid"],
-		[7, 42.0, 62.0, -60.0, 60.0, "fringe"],
-		[4, 52.0, 70.0, 70.0, 120.0, "side"],
-		[4, 52.0, 70.0, -120.0, -70.0, "side"],
-		[15, 58.0, 118.0, 120.0, 240.0, "back"],
-	]
-	for z in zones:
-		for i in maxi(1, roundi(float(z[0]) * count_k)):
-			var th := deg_to_rad(rng.randf_range(z[1], z[2]))
-			var ph := deg_to_rad(rng.randf_range(z[3], z[4]))
-			var kind: String = z[5]
-			var P := C + Vector3(R.x * sin(th) * sin(ph), R.y * cos(th), -R.z * sin(th) * cos(ph))
-			var n := Vector3((P.x - C.x) / (R.x * R.x), (P.y - C.y) / (R.y * R.y), (P.z - C.z) / (R.z * R.z)).normalized()
-			var rnd := Vector3(rng.randf_range(-1, 1), rng.randf_range(-1, 1), rng.randf_range(-1, 1)) * rnd_k
-			var asym := 1.0 + 0.35 * signf(P.x)       # más volumen a la derecha
-			var d: Vector3
-			var L: float
-			var grav := 0.0
-			match kind:
-				"top":
-					d = n + Vector3(0.35, 0.45, 0) + rnd * 0.6
-					L = rng.randf_range(0.05, 0.078) * asym
-				"swirl":    # remolino: los mechones giran alrededor de la coronilla
-					d = n + Vector3(cos(ph), 0.0, -sin(ph)).rotated(Vector3.UP, PI * 0.5) * 1.1 + rnd * 0.25
-					L = rng.randf_range(0.04, 0.06)
-					grav = 0.1
-				"mid":
-					d = n + Vector3(0.15, 0.25, 0) + rnd * 0.6
-					L = rng.randf_range(0.045, 0.075) * asym
-					grav = 0.15
-				"fringe":
-					d = n * 0.35 + Vector3(rng.randf_range(-0.6, 0.6) + 0.35, -0.75, -0.45)
-					L = rng.randf_range(0.045, 0.065)
-					grav = 0.3
-				"side":     # sienes: suben y van hacia atrás, sin cubrir las orejas
-					d = n + Vector3(0, 0.15, 0.55) + rnd * 0.3
-					L = rng.randf_range(0.04, 0.055)
-					grav = 0.1
-				_:
-					d = n + Vector3(0, -0.45, 0.3) + rnd * 0.5
-					L = rng.randf_range(0.05, 0.08)
-					grav = 0.25
-			d = (d + wind * (0.0 if kind == "fringe" else 1.0) + (wind * 0.5 if kind == "fringe" else Vector3.ZERO)).normalized()
-			L *= len_k
-			grav *= grav_k
-			var curl := d.cross(n).normalized() * rng.randf_range(-0.3, 0.3)
-			var pts := PackedVector3Array()
-			for tries in 6:
-				pts = PackedVector3Array()
-				for k in 5:
-					var t := float(k) / 4.0
-					pts.append(P - n * 0.012 + d * L * t + (curl + Vector3(0, -grav, 0)) * L * t * t)
-				# el flequillo no tapa las cejas (están en ~0.174)
-				if kind != "fringe" or pts[4].y >= 0.186:
-					break
-				L *= 0.85
-			var w0 := rng.randf_range(0.019, 0.03) * wide_k
-			var ra := [w0 * 0.95, w0, w0 * 0.8, w0 * 0.45, 0.0025]
-			var rb := [0.008, 0.0085, 0.007, 0.004, 0.0015]
-			var base := dark.lerp(mid, rng.randf())
-			var p0 := P
-			var dd := d
-			var LL := L
-			_tube(hair_m, pts, ra, rb, 5, n, func(p: Vector3) -> Color:
-				var t := clampf((p - p0).dot(dd) / LL, 0.0, 1.0)
-				return _c(base.lerp(dust, 0.35 * smoothstep(0.55, 1.0, t))))
-	# mechón grande asimétrico que cruza la frente (de la coronilla derecha hacia la sien izquierda)
-	if variant != 1:
-		var sl := 0.5 if variant == 2 else 1.0
-		_tube(hair_m, PackedVector3Array([Vector3(0.035, 0.236, -0.02), Vector3(0.01, 0.242 - 0.02 * (1.0 - sl), -0.075),
-			Vector3(-0.03, 0.222 - 0.03 * (1.0 - sl), -0.108), Vector3(-0.058, 0.2, -0.108), Vector3(-0.072, 0.19, -0.095)]),
-			[0.026, 0.03, 0.026, 0.016, 0.004], [0.01, 0.011, 0.009, 0.006, 0.002], 6, Vector3(0, 1, -0.4).normalized(),
-			_c(mid.lerp(dark, 0.4)))
+	rng.seed = 68107 + variant * 101
+	var base := HAIR_BLOCK * dk
+	# ¿p está dentro del cráneo? (mismos anillos que _geo_head; arriba cierra en un casquete de 4 mm)
+	var inside := func(p: Vector3) -> bool:
+		if p.y < 0.0 or p.y > top_y + 0.004:
+			return false
+		var r := _ring_at(keys, minf(p.y, top_y))
+		var sh := 1.0 - maxf(p.y - top_y, 0.0) / 0.004
+		var cz: float = r["cz"]
+		var a: float = float(r["a"]) * sh
+		var b: float = (float(r["bf"]) if p.z < cz else float(r["bb"])) * sh
+		if a < 1e-5 or b < 1e-5:
+			return false
+		var n: float = r["n"]
+		return pow(absf(p.x - float(r["cx"])) / a, n) + pow(absf(p.z - cz) / b, n) <= 1.0
+	# distancia desde c (dentro del cráneo) hasta su superficie en la dirección d
+	var skull := func(c: Vector3, d: Vector3) -> float:
+		var lo := 0.0
+		var hi := 0.2
+		for it in 15:
+			var m := (lo + hi) * 0.5
+			if inside.call(c + d * m):
+				lo = m
+			else:
+				hi = m
+		return lo
+	var C0 := Vector3(0.0, 0.14, 0.005)
+	# dirección desde C0: phi 0 = frente (−z), +PI/2 = derecha (+x); e = elevación
+	var dir := func(phi: float, e: float) -> Vector3:
+		return Vector3(sin(phi) * cos(e), sin(e), -cos(phi) * cos(e))
+	# elevación a la que el cráneo, en el ángulo phi, está a la altura y
+	var at_y := func(phi: float, y: float) -> float:
+		var lo := -1.4
+		var hi := PI * 0.5
+		for it in 15:
+			var m := (lo + hi) * 0.5
+			var d: Vector3 = dir.call(phi, m)
+			if (C0 + d * float(skull.call(C0, d))).y < y:
+				lo = m
+			else:
+				hi = m
+		return lo
+	# línea de pelo: recta y alta en la frente, sube sobre la oreja, baja por detrás hasta la nuca
+	var hairline := func(phi: float) -> float:
+		var t := absf(rad_to_deg(wrapf(phi, -PI, PI)))
+		var KP := [[0.0, 0.194], [40.0, 0.19], [58.0, 0.18], [70.0, 0.17], [116.0, 0.166], [134.0, 0.12],
+			[156.0, 0.088], [180.0, 0.078]]
+		for k in KP.size() - 1:
+			if t <= float(KP[k + 1][0]):
+				var u := (t - float(KP[k][0])) / (float(KP[k + 1][0]) - float(KP[k][0]))
+				return lerpf(KP[k][1], KP[k + 1][1], smoothstep(0.0, 1.0, u))
+		return 0.078
+
+	# 1) Casquete pegado al cráneo por encima de la línea de pelo: bajo rollos y franjas no queda piel.
+	#    La última fila se hunde en la piel: canto de arcilla limpio.
+	# grosor del casquete: fino en la línea de pelo; en los lados sube hasta el ancho de los rollos (sin escalón)
+	var shell_off := func(phi: float, ys: float) -> float:
+		var a := absf(rad_to_deg(wrapf(phi, -PI, PI)))
+		var sf := smoothstep(30.0, 62.0, a) * (1.0 - smoothstep(105.0, 140.0, a))
+		return 0.0075 + 0.013 * sf * smoothstep(0.165, 0.215, ys)
+	var M := 48
+	var NR := 14
+	var P := PackedVector3Array()
+	P.resize((NR + 1) * M)
+	for j in M:
+		var phi := TAU * float(j) / float(M)
+		var e0: float = at_y.call(phi, hairline.call(phi))
+		for i in NR + 1:
+			var e := lerpf(PI * 0.5, e0, float(mini(i, NR - 1)) / float(NR - 1))
+			var d: Vector3 = dir.call(phi, e)
+			var q := C0 + d * float(skull.call(C0, d))
+			P[i * M + j] = q + d * (float(shell_off.call(phi, q.y)) if i < NR else -0.002)
+	var hcol := _c(base)
+	_grid(hair_m, P, NR + 1, M, Transform3D.IDENTITY, func(p: Vector3) -> Color:
+		var g := 0.8 + 0.14 * (0.5 + 0.5 * sin(p.y * 820.0 - absf(p.z) * 90.0))   # surcos de peine hacia atrás
+		return Color(hcol.r * g, hcol.g * g, hcol.b * g))
+
+	# 2) Rollos del tupé: 5, de la frente a la coronilla, en planos casi verticales (los de fuera más bajos e
+	#    inclinados hacia afuera). Cada uno en dos piezas: bloque bajo sobre la frente + rollo alto que lo monta.
+	var xs := [-0.055, -0.028, -0.001, 0.026, 0.054]
+	var bw := 0.0148     # semiancho de cada rollo (el bloque no es más ancho que la cabeza con sus lados)
+	if variant == 3:
+		xs += [-0.015, 0.04]      # caótico: dos rollos de más, montados y torcidos
+	var hz := Vector3(0, 0, 1)
+	for i in xs.size():
+		var x0: float = xs[i] + jit * rng.randf_range(-0.007, 0.007)
+		var side := absf(x0) / 0.055
+		var beta := signf(x0) * 0.22 * side + jit * rng.randf_range(-0.22, 0.22)
+		var V := Vector3(sin(beta), cos(beta), 0.0)
+		var up := V.cross(hz).normalized()
+		var C := Vector3(x0 * 0.75, 0.14, 0.005)
+		var Hb := 0.145 - 0.016 * side * side + jit * rng.randf_range(-0.012, 0.01)
+		var Fb := 0.116 - 0.006 * side + jit * rng.randf_range(-0.006, 0.006)
+		var Bb := 0.126
+		var bc := base * (0.93 + 0.1 * rng.randf())
+		var lk := lean
+		var hk := h_k
+		# [centro, semigrosor radial] del rollo en el ángulo psi (0 = frente, PI/2 = arriba, PI = atrás)
+		var prof := func(psi: float) -> Array:
+			var d := V * sin(psi) - hz * cos(psi)
+			var ri: float = skull.call(C, d)
+			var c := cos(psi)
+			var He := Hb * (1.0 + 0.07 * c)     # tupé: más alto delante, cae hacia la coronilla
+			var rbox := 1.0 / pow(pow(absf(sin(psi)) / He, 4.5) + pow(absf(c) / (Fb if c > 0.0 else Bb), 4.5), 1.0 / 4.5)
+			var ro := ri + maxf((rbox - ri) * hk, 0.009)
+			var rin := ri - 0.006
+			var p := C + d * (ro + rin) * 0.5
+			p.z += lk * maxf(p.y - 0.19, 0.0)
+			return [p, (ro - rin) * 0.5]
+		var psi0 := -1.0
+		var psic := 0.6
+		var ps := 0.0
+		while ps < 1.4:
+			var y: float = ((prof.call(ps) as Array)[0] as Vector3).y
+			if psi0 < 0.0 and y >= 0.205 - 0.008 * side:
+				psi0 = ps
+			if y >= 0.233 - 0.008 * side:
+				psic = ps
+				break
+			ps += 0.02
+		psi0 = maxf(psi0, 0.0)
+		var low := PackedVector3Array()
+		var low_a: Array = []
+		for k in 4:
+			var q: Array = prof.call(lerpf(psi0, psic + 0.03, float(k) / 3.0))
+			low.append(q[0])
+			low_a.append(float(q[1]) - 0.007)
+		# surcos: las caras laterales de cada rollo se oscurecen (como la sombra entre ladrillos de la referencia)
+		var cc := _c(bc)
+		var yc: float = ((prof.call(psic) as Array)[0] as Vector3).y     # pliegue entre los dos pisos
+		var groove := func(p: Vector3) -> Color:
+			var g := 1.0 - 0.45 * smoothstep(0.55, 1.0, absf((p - C).dot(up)) / bw)
+			if p.z < C.z - 0.06:
+				g *= 1.0 - 0.55 * (1.0 - smoothstep(yc - 0.002, yc + 0.012, p.y))
+			return Color(cc.r * g, cc.g * g, cc.b * g)
+		var cl := _c(bc * 0.88)
+		var groove_l := func(p: Vector3) -> Color:
+			var g := 1.0 - 0.45 * smoothstep(0.55, 1.0, absf((p - C).dot(up)) / (bw * 0.92))
+			g *= 1.0 - 0.3 * smoothstep(yc - 0.012, yc, p.y)
+			return Color(cl.r * g, cl.g * g, cl.b * g)
+		_tube(hair_m, low, low_a, bw * 0.92, 16, up, groove_l, true, 4.0)
+		var hi := PackedVector3Array()
+		var hi_a: Array = []
+		var psi1 := deg_to_rad(150.0) + jit * rng.randf_range(-0.15, 0.1)
+		for k in 13:
+			var u := float(k) / 12.0
+			var q: Array = prof.call(lerpf(psic + 0.035, psi1, u))
+			hi.append(q[0])
+			hi_a.append(float(q[1]) * (1.0 - 0.25 * smoothstep(0.75, 1.0, u)) + 0.003 * (1.0 - smoothstep(0.0, 0.2, u)))
+		_tube(hair_m, hi, hi_a, bw, 16, up, groove, true, 4.0)
+
+	# 3) Franjas de la nuca: 7 bandas verticales desde la coronilla (bajo las puntas de los rollos) a la nuca
+	var NS := 7
+	var gmax := deg_to_rad(56.0)
+	for s in NS:
+		var gam := lerpf(-gmax, gmax, float(s) / float(NS - 1)) + jit * rng.randf_range(-0.08, 0.08)
+		var hh := Vector3(sin(gam), 0.0, cos(gam))
+		var up := Vector3.UP.cross(hh).normalized()
+		var g01 := absf(gam) / gmax
+		var psa := deg_to_rad(118.0)
+		var psb := deg_to_rad(214.0 - 26.0 * g01 * g01)
+		var path := PackedVector3Array()
+		var ra: Array = []
+		var rb: Array = []
+		for k in 11:
+			var u := float(k) / 10.0
+			var psv := lerpf(psa, psb, u)
+			var d := Vector3.UP * sin(psv) - hh * cos(psv)
+			var ri: float = skull.call(C0, d)
+			var th := (0.008 + 0.01 * h_k) * (1.0 - 0.3 * u) + 0.004 * smoothstep(0.75, 1.0, u)
+			path.append(C0 + d * (ri + (th - 0.005) * 0.5))
+			ra.append((th + 0.005) * 0.5)
+			rb.append(maxf(0.45 * (2.0 * gmax / float(NS - 1)) * ri * absf(cos(psv)), 0.008))
+		var sc := _c(base * (0.9 + 0.1 * rng.randf()))
+		var wk := 0.45 * 2.0 * gmax / float(NS - 1)
+		var hh2 := hh
+		var up2 := up
+		_tube(hair_m, path, ra, rb, 12, up, func(p: Vector3) -> Color:
+			var q := p - C0
+			var g := 1.0 - 0.45 * smoothstep(0.55, 1.0, absf(q.dot(up2)) / maxf(wk * absf(q.dot(hh2)), 0.008))
+			return Color(sc.r * g, sc.g * g, sc.b * g), true, 4.0)
+
+	# 4) Lados: cordones peinados hacia atrás (surcos de peine) y patilla corta delante de la oreja
+	for sx in [-1.0, 1.0]:
+		for k in (1 if variant == 2 else 3):     # mojado: lados lisos, casi sin surcos
+			var y0 := 0.176 + 0.014 * float(k)
+			var path := PackedVector3Array()
+			for m in 6:
+				var u := float(m) / 5.0
+				var phi: float = sx * deg_to_rad(lerpf(64.0 + 4.0 * k, 128.0 - 6.0 * k, u))
+				var e: float = at_y.call(phi, y0 + 0.006 * sin(u * PI) - 0.012 * u)
+				var d: Vector3 = dir.call(phi, e)
+				var q := C0 + d * float(skull.call(C0, d))
+				path.append(q + d * (float(shell_off.call(phi, q.y)) - 0.0005))
+			_tube(hair_m, path, [0.002, 0.005, 0.006, 0.006, 0.005, 0.002], [0.0012, 0.0025, 0.0028, 0.0028, 0.0025, 0.0012],
+				6, Vector3(sx, 0, 0), _c(base * 0.95), true)
+		var sb := PackedVector3Array()
+		for m in 4:
+			var u := float(m) / 3.0
+			var phi: float = sx * deg_to_rad(70.0 + 2.0 * u)
+			var e: float = at_y.call(phi, lerpf(0.172, 0.142, u))
+			var d: Vector3 = dir.call(phi, e)
+			sb.append(C0 + d * (float(skull.call(C0, d)) + 0.002))
+		_tube(hair_m, sb, [0.0065, 0.006, 0.005, 0.0035], [0.0035, 0.003, 0.0026, 0.002], 6, Vector3(sx, 0, 0),
+			_c(base), true)
 
 
 ## Cambia la variante de pelo (0 clásico, 1 viento, 2 mojado, 3 caótico). Mallas cacheadas: no hay tirones.

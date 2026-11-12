@@ -1,6 +1,6 @@
 # ANDRO_CONTEXTO — Rediseño del personaje (arcilla gótica / stop-motion)
 
-Versión 2.4 · 12-nov-2026 · F0 a F8 hechas · nueva referencia: video 68105 · Rama `fase-3d-godot` · Godot 4.3 · renderer Mobile
+Versión 2.5 · 12-nov-2026 · F0 a F9 hechas · referencia principal: turnaround 68107 · Rama `fase-3d-godot` · Godot 4.3 · renderer Mobile
 Alcance: SOLO Andro (`godot3d/character/`) y su movimiento. Nada del mapa, vehículos ni UI.
 
 > Antes de empezar: leer `ESTADO.md` y `CONTRACT.md` (reglas del proyecto). De este documento, leer §0–§3 y §9 siempre, y de §8 solo la fase activa. Así cada sesión sale barata en tokens.
@@ -66,6 +66,7 @@ El pelo, la bufanda y el bolso NO son nodos propios: están horneados dentro de 
 
 | Archivo | Qué es | Autoridad para |
 |---|---|---|
+| **68107.jpg** (12-nov) | **Turnaround definitivo de Pablo**: frente, perfil, espalda y primer plano de la cara, fondo gris. Copia en `docs/andro/shots/REF_68107_turnaround.jpg` | **Todo el personaje** (manda sobre el video y las láminas) |
 | **68105.mp4** (12-nov, 10 s) | **Video de Pablo: "cómo debe quedar el personaje"**. Andro en arcilla caminando, saltando un muro y hablando a cámara en un parque gótico de noche. Fotogramas en `docs/andro/shots/REF_video68105_*.jpg` | **Todo el personaje** (manda sobre las láminas) |
 | 68017.jpg | Hoja "Rediseño de cabello gótico despeinado (Asset #044-B)" | Cabello: forma, capas, 4 variantes, paleta, medidas |
 | 68015.jpg | Hoja "Bufanda gótica (Asset #042)" | Bufanda: nudo, rayas, variantes, paleta |
@@ -75,7 +76,7 @@ El pelo, la bufanda y el bolso NO son nodos propios: están horneados dentro de 
 
 Capturas base de F0 (en `docs/andro/shots/`): `F0_plast_face.jpg`, `F0_plast_full.jpg` (luz plastilina), `F0_lineup.jpg` y `F0_luzprueba_face.jpg` (luz de prueba del portrait). Todas con GL Compatibility/llvmpipe: sirven de guía, no son idénticas al teléfono (Mobile/Vulkan, HDR).
 
-**Prioridad si hay conflicto**: 1) lo que diga Pablo en el chat → 2) el video 68105 → 3) la hoja específica de la parte → 4) el turnaround 68009 → 5) el estado actual del código.
+**Prioridad si hay conflicto**: 1) lo que diga Pablo en el chat → 2) el turnaround 68107 → 2b) el video 68105 → 3) la hoja específica de la parte → 4) el turnaround 68009 → 5) el estado actual del código.
 
 **Lo que muestra el video 68105 (leído en F8)**
 - Abrigo gris carbón neutro casi negro (nada de morado), largo a medio muslo, una fila de ~6 botones negros pequeños, solapas cortas, 2 bolsillos con solapa abajo, ribete ocre en el pecho. Debajo, chaleco/camisa café oscuro en una franja estrecha y cuello alto negro. → **Hecho en F8.**
@@ -290,7 +291,7 @@ Resultado en §1, §3 y §9.1.
 ### F8 · Abrigo, camisa, torso, brazos y manos — HECHA (ver §9.1)
 - Hacer: §4.7. Aceptación: abrigo negro con tela visible, solapas, botones y bolsillos.
 
-### F9 · Piernas, zapatos y proporciones finales
+### F9 · Piernas, zapatos y proporciones finales — HECHA (ver §9.1; incluye F6 bis, F7 bis y pasada de cara)
 - Hacer: §4.8 con la decisión de §11.1. Revisar que la cápsula y la entrada a autos no se rompan.
 
 ### F10 · Stop-motion
@@ -395,6 +396,18 @@ Plantilla (una entrada por fase, la más nueva arriba):
 - Decisiones por defecto: bandolera fuera (el video no la tiene); el video manda sobre las láminas.
 - Siguiente paso: F9 (piernas, zapatos negros y proporciones según el video) y decidir con Pablo el pelo y el verde de la bufanda del video.
 
+### 2026-11-12 · F9 + F6 bis + F7 bis + cara · Según el turnaround 68107 (4 agentes en paralelo)
+Método: 4 agentes editaron a la vez `player_model.gd`, cada uno solo en sus funciones (reglas en el brief común; solo `Edit`, sin reescribir el archivo). El coordinador integró, midió y ajustó la proporción.
+- **A · Pelo (F6 bis)**: `_geo_hair` reescrita y nueva constante `HAIR_BLOCK` (0.41, 0.41, 0.38). Casquete calculado desde `_head_keys()`, con la línea de pelo recta en y 0.194. Tupé de 5 rollos cuadrados (`_tube` con n=4) de frente a coronilla, en dos pisos y con surcos oscuros. Nuca de 7 franjas en abanico. Lados con 3 cordones peinados hacia atrás y patilla corta; oreja libre. Variantes: 1 viento (rollos hacia atrás), 2 mojado (45 % de alto), 3 caótico (rollos desalineados, +2).
+- **B · Cara**: ojos blancos sin iris (`C_CLAY_SCLERA`, `EYE_R` (0.0262, 0.0258, 0.0168), pupila r 0.0054, brillo arriba), centro hundido +0.0035. Párpado: casquete de 76° (reposo ≈ 56°); `set_face` gira [0, −0.62, −1.6] y estira en z [1, 1.12, 1.55]. Ojeras con `_eye_rim`/`_bag_ring` en 3 anillos (párpado inferior malva, banda gris morada, pliegue superior). Cejas casi negras en arco (`C_BROW`, `_brow_y`). Nariz recta de perfil, en cuña, con punta rosada. M1 con sonrisa suave y hoyuelos. Orejas 26 % más pequeñas.
+- **C · Bufanda (F7 bis)**: `STRIPE_W` [0.026 verde, 0.019 blanco], con bordes de raya nítidos (`_stripe_ts`, filas dobles). `SCARF_G` (0.355, 0.462, 0.335) se ve #3C803A y `SCARF_W` (0.595, 0.615, 0.58) se ve #CFCCB7. Rollo grueso al cuello sin nudo. Colas paralelas (`a` larga en +X, `b` en −X) con 7 flecos verdes y blancos. Sin óxido salvo en la variante 2.
+- **D · F9**: pantalón recto y holgado, con pliegue sobre el zapato (`C_TROUSER` (0.33, 0.328, 0.205), se ve #282024). Zapatos derby café de 0.27 m (`C_DRESS_SHOE` (0.36, 0.33, 0.10), se ven #3C2B28–#5D4B3D). Abrigo ABIERTO: `hw` de 0.064 a 0.082, suéter de punto `_knit()` café (`C_VEST` (0.42, 0.36, 0.215), se ve #4B332B) hasta y −0.33, y cuello alto café. Solapas con muesca hasta medio pecho, un solo botón a la cintura, faldones abiertos al frente (`a0` 0.42) y bolsillos a y −0.055. Largos: `THIGH_LEN` 0.43, `SHIN_LEN` 0.38, `HIPS_HEIGHT` 0.95; las alturas relativas coinciden con 68107 (entrepierna 0.50, borde del abrigo 0.41, dedos 0.39).
+- **Coordinador**: `CLAY_HEAD_SY` 1.13 (`CLAY_HEAD_S`). La cabeza y sus piezas se estiran en y desde el mentón, porque en 68107 la cabeza es más alta que ancha. Altura 2.115 m; con pelo, 3.88 cabezas (antes 4.25; la referencia ≈ 3.7).
+- Capturas: `F9_comparacion` (referencia arriba, Andro abajo), `F9_cuerpo`, `F9_perfil`, `F9_espalda`, `F9_cara`, `F9_tres_cuartos`, `F9_perfil_cabeza`, `F9_nuca`, `F9_bufanda`, `F9_torso`, `F9_estudio_cara`, `F9_estudio_cuerpo`, `F9_caminar`, `F9_ojos_cerrados`.
+- Tris: 27 298 (antes 20 048). Sube por el pelo, las ojeras y las rayas nítidas de la bufanda. Se revisa en F11. Tests: 5 PASS.
+- Pendiente / diferencias que quedan frente a 68107: los ojos se ven algo más pequeños y las ojeras como aros duros (en la referencia son un degradado suave). Falta el hoyuelo del mentón y las arrugas. El abrigo de la referencia es algo más ancho de hombros. El material del pelo es `hoodie_knit` (fibra) y no huella de arcilla. Las bocas M2–M5 siguen con `C_LIP` viejo. Los colores están calibrados con la luz morada del preset: si cambia la luz, hay que recalibrar (pantalón y pelo son muy sensibles).
+- Siguiente paso: F10 (stop-motion: pasos a 8–12 pps, parpadeo y bocas en el juego), o una pasada fina de ojos/ojeras si Pablo lo pide.
+
 ### 9.2 Comandos (desde la raíz del repo; `godot` = 4.3)
 ```
 # Importar la primera vez
@@ -436,7 +449,7 @@ Respetar los nombres existentes. Piezas nuevas sugeridas (hijas del pivote corre
 | F6 | [x] hecha | 12-nov; pelo = pieza `hair` con 4 variantes, `set_hair_variant()` |
 | F7 | [x] hecha | 12-nov; colas con cadena de pivotes, lima corregida (filtro de musgo), `set_scarf_variant()` |
 | F8 | [x] hecha | 12-nov; abrigo a medio muslo con faldones `coat_l/r`, chaleco, 6 botones, manos gruesas, sin bandolera |
-| F9 | [ ] pendiente | |
+| F9 | [x] hecha | 12-nov; con 4 agentes en paralelo según 68107: pelo en bloque, cara, bufanda, piernas/zapatos/abrigo abierto, cabeza ×1.13 en y (3.88 cabezas) |
 | F10 | [ ] pendiente | |
 | F11 | [ ] pendiente | |
 

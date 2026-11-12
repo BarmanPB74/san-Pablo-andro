@@ -19,7 +19,14 @@ Plan gráfico anterior (fases 1-5): `PLAN_GRAFICOS.md`. El plan vigente está en
 - Rendimiento medido en el editor del teléfono: ~51 FPS en el parque, ~78 FPS en la calle.
 - Sin APK todavía (a propósito): se juega desde el editor de Godot en el teléfono.
 
-## Última sesión (12 nov 2026) — Rediseño de Andro, F8 (abrigo, chaleco, manos) según el video 68105
+## Última sesión (12 nov 2026) — Rediseño de Andro, F9 + pelo, cara y bufanda según el turnaround 68107 (4 agentes)
+- Referencia principal nueva: `docs/andro/shots/REF_68107_turnaround.jpg`. Comparación final: `docs/andro/shots/F9_comparacion.jpg`.
+- Pelo en bloque (5 rollos de tupé, franjas en la nuca, lados peinados atrás); ojos blancos con pupila pequeña, ojeras malva, cejas negras en arco,
+  nariz recta, sonrisa suave, orejas más pequeñas; bufanda verde vivo y crema con rayas regulares y flecos; pantalón negro recto, zapatos café,
+  abrigo abierto con suéter café de punto; piernas más cortas (`THIGH_LEN` 0.43, `SHIN_LEN` 0.38, `HIPS_HEIGHT` 0.95); cabeza ×1.13 en alto (3.88 cabezas).
+- Tris 27 298. Tests PASS (5). Detalle por agente en `ANDRO_CONTEXTO.md` §9.1. Siguiente: F10 (stop-motion).
+
+## Sesión anterior (12 nov 2026) — Rediseño de Andro, F8 (abrigo, chaleco, manos) según el video 68105
 - Nueva referencia principal: video 68105 de Pablo (fotogramas en `docs/andro/shots/REF_video68105_*.jpg`, lectura en `ANDRO_CONTEXTO.md` §2).
 - Abrigo gris carbón neutro a medio muslo: faldones `coat_l/r` hijos de `hips` que siguen al muslo (sin atravesar piernas); chaleco café, 6 botones negros,
   bolsillos con solapa, solapas cortas, cuello alto negro. Manos más grandes y de dedos gruesos. Bandolera apagada (`SATCHEL_ON = false`).
