@@ -70,6 +70,11 @@ func apply_gothic_clay_style() -> void:
 	var target := _target()
 	if target == null:
 		return
+	apply_to(target)
+
+
+## Estiliza solo un subárbol (piezas que se crean después, p. ej. variantes de pelo o bufanda).
+func apply_to(target: Node3D) -> void:
 	_ensure_textures()
 	for mi in _meshes(target):
 		var mesh := mi.mesh
@@ -155,6 +160,7 @@ func _styled(m: Material, role: String, recolor: bool) -> Material:
 		# el personaje conserva sus colores (blancos de camisa/bufanda/ojos no se vuelven rosados)
 		c.set_shader_parameter("grey_amount", 0.0)
 		c.set_shader_parameter("brick_shift", 0.0)
+		c.set_shader_parameter("moss_amount", 0.0)    # sin musgo: ese filtro del mundo volvía lima la bufanda (F7)
 		# Texturas de las láminas (piel pálida, textil del abrigo, bloque de pelo, lana, cuero)
 		var set_name: String = ROLE_SET.get(role, "")
 		if set_name != "" and not (recolor and role == "scarf"):

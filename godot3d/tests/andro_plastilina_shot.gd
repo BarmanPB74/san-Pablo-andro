@@ -31,8 +31,10 @@ func _initialize() -> void:
 	match view:
 		"side", "hperfil": yaw = -PI * 0.5
 		"hperfil2": yaw = PI * 0.5
+		"hback": yaw = PI
 		"h34": yaw = deg_to_rad(-45.0)
 		"back": yaw = PI
+		"bufanda": yaw = deg_to_rad(20.0)
 		_: yaw = deg_to_rad(20.0) if view == "face" or view == "close" else 0.0
 	m.rotation.y = yaw + PI
 	m.snap_pose("idle", 0.0, 0.0)
@@ -41,6 +43,14 @@ func _initialize() -> void:
 	cam.far = 2400.0
 	root.add_child(cam)
 	match view:
+		"bufanda":
+			cam.fov = 30.0
+			cam.position = Vector3(0, 1.5, 1.7)
+			cam.look_at(Vector3(0, 1.47, 0))
+		"hback":
+			cam.fov = 30.0
+			cam.position = Vector3(0, 1.9, 1.5)
+			cam.look_at(Vector3(0, 1.86, 0))
 		"hperfil", "hperfil2", "h34":
 			cam.fov = 30.0
 			cam.position = Vector3(0, 1.84, 1.5)
@@ -66,6 +76,11 @@ func _initialize() -> void:
 	m.set_face(int(OS.get_environment("ANDRO_BLINK")),
 		Vector2(float(gz[0]), float(gz[1])) if gz.size() == 2 else Vector2.ZERO,
 		float(br[0]) if br.size() == 2 else 0.0, float(br[1]) if br.size() == 2 else 0.0)
+	if OS.get_environment("ANDRO_SCARF") != "":
+		m.set_scarf_variant(int(OS.get_environment("ANDRO_SCARF")))
+	if OS.get_environment("ANDRO_HAIR") != "":
+		m.set_hair_variant(int(OS.get_environment("ANDRO_HAIR")))
+	m.set_mouth(int(OS.get_environment("ANDRO_MOUTH")) if OS.get_environment("ANDRO_MOUTH") != "" else 1)
 	for i in 52:
 		await process_frame
 	root.get_viewport().get_texture().get_image().save_png(out)

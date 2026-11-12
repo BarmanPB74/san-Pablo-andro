@@ -19,12 +19,20 @@ Plan gráfico anterior (fases 1-5): `PLAN_GRAFICOS.md`. El plan vigente está en
 - Rendimiento medido en el editor del teléfono: ~51 FPS en el parque, ~78 FPS en la calle.
 - Sin APK todavía (a propósito): se juega desde el editor de Godot en el teléfono.
 
-## Última sesión (12 nov 2026) — Rediseño de Andro, F3 (nariz y orejas) y F4 (ojos, párpados, cejas)
+## Última sesión (12 nov 2026) — Rediseño de Andro, F5 (boca), F6 (pelo) y F7 (bufanda)
+- F5: 5 bocas como piezas cacheadas (`set_mouth(1..5)`: neutro, asombrado, triste, hablando, tenso).
+- F6: el pelo es la pieza `hair` con 4 variantes (`set_hair_variant(0..3)`: clásico, viento, mojado, caótico); 3 capas, remolino, volumen asimétrico, sin tapar las orejas.
+- F7: bufanda con rayas irregulares, nudo y 2 colas con cadena de pivotes que reaccionan a aceleración y giro (`_update_cloth` en `animate`); 4 variantes (`set_scarf_variant(0..3)`).
+  El verde lima venía del filtro de musgo del mundo (`moss_amount` 0.6 en `clay_grade`): se apagó solo para Andro en `GothicClayAdapter`.
+- Tris: 19 360. Tests PASS (andro_f5f7_test nuevo + los 4 anteriores). Capturas `docs/andro/shots/F5_*`, `F6_*`, `F7_*`.
+- Pendiente: nada de esto está conectado a diálogo/estado del jugador todavía (F10); confirmar en el teléfono. Siguiente: F8.
+
+## Sesión anterior (12 nov 2026) — Rediseño de Andro, F3 (nariz y orejas) y F4 (ojos, párpados, cejas)
 - F3: nariz con proyección real en perfil (punta redonda y levantada, fosas nasales); orejas grandes con concha, hélix y lóbulo, la izquierda algo mayor.
 - F4: ojo, párpado y ceja son 6 piezas hijas de `head` (`eye_l/r`, `lid_l/r`, `brow_l/r`). `PlayerModel.set_face(blink 0|1|2, gaze, brow_l, brow_r)` da parpadeo de 3 poses,
   mirada y cejas; todavía no se llama desde `animate` (F10). Párpado pesado, iris oscuro y un solo brillo.
 - Tris: 19 364 (+1 136 vs F2); se revisa en F11. Nuevo `tests/andro_face_test.gd`; los 4 tests dan PASS. Capturas: `docs/andro/shots/F3_*`, `F4_*`.
-- Pendiente: el pelo actual tapa la oreja izquierda (F6); confirmar el aspecto en el teléfono. Siguiente: F5 (boca).
+- Pendiente de entonces: el pelo tapaba la oreja izquierda (resuelto en F6). Siguiente era F5 (boca).
 
 ## Sesión anterior (12 nov 2026) — Rediseño de Andro, F1 (luz y material) y F2 (cabeza y cara)
 - F1: rugosidad piel/tela 0.80 y ojos 0.25; albedos recalibrados midiendo capturas (piel ≈ #C9ADA5, abrigo ≈ #22152A, pelo y ojeras con lectura de material).

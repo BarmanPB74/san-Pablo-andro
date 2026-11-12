@@ -1,6 +1,6 @@
 # ANDRO_CONTEXTO — Rediseño del personaje (arcilla gótica / stop-motion)
 
-Versión 2.2 · 12-nov-2026 · F0 a F4 hechas · Rama `fase-3d-godot` · Godot 4.3 · renderer Mobile
+Versión 2.3 · 12-nov-2026 · F0 a F7 hechas · Rama `fase-3d-godot` · Godot 4.3 · renderer Mobile
 Alcance: SOLO Andro (`godot3d/character/`) y su movimiento. Nada del mapa, vehículos ni UI.
 
 > Antes de empezar: leer `ESTADO.md` y `CONTRACT.md` (reglas del proyecto). De este documento, leer §0–§3 y §9 siempre, y de §8 solo la fase activa. Así cada sesión sale barata en tokens.
@@ -94,7 +94,7 @@ Método: color promedio/dominante de zonas recortadas. Incluyen iluminación y c
 | Piel | luz #CBBAB0, medio #AF9C95/#BAA79F | #EFDFD6 / #E7D5CA | #FEE8CD (clipeado) | Sobreexpuesta: ~50 niveles por encima. Bajar exposición/luz en F1 antes de tocar el albedo |
 | Pelo | #1E1818 / #382F2E (hoja #1C1A1A) | #3F2D31 | #07040D | Ahora casi negro puro y sin lectura de arcilla. Levantar a #1C1A1A y dejar ver mechones #322E2E / polvo #78716C |
 | Abrigo | #141114 a #292426 | #261A25 | #0B0416 | Negro-morado sin textura. Objetivo #1E191C con tela visible |
-| Bufanda, verde | #3F553C (hoja #2B452B) | #2D652F | #417433 | Verde lima. En código es #335430, así que algo lo sube (¿textura `lana_albedo`, exposición, glow?): investigar en F7 |
+| Bufanda, verde | #3F553C (hoja #2B452B) | #2D652F | #417433 | **Causa hallada en F7**: `clay_grade` de `look/clay.gdshader` mezcla los verdes hacia `moss_tint` (musgo del mundo, `moss_amount` 0.6). El adaptador ahora pone `moss_amount = 0` en Andro. Albedos de bufanda: `SCARF_G` (0.095, 0.17, 0.10), `SCARF_W` (0.58, 0.585, 0.57), `SCARF_RUST` (0.4, 0.25, 0.18) |
 | Bufanda, blanco | #8C9582 (hoja #B2ACA0) | #97B18E | #B8CE8A | Amarillo-verdoso. Debe ser blanco sucio cálido |
 | Ojeras | #5B4653 | morado | #8F3E7C | Magenta saturado. Bajar saturación y oscurecer |
 
@@ -265,15 +265,15 @@ Resultado en §1, §3 y §9.1.
 - Hacer: §4.3; piezas aparte con pivotes para animarlas.
 - Aceptación: parpadeo de 3 poses y mirada con pasos; un solo brillo en el ojo.
 
-### F5 · Boca y expresiones
+### F5 · Boca y expresiones — HECHA (ver §9.1)
 - Hacer: M1–M5 como piezas cacheadas.
 - Aceptación: las 5 bocas se alternan sin parpadeos de malla.
 
-### F6 · Cabello 044-B
+### F6 · Cabello 044-B — HECHA (ver §9.1)
 - Hacer: §4.5 (volumen, capas, variantes como piezas).
 - Aceptación: silueta desgreñada y asimétrica en 4 vistas, color de §5.
 
-### F7 · Bufanda 042
+### F7 · Bufanda 042 — HECHA (ver §9.1)
 - Hacer: §4.6 (nudo, color, colas con pivotes).
 - Aceptación: colores #2B452B / #B2ACA0 en pantalla, colas con retraso en giros y aceleración.
 
@@ -352,6 +352,29 @@ Plantilla (una entrada por fase, la más nueva arriba):
 - Decisiones por defecto: el brillo del ojo va dentro de la pieza del globo (gira con la mirada); las cejas siguen en el material del pelo.
 - Siguiente paso: F5 (boca y expresiones).
 
+### 2026-11-12 · F5 · Boca y expresiones
+- Archivos tocados: `character/player_model.gd` (`_geo_mouth`, `_lip`, `_mouth_cavity`, `_teeth_row`, `set_mouth`, `get_mouth`; `C_LIP` (0.42, 0.2, 0.2) en arcilla), `tests/andro_f5f7_test.gd` (nuevo).
+- Qué cambió: los labios salieron de la malla de la cabeza. Hay 5 piezas hijas de `head` (`mouth_m1..m5`), cacheadas, una visible a la vez: M1 neutro, M2 asombrado (O con interior oscuro), M3 triste, M4 hablando (dientes superiores), M5 tenso (dientes apretados). `set_mouth(id)` solo cambia `visible`.
+- Capturas: `F5_bocas`.
+- Efectos colaterales: sin conectar aún a diálogo ni a `animate` (F10). En modo no arcilla se mantienen los labios antiguos.
+- Siguiente paso: F6.
+
+### 2026-11-12 · F6 · Cabello 044-B
+- Archivos tocados: `character/player_model.gd` (`_geo_hair`, `set_hair_variant`, `get_hair_variant`, `_style_piece`; el casquete y los mechones salieron de `_geo_head` en arcilla), `character/gothic_clay_adapter.gd` (`apply_to(nodo)`).
+- Qué cambió: el pelo es la pieza `hair` (hija de `head`, gira en `HAIR_ORIGIN`). Mechones más gruesos y aplanados, 3 capas (frente, sienes, nuca), volumen 35 % mayor a la derecha, remolino en la coronilla, sienes que suben sin tapar las orejas y puntas con polvo #78716C. 4 variantes por reemplazo: 0 clásico, 1 viento, 2 mojado, 3 caótico (4 056 tris en la clásica).
+- Capturas: `F6_variantes_pelo`, `F6_perfil`, `F6_nuca`, `F6_tres_cuartos`.
+- Efectos colaterales: las púas de arriba suben la altura total a 2.19 m (antes 2.14); el pelo está fuera del AABB de `head` (el inventario ya lo suma). Una pieza creada tras `_ready` debe pasar por `_style_piece` (ClayStyle convierte el material y luego el adaptador lo estila).
+- Siguiente paso: F7.
+
+### 2026-11-12 · F7 · Bufanda 042
+- Archivos tocados: `character/player_model.gd` (`_clay_scarf` reescrita, `_stripe_col`, `_scarf_joints`, `_geo_scarf_seg`, `_build_scarf_tails`, `set_scarf_variant`, `_update_cloth` llamada desde `animate`), `character/gothic_clay_adapter.gd` (`moss_amount = 0`).
+- Qué cambió: el verde lima era el filtro de musgo del mundo (`clay_grade`), no la textura ni la exposición. Con eso apagado, los albedos de la bufanda se calibraron midiendo (verde marchito, blanco sucio, óxido en las puntas). Rayas de ancho irregular con desgaste, nudo de dos bultos, dos vueltas al cuello. Las dos colas son cadenas de pivotes hijas de `chest` (`scarf_a1..a4`, `scarf_b1..b3`); `_update_cloth` las separa al acelerar/frenar/correr y las balancea al girar (más lentas que el pelo). 4 variantes: clásica, torcida, corta/rota, flecos largos.
+- Capturas: `F7_bufanda`, `F7_variantes`, `F7_cara_completa`, `F7_estudio_cara`, `F7_cuerpo`.
+- Tris / FPS: 19 360 total (chest 4 456, head 2 764, hair 4 056, mouth ≈ 190). FPS sin medir.
+- Efectos colaterales: el filtro de musgo del mundo sigue activo para el resto del mapa (no se tocó). La bufanda en estudio y en preset se ve igual de apagada.
+- Decisiones por defecto: la respiración de las colas usa `Time.get_ticks_msec` (F10 la pasará a pasos de `step_fps`).
+- Siguiente paso: F8 (abrigo, torso, brazos y manos).
+
 ### 9.2 Comandos (desde la raíz del repo; `godot` = 4.3)
 ```
 # Importar la primera vez
@@ -361,10 +384,11 @@ godot --headless --path godot3d -s res://tests/integration_test.gd
 godot --headless --path godot3d -s res://tests/character_logic_test.gd
 godot --headless --path godot3d -s res://tests/gothic_clay_adapter_test.gd
 godot --headless --path godot3d -s res://tests/andro_face_test.gd
-# Cara por pasos en las capturas: variables ANDRO_BLINK=0|1|2, ANDRO_GAZE="x,y", ANDRO_BROW="izq,der"
+godot --headless --path godot3d -s res://tests/andro_f5f7_test.gd
+# Cara por pasos en las capturas: variables ANDRO_BLINK=0|1|2, ANDRO_GAZE="x,y", ANDRO_BROW="izq,der", ANDRO_MOUTH=1..5, ANDRO_HAIR=0..3, ANDRO_SCARF=0..3
 # Inventario: tris, medidas y materiales de Andro
 godot --headless --path godot3d -s res://tests/andro_inventory.gd
-# Captura con luz plastilina (llvmpipe; vistas: face, close, full, side, back, hperfil, hperfil2, h34 (cabeza); ruta de salida ABSOLUTA; 3er argumento opcional: preset | estudio)
+# Captura con luz plastilina (llvmpipe; vistas: face, close, full, side, back, hperfil, hperfil2, h34, hback (cabeza), bufanda; ruta de salida ABSOLUTA; 3er argumento opcional: preset | estudio)
 xvfb-run -a -s "-screen 0 1280x720x24" godot --path godot3d --rendering-driver opengl3 --rendering-method gl_compatibility -s res://tests/andro_plastilina_shot.gd -- face /ruta/absoluta/Fxx_face.png
 ```
 Godot 4.3: `https://github.com/godotengine/godot/releases/download/4.3-stable/Godot_v4.3-stable_linux.x86_64.zip`. En este entorno no hay Vulkan: las capturas son GL Compatibility; pedir a Pablo capturas del teléfono para confirmar color y brillo.
@@ -388,9 +412,9 @@ Respetar los nombres existentes. Piezas nuevas sugeridas (hijas del pivote corre
 | F2 | [x] hecha | 12-nov; tris sin cambio (18 228) |
 | F3 | [x] hecha | 12-nov; nariz proyecta en perfil, orejas con hélix/concha/lóbulo |
 | F4 | [x] hecha | 12-nov; ojos, párpados y cejas son piezas con `set_face()`; falta conectarlo a `animate` (F10) |
-| F5 | [ ] pendiente | |
-| F6 | [ ] pendiente | |
-| F7 | [ ] pendiente | |
+| F5 | [x] hecha | 12-nov; 5 bocas como piezas, `set_mouth(1..5)` |
+| F6 | [x] hecha | 12-nov; pelo = pieza `hair` con 4 variantes, `set_hair_variant()` |
+| F7 | [x] hecha | 12-nov; colas con cadena de pivotes, lima corregida (filtro de musgo), `set_scarf_variant()` |
 | F8 | [ ] pendiente | |
 | F9 | [ ] pendiente | |
 | F10 | [ ] pendiente | |

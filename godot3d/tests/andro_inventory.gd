@@ -14,7 +14,9 @@ func _init() -> void:
 	print("TRIS_TOTAL ", m.triangle_count())
 	var total := AABB()
 	var first := true
-	var joints: Dictionary = m._joints
+	var joints: Dictionary = m._joints.duplicate()
+	for pk in m._pieces:      # F4+: piezas animables (ojos, boca, pelo, colas de bufanda)
+		joints["~" + String(pk)] = m._pieces[pk]
 	for jn in joints:
 		var n: Node3D = joints[jn]
 		var mi := n.get_node_or_null("Mesh") as MeshInstance3D
@@ -46,6 +48,8 @@ func _init() -> void:
 	print("MODEL_AABB size=(%.3f, %.3f, %.3f) y=[%.3f..%.3f]" % [total.size.x, total.size.y, total.size.z, total.position.y, total.end.y])
 	var head_mi := m.head.get_node("Mesh") as MeshInstance3D
 	var hb := head_mi.global_transform * head_mi.mesh.get_aabb()
+	var hair_mi := (m._pieces["hair"] as Node3D).get_node("Mesh") as MeshInstance3D
+	hb = hb.merge(hair_mi.global_transform * hair_mi.mesh.get_aabb())     # cabeza + pelo
 	print("HEAD size=(%.3f, %.3f, %.3f) y=[%.3f..%.3f]  altura/cabeza=%.2f" % [hb.size.x, hb.size.y, hb.size.z, hb.position.y, hb.end.y, total.size.y / hb.size.y])
 	var uniq := {}
 	for jn in joints:
