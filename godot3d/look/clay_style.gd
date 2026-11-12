@@ -165,6 +165,7 @@ static func clay_of(m: Material, local := false) -> Material:
 		out = _from_shader(m as ShaderMaterial, local)
 	if out != m:
 		out.set_meta("clay", true)
+		out.set_meta("clay_src", m)   # material original (lo usa GothicClayAdapter para saber qué pieza es)
 		if m.next_pass != null:
 			out.next_pass = m.next_pass
 	_conv[key] = out

@@ -38,7 +38,7 @@ const C_GLOVE := Color(0.035, 0.035, 0.04)
 const C_BAG := Color(0.1, 0.115, 0.1)
 const C_STRAP := Color(0.03, 0.03, 0.035)
 const C_ZIP := Color(0.22, 0.23, 0.25)
-const C_HAIR := Color(0.045, 0.035, 0.03)
+static var C_HAIR := Color(0.045, 0.035, 0.03)
 const C_EYE := Color(0.03, 0.02, 0.015)
 const C_IRIS := Color(0.16, 0.09, 0.05)
 const C_SCLERA := Color(0.78, 0.74, 0.68)
@@ -47,14 +47,15 @@ static var SKIN_TONE := Color(0.76, 0.62, 0.52)  # piel clara, algo pálida (en 
 # Modo plastilina (ClayStyle.enabled): cabeza y manos grandes, ojos saltones, bufanda tejida a rayas.
 const CLAY_HEAD_K := 1.34
 const CLAY_HAND_K := 1.22
-const C_CLAY_SKIN := Color(0.88, 0.78, 0.68)
-const C_CLAY_EYE := Color(0.95, 0.94, 0.9)
+# Paleta de plastilina = la del adaptador "arcilla gótica" (character/gothic_clay_adapter.gd)
+const C_CLAY_SKIN := GothicClayAdapter.SKIN
+const C_CLAY_EYE := GothicClayAdapter.EYE
 # Traje oscuro + camisa blanca (concepto de Pablo: figura alta y delgada)
-const C_SUIT := Color(0.06, 0.06, 0.068)
-const C_SUIT_LAPEL := Color(0.035, 0.035, 0.042)
+static var C_SUIT := Color(0.06, 0.06, 0.068)
+static var C_SUIT_LAPEL := Color(0.035, 0.035, 0.042)
 const C_SHIRT := Color(0.86, 0.86, 0.83)
 const C_BUTTON := Color(0.03, 0.03, 0.035)
-const C_DRESS_SHOE := Color(0.035, 0.035, 0.04)
+static var C_DRESS_SHOE := Color(0.035, 0.035, 0.04)
 const BEARD_ON := false         # barba (cáscara de pelo); el concepto actual va afeitado
 const ARM_K := 1.1              # brazos 10 % más largos
 const STUBBLE_TONE := Color(0.4, 0.29, 0.23)    # barba de pocos días
@@ -130,7 +131,12 @@ func _ready() -> void:
 
 func _build() -> void:
 	_built = true
-	SKIN_TONE = C_CLAY_SKIN if ClayStyle.enabled else Color(0.76, 0.62, 0.52)
+	var clay := ClayStyle.enabled
+	SKIN_TONE = C_CLAY_SKIN if clay else Color(0.76, 0.62, 0.52)
+	C_SUIT = GothicClayAdapter.COAT if clay else Color(0.06, 0.06, 0.068)
+	C_SUIT_LAPEL = GothicClayAdapter.COAT * 0.7 if clay else Color(0.035, 0.035, 0.042)
+	C_HAIR = GothicClayAdapter.HAIR if clay else Color(0.045, 0.035, 0.03)
+	C_DRESS_SHOE = GothicClayAdapter.SHOE if clay else Color(0.035, 0.035, 0.04)
 	root = _pivot("root", self, Vector3.ZERO)
 	hips = _pivot("hips", root, Vector3(0, HIPS_HEIGHT, 0))
 	spine = _pivot("spine", hips, Vector3(0, 0.1, 0))
@@ -166,6 +172,10 @@ func _build() -> void:
 		_dress(_joints["shin_" + sfx], "shin_" + sfx, _geo_shin.bind(float(side)))
 		_dress(_joints["foot_" + sfx], "foot_" + sfx, _geo_foot.bind(float(side)))
 	_prev_yaw = global_rotation.y if is_inside_tree() else 0.0
+	if clay:
+		var ad := GothicClayAdapter.new()
+		ad.name = "GothicClayAdapter"
+		add_child(ad)
 
 
 func _pivot(pname: String, parent: Node3D, pos: Vector3) -> Node3D:
@@ -246,6 +256,18 @@ static func _knit() -> Material:    # buzo
 
 static func _twill() -> Material:   # cargo
 	return _vcmat("twill", MatActors.cargo_twill(Color.WHITE, Vector3.ONE), 0.25)
+
+static func _eye() -> Material:     # globo ocular y pupila (pieza propia: el adaptador la deja brillante)
+	return _vcmat("eye", MatActors.skin(Color.WHITE, Vector3.ONE), 0.12)
+
+## Nombre de la pieza a la que pertenece un material de Andro ("" si no es suyo).
+static func material_key(m: Material) -> String:
+	for k in _mats:
+		if _mats[k] == m:
+			return k
+	if MatActors.scarf_antioquia(Color.WHITE, Vector3.ONE) == m:
+		return "knit"
+	return ""
 
 static func _skin() -> Material:
 	return _vcmat("skin", MatActors.skin(Color.WHITE, Vector3.ONE), 0.12)
@@ -1506,8 +1528,8 @@ func snap_pose(state: String, speed: float, phase := 0.0) -> void:
 func _clay_eye(skin_m: Material, hair_m: Material, ex: float, sx: float, ez: float) -> void:
 	var up_f := Vector3(0, 0, -1)
 	var c := Vector3(ex * 1.08, EYE_Y + 0.002, ez - 0.002)
-	_ellip(skin_m, c, Vector3(0.0215, 0.0205, 0.016), _c(C_CLAY_EYE), Vector3.ZERO, 14, 8)
-	_ellip(skin_m, c + Vector3(-0.0015 * sx, -0.0015, -0.0158), Vector3(0.0042, 0.0042, 0.0018), _c(C_EYE), Vector3.ZERO, 8, 4)
+	_ellip(_eye(), c, Vector3(0.0215, 0.0205, 0.016), _c(C_CLAY_EYE), Vector3.ZERO, 14, 8)
+	_ellip(_eye(), c + Vector3(-0.0015 * sx, -0.0015, -0.0158), Vector3(0.0042, 0.0042, 0.0018), _c(GothicClayAdapter.PUPIL), Vector3.ZERO, 8, 4)
 	# párpado superior: casquete de piel inclinado hacia adelante
 	_ellip(skin_m, c + Vector3(0, 0.0145, 0.003), Vector3(0.0228, 0.0105, 0.0168), _c(SKIN_TONE * 0.96),
 		Vector3(-0.3, 0.0, 0.0), 14, 7)
@@ -1523,8 +1545,8 @@ func _clay_eye(skin_m: Material, hair_m: Material, ex: float, sx: float, ez: flo
 ## Bufanda tejida a rayas verde/blanco: una vuelta al cuello y dos puntas que cuelgan por delante.
 func _clay_scarf(keys: Array) -> void:
 	var km := _knit()
-	var g := _c(Color(0.05, 0.38, 0.14))
-	var w := _c(Color(0.9, 0.9, 0.84))
+	var g := _c(GothicClayAdapter.SCARF_GREEN)
+	var w := _c(GothicClayAdapter.SCARF_CREAM)
 	var stripe := func(u: float) -> Color:
 		return w if fposmod(u, 1.0) < 0.42 else g
 	# vuelta alrededor del cuello (ligeramente caída hacia adelante)

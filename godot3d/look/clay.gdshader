@@ -76,7 +76,7 @@ vec3 clay_grade(vec3 c) {
 	float green = smoothstep(0.14, 0.2, hsv.x) * (1.0 - smoothstep(0.48, 0.54, hsv.x)) * smoothstep(0.05, 0.16, hsv.y);
 	hsv.y = clamp(hsv.y * saturation * (1.0 + 0.25 * green), 0.0, 1.0);
 	vec3 o = hsv2rgb(hsv);
-	o = mix(o, moss_tint * clamp(hsv.z / 0.4, 0.35, 1.3), green * moss_amount);
+	o = mix(o, moss_tint * clamp(hsv.z / 0.4, 0.0, 1.3), green * moss_amount);   // verdes oscuros (postes) siguen oscuros
 	float grey = (1.0 - smoothstep(0.06, 0.24, hsv.y)) * (1.0 - green);
 	o = mix(o, hsv.z * grey_tint * 1.08, grey * grey_amount);
 	return o * (1.0 - value_lift) + value_lift * vec3(0.16, 0.12, 0.17);

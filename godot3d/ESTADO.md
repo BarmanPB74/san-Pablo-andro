@@ -19,7 +19,18 @@ Plan gráfico anterior (fases 1-5): `PLAN_GRAFICOS.md`. El plan vigente está en
 - Rendimiento medido en el editor del teléfono: ~51 FPS en el parque, ~78 FPS en la calle.
 - Sin APK todavía (a propósito): se juega desde el editor de Godot en el teléfono.
 
-## Última sesión (11 nov 2026) — Fase 4.0: estilo PLASTILINA (stop-motion)
+## Última sesión (11 nov 2026) — Fase 4.1: adaptador "arcilla gótica" (port del script de Unity de Pablo)
+- Pablo trajo `GothicClayCharacterAdapter.cs` (Unity/C#). No corre en Godot: se portó a `character/gothic_clay_adapter.gd`
+  (`GothicClayAdapter`) con los mismos parámetros, colores, reglas por nombre y generadores de textura (normal de arcilla y
+  bufanda a rayas). Se rige por rugosidad = 1 − smoothness (0.88 mate; ojos 0.55).
+- Andro en modo plastilina lo usa solo: `player_model.gd` toma su paleta (piel 0.82/0.75/0.70, saco 0.11, pelo 0.08,
+  bufanda verde 0.13/0.36/0.21 y crema, zapatos café) y agrega el nodo adaptador, que deja mate la ropa/piel y brillantes
+  los ojos (nuevo material `_eye()`). El personaje no pasa por la gradación gris→rosa (camisa y bufanda quedan blancas).
+- `replace_with_clay_glb()` listo para `personaje_arcilla_gotica.glb` (esconde mallas, mantiene física/animación, pega "Head"
+  al pivote de la cabeza) pero SIN probar: el .glb no llegó. Ponerlo en `res://character/` y fijar `gothic_clay_model_path`.
+- Prueba nueva: `tests/gothic_clay_adapter_test.gd` (PASS). integration y character_logic PASS.
+
+## Sesión anterior (11 nov 2026) — Fase 4.0: estilo PLASTILINA (stop-motion)
 - Pablo trajo una imagen propia (pueblo de plastilina de noche: iglesia de ladrillo, árboles retorcidos, rejas de lanza,
   faroles ámbar, cielo morado, muchacho con bufanda verde/blanca, botones de piedra) y pidió transformar todo el juego a ese estilo.
 - Nuevo preset `plastilina` (ahora es el valor por defecto de `time_of_day` en `core/game.gd`). Para volver al look anterior:
