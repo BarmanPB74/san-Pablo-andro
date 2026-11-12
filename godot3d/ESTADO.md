@@ -19,7 +19,18 @@ Plan gráfico anterior (fases 1-5): `PLAN_GRAFICOS.md`. El plan vigente está en
 - Rendimiento medido en el editor del teléfono: ~51 FPS en el parque, ~78 FPS en la calle.
 - Sin APK todavía (a propósito): se juega desde el editor de Godot en el teléfono.
 
-## Última sesión (11 nov 2026) — Fase 4.3: texturas de arcilla de las láminas + cabello despeinado
+## Última sesión (12 nov 2026) — Rediseño de Andro, F0 (inventario y línea base, sin cambios de arte)
+- Nuevo `ANDRO_CONTEXTO.md`: contexto maestro del rediseño del personaje (reglas, inventario verificado, diagnóstico medido,
+  paleta, plan por fases F0–F11, comandos, registro de cambios). Leerlo antes de tocar `character/`.
+- Medido en F0: Andro = 18 228 tris, 22 superficies, 2.138 m de alto, 4.2 cabezas (la hoja turnaround muestra ≈ 3).
+  Sin AnimationPlayer: la animación es procedural (`PlayerModel.animate`); el stop-motion se hará muestreando la pose a 8–12 pps (F10).
+- Con luz `plastilina` (GL Compatibility): piel sobreexpuesta (#FEE8CD vs #CBBAB0 de la lámina), pelo y abrigo casi negros,
+  bufanda verde lima (#417433) y ojeras magenta. Detalle en §3 del documento.
+- Nuevos: `tests/andro_inventory.gd` (tris/medidas/materiales), `tests/andro_plastilina_shot.gd` (captura con el preset real),
+  `docs/andro/shots/F0_*.jpg`. Sin cambios de malla ni de material. Tests PASS (integration, character_logic, gothic_clay_adapter).
+- Siguiente: F1 (estudio de luz y material). FPS del personaje en el teléfono: sin medir.
+
+## Sesión anterior (11 nov 2026) — Fase 4.3: texturas de arcilla de las láminas + cabello despeinado
 - Texturas nuevas hechas por código (`tools/texgen/clay_sets.py` → `art/tex/clay/<set>_albedo.png` + `_detail.png`
   con normal en RG y altura en B). Personaje 512 px: piel (arcilla pálida con presiones y huellas), abrigo (textil con
   poros y fibras), pelo (surcos de espátula), lana (punto en V con pelusa), cuero (grietas). Mapa 1024 px: ladrillo
