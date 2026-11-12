@@ -21,6 +21,23 @@ const WET_SHADER := "res://look/wet_asphalt.gdshader"
 ## true = el juego se construye en modo plastilina (árboles retorcidos, rejas de lanza, personaje cabezón).
 static var enabled := false
 
+## Sets de textura de arcilla (tools/texgen/clay_sets.py → art/tex/clay/<set>_albedo/_detail.png).
+## nombre → [metros por repetición, relieve, parámetros extra del shader]
+const SET_DIR := "res://art/tex/clay/"
+const SETS := {
+	"ladrillo": [1.6, 1.1, {"brick_shift": 0.0, "grey_amount": 0.0, "saturation": 1.0}],
+	"panete": [2.5, 0.9, {}],
+	"asfalto": [3.0, 0.9, {"grey_amount": 0.3, "value_lift": 0.0}],
+	"acera": [2.0, 1.0, {"grey_amount": 0.25}],
+	# personaje (GothicClayAdapter)
+	"piel": [0.18, 0.6, {}],
+	"abrigo": [0.3, 0.9, {}],
+	"pelo": [0.12, 1.1, {}],
+	"lana": [0.1, 1.0, {}],
+	"cuero": [0.16, 0.8, {}],
+}
+static var _set_tex := {}
+
 static var _shaders := {}      # "cut_cull" → Shader
 static var _conv := {}         # id material + modo → material de arcilla
 static var _done_meshes := {}  # id de malla → true
@@ -184,6 +201,50 @@ static func _new_clay(cutout: bool, cull_off: bool, local: bool) -> ShaderMateri
 	return c
 
 
+## Qué set de arcilla reemplaza a una textura original del mapa ("" = ninguno: se usa la original difuminada).
+static func set_for_texture(path: String) -> String:
+	if path.contains("/brick/") and not path.contains("calado") and not path.contains("losa"):
+		return "ladrillo"
+	if path.contains("/paving/") and (path.contains("adoquin") or path.contains("anden_ladrillo")):
+		return "ladrillo"
+	if path.contains("/plaster/") and not path.contains("roof"):
+		return "panete"
+	if path.contains("/asphalt/asphalt_"):
+		return "asfalto"
+	if path.contains("anden_concreto") or path.contains("sardinel"):
+		return "acera"
+	return ""
+
+
+static func set_textures(set_name: String) -> Array:
+	if not _set_tex.has(set_name):
+		_set_tex[set_name] = [load(SET_DIR + set_name + "_albedo.png"), load(SET_DIR + set_name + "_detail.png")]
+	return _set_tex[set_name]
+
+
+## Pone un set de arcilla en un material de arcilla: albedo y relieve con la misma proyección triplanar.
+## local = el objeto se mueve (personaje, autos): proyección en espacio de objeto.
+static func apply_set(c: ShaderMaterial, set_name: String, local := false, tile := -1.0) -> void:
+	if not SETS.has(set_name):
+		return
+	var info: Array = SETS[set_name]
+	var tx := set_textures(set_name)
+	var k := 1.0 / (tile if tile > 0.0 else float(info[0]))
+	c.set_shader_parameter("albedo_tex", tx[0])
+	c.set_shader_parameter("clay_tex", tx[1])
+	c.set_shader_parameter("has_tex", true)
+	c.set_shader_parameter("detail_matched", true)
+	c.set_shader_parameter("uv_mode", 2 if local else 1)
+	c.set_shader_parameter("uv_scale", Vector3(k, k, k))
+	c.set_shader_parameter("uv_offset", Vector3.ZERO)
+	c.set_shader_parameter("tex_blur", 0.0)
+	c.set_shader_parameter("tex_keep", 1.0)
+	c.set_shader_parameter("clay_bump", info[1])
+	var extra: Dictionary = info[2]
+	for key in extra:
+		c.set_shader_parameter(key, extra[key])
+
+
 static func _from_base(b: BaseMaterial3D, local: bool) -> Material:
 	if b.shading_mode == BaseMaterial3D.SHADING_MODE_UNSHADED:
 		return b
@@ -218,6 +279,11 @@ static func _from_base(b: BaseMaterial3D, local: bool) -> Material:
 			c.set_shader_parameter("emission_tex", b.emission_texture)
 			c.set_shader_parameter("has_emission_tex", true)
 			c.set_shader_parameter("emission_add", b.emission_operator == BaseMaterial3D.EMISSION_OP_ADD)
+	# Textura del mapa con set de arcilla propio (ladrillo, pañete, asfalto, acera)
+	if b.albedo_texture != null and b.uv1_triplanar:
+		var sname := set_for_texture(b.albedo_texture.resource_path)
+		if sname != "":
+			apply_set(c, sname, local)
 	# Brillos: lo pulido (pintura de auto, metal) queda como plastilina más lisa y cerosa.
 	if b.roughness < 0.35 and b.albedo_texture == null:
 		c.set_shader_parameter("rough", 0.42)
@@ -244,4 +310,9 @@ static func _from_shader(s: ShaderMaterial, local: bool) -> Material:
 		var col: Color = Color(bc.x, bc.y, bc.z) if bc is Vector3 else (bc if bc is Color else Color(0.12, 0.12, 0.13))
 		c.set_shader_parameter("base_color", col)
 	c.set_shader_parameter("tex_blur", 0.8)   # pisos: se conserva la forma del adoquín
+	var src = s.get_shader_parameter("tex_albedo")
+	if s.get_shader_parameter("use_tex") and src is Texture2D:
+		var sname := set_for_texture((src as Texture2D).resource_path)
+		if sname != "":
+			apply_set(c, sname, local)
 	return c

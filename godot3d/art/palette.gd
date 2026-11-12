@@ -124,8 +124,6 @@ static func _undim(c: Color) -> Color:
 
 # ---------- Suelo urbano ----------
 static func asphalt() -> Material:          # asfalto mojado (shader con charcos)
-	if ClayStyle.enabled:
-		return MatPaving.clay_cobble()      # arcilla gótica: calles de adoquín
 	if USE_TEXTURES:
 		return MatAsphalt.asphalt_worn()    # Boston: barrio tradicional, asfalto con parches
 	return wet_asphalt()

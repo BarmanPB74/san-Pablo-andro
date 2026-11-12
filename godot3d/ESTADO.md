@@ -19,7 +19,25 @@ Plan gráfico anterior (fases 1-5): `PLAN_GRAFICOS.md`. El plan vigente está en
 - Rendimiento medido en el editor del teléfono: ~51 FPS en el parque, ~78 FPS en la calle.
 - Sin APK todavía (a propósito): se juega desde el editor de Godot en el teléfono.
 
-## Última sesión (11 nov 2026) — Fase 4.2: personaje y barrio según las láminas "arcilla gótica"
+## Última sesión (11 nov 2026) — Fase 4.3: texturas de arcilla de las láminas + cabello despeinado
+- Texturas nuevas hechas por código (`tools/texgen/clay_sets.py` → `art/tex/clay/<set>_albedo.png` + `_detail.png`
+  con normal en RG y altura en B). Personaje 512 px: piel (arcilla pálida con presiones y huellas), abrigo (textil con
+  poros y fibras), pelo (surcos de espátula), lana (punto en V con pelusa), cuero (grietas). Mapa 1024 px: ladrillo
+  (hecho a mano, juntas hondas, grietas, parches morados), pañete (untadas de espátula), asfalto (arcilla negra y gris con
+  huellas de dedo y zapato), acera (losas grises de bordes redondeados con grietas). Cielo `sky_clay.png` (remolinos
+  púrpura/azul, `PanoramaSkyMaterial` en el preset plastilina; `sky_panorama` / `sky_pano_energy`).
+- `clay.gdshader`: `detail_matched` usa el relieve con la MISMA proyección que el albedo (juntas y grietas coinciden).
+  `ClayStyle.set_for_texture()` decide qué textura original se cambia por qué set; `ClayStyle.apply_set()` lo aplica.
+  `GothicClayAdapter.ROLE_SET` pone el set por pieza del personaje (piel, abrigo, pelo, lana, cuero).
+- Cabello (lámina #044-B): `_clay_hair()` en `player_model.gd`: casquete + ~60 mechones en punta con volumen asimétrico,
+  flequillo que no tapa las cejas y un mechón grande que cruza la frente; puntas con polvo mate.
+- Personaje: piel hueso, ojeras morado/marrón más marcadas, labio inferior rojo apagado, abrigo carbón-café, botones
+  café, botines café, bufanda verde marchito/blanco sucio (#2B452B/#B2ACA0), bolso de cuero con 2 hebillas (#043).
+- Calles: se quitó el adoquín de la fase 4.2; vuelve el asfalto, ahora de arcilla negra (lámina "pavimento y calzada").
+- Pruebas PASS (integration, character_logic, gothic_clay_adapter). Sin probar en el teléfono: hay ~10 texturas nuevas
+  (≈11 MB en disco); si falta memoria, bajar los sets del mapa a 512 px en `clay_sets.py`.
+
+## Sesión anterior (11 nov 2026) — Fase 4.2: personaje y barrio según las láminas "arcilla gótica"
 - Pablo trajo 6 láminas de referencia (hoja de personaje, texturas, mapa gótico, calle, optimización móvil).
 - Personaje (solo modo plastilina, `player_model.gd`): cabeza ×1.6, ojos redondos enormes con pupila pequeña, ojeras malva,
   cejas gruesas, orejas salidas, saco ciruela CERRADO (sin camisa blanca), pantalón más oscuro, pelo café-ciruela,

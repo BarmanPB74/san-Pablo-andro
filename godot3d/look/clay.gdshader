@@ -18,6 +18,7 @@ uniform float alpha_cut = 0.5;
 
 // ---- arcilla ----
 uniform sampler2D clay_tex : filter_linear_mipmap, repeat_enable;   // RG = normal, B = altura
+uniform bool detail_matched = false;  // true: clay_tex es el relieve del MISMO dibujo de albedo_tex (sets de art/tex/clay)
 uniform float clay_scale = 1.4;       // repeticiones por metro
 uniform float clay_bump = 0.75;
 uniform float clay_cavity = 0.35;     // oscurece los surcos (huellas, presiones)
@@ -119,10 +120,13 @@ void fragment() {
 
 	// detalle de arcilla triplanar (sin tangentes: se perturba la normal en el espacio de v_nrm)
 	vec3 w = tri_w(v_nrm);
-	vec3 p = v_pos * clay_scale;
+	// sets: misma proyección y escala que el albedo (juntas, grietas y puntadas coinciden con el dibujo)
+	vec3 p = detail_matched ? v_pos * uv_scale + uv_offset : v_pos * clay_scale;
+	vec2 o1 = detail_matched ? vec2(0.0) : vec2(0.37, 0.71);
+	vec2 o2 = detail_matched ? vec2(0.0) : vec2(0.53, 0.19);
 	vec3 sx = texture(clay_tex, p.zy).rgb;
-	vec3 sy = texture(clay_tex, p.xz + vec2(0.37, 0.71)).rgb;
-	vec3 sz = texture(clay_tex, p.xy + vec2(0.53, 0.19)).rgb;
+	vec3 sy = texture(clay_tex, p.xz + o1).rgb;
+	vec3 sz = texture(clay_tex, p.xy + o2).rgb;
 	vec2 dx = (sx.rg * 2.0 - 1.0) * clay_bump;
 	vec2 dy = (sy.rg * 2.0 - 1.0) * clay_bump;
 	vec2 dz = (sz.rg * 2.0 - 1.0) * clay_bump;

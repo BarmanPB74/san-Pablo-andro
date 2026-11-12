@@ -31,6 +31,9 @@ const SHOE := Color(0.26, 0.21, 0.17)
 const EYE := Color(0.93, 0.92, 0.89)
 const PUPIL := Color(0.03, 0.03, 0.03)
 
+## Set de textura de arcilla por pieza (art/tex/clay/<set>_*.png, ver tools/texgen/clay_sets.py)
+const ROLE_SET := {"skin": "piel", "coat": "abrigo", "hair": "pelo", "scarf": "lana", "shoe": "cuero"}
+
 @export var existing_character_root: Node3D          ## vacío = el padre de este nodo
 @export_file("*.glb", "*.gltf", "*.tscn") var gothic_clay_model_path := ""
 @export_range(0.0, 1.0) var clay_smoothness := 0.12   ## arcilla mate (rugosidad ~0.88)
@@ -117,7 +120,7 @@ static func _role_from_player_material(m: Material) -> String:
 		"hair": return "hair"
 		"twill", "rip": return "coat"
 		"knit": return "scarf"
-		"shoe", "sole": return "shoe"
+		"shoe", "sole", "leather": return "shoe"
 	return ""
 
 
@@ -152,6 +155,13 @@ func _styled(m: Material, role: String, recolor: bool) -> Material:
 		# el personaje conserva sus colores (blancos de camisa/bufanda/ojos no se vuelven rosados)
 		c.set_shader_parameter("grey_amount", 0.0)
 		c.set_shader_parameter("brick_shift", 0.0)
+		# Texturas de las láminas (piel pálida, textil del abrigo, bloque de pelo, lana, cuero)
+		var set_name: String = ROLE_SET.get(role, "")
+		if set_name != "" and not (recolor and role == "scarf"):
+			ClayStyle.apply_set(c, set_name, true)
+			c.set_shader_parameter("clay_bump", float(ClayStyle.SETS[set_name][1]) * normal_bump_scale / 0.65)
+			c.set_shader_parameter("grey_amount", 0.0)
+			c.set_shader_parameter("brick_shift", 0.0)
 		if recolor:
 			c.set_shader_parameter("base_color", _tint(role))
 			if role == "scarf":

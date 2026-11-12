@@ -108,6 +108,8 @@ const PRESETS := {
 		"haze": Color(0.34, 0.21, 0.42), "haze_base": 0.65, "haze_top": 0.4, "night": 1.0,
 		"rain_fx": 0.0, "vignette": 0.5, "grain": 0.018, "aberration": 0.0, "vignette_color": Color(0.06, 0.02, 0.09),
 		"dof_far": 60.0, "dof_far_t": 40.0, "dof_near": 0.0, "dof_amount": 0.012,
+		# cielo de arcilla púrpura y azul (lámina "Recursos y texturas"): panorama de tools/texgen/clay_sets.py
+		"sky_panorama": "res://art/tex/clay/sky_clay.png", "sky_pano_energy": 0.8,
 	},
 }
 
@@ -133,6 +135,7 @@ var current_preset := ""
 var is_compatibility := false            # GL Compatibility (sin RenderingDevice)
 
 var _lut_cache := {}
+var _pano: PanoramaSkyMaterial
 
 
 func _ready() -> void:
@@ -286,6 +289,16 @@ func _apply(p: Dictionary) -> void:
 	sun.shadow_enabled = float(p.sun_energy) > 0.05
 
 	# --- cielo ---
+	var pano_path: String = p.get("sky_panorama", "")
+	if pano_path != "" and ResourceLoader.exists(pano_path):
+		if _pano == null:
+			_pano = PanoramaSkyMaterial.new()
+			_pano.filter = true
+		_pano.panorama = load(pano_path)
+		_pano.energy_multiplier = float(p.get("sky_pano_energy", 1.0))
+		environment.sky.sky_material = _pano
+	else:
+		environment.sky.sky_material = sky_material
 	sky_material.set_shader_parameter("zenith_color", p.zenith)
 	sky_material.set_shader_parameter("horizon_color", p.horizon)
 	sky_material.set_shader_parameter("ground_color", p.ground)
