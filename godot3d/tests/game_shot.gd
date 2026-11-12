@@ -29,6 +29,22 @@ func _initialize() -> void:
 		for i in 50: await physics_frame
 		Input.action_press("move_right")
 		for i in 20: await physics_frame
+	elif mode == "vista":
+		# composición tipo póster: personaje de frente en el parque, iglesia al fondo
+		p.global_position = Vector3(-15.0, 1.2, -2.0)
+		for i in 40: await physics_frame
+		var cam := Camera3D.new()
+		cam.fov = 62.0
+		root.add_child(cam)
+		var ch := p.global_position
+		var church := Vector3(-52, 7, -20)
+		var away := (ch - church)
+		away.y = 0.0
+		away = away.normalized()
+		cam.global_position = ch + away * 3.6 + Vector3(0, 1.5, 0)
+		cam.look_at(ch.lerp(church, 0.18) + Vector3(0, 1.6, 0))
+		p.look_at(cam.global_position * Vector3(1, 0, 1) + Vector3(0, p.global_position.y, 0))
+		cam.current = true
 	elif mode == "aerial":
 		var cam := Camera3D.new()
 		cam.far = 2600.0

@@ -69,6 +69,8 @@ static func tactile_alert_dry() -> Material:
 ## Adoquín HEXAGONAL gris del Parque de Boston (~28.6 cm entre caras), musgo y humedad en juntas.
 ## tile_m = 2.0. Para senderos y plaza del parque (ref. 5).
 static func hex_pavers() -> Material:
+	if ClayStyle.enabled:
+		return brick_sidewalk()   # pueblo de plastilina: senderos de ladrillo rojo
 	return _wet("adoquin_hex", 2.0, {
 		"puddle_color": Color(0.09, 0.095, 0.1),
 		"puddle_coverage": 0.3, "puddle_scale": 0.15,
@@ -83,6 +85,8 @@ static func hex_pavers_dry() -> Material:
 ## Adoquín rectangular 20 x 10 cm en espina de pescado (90°), gris de plaza. tile_m = 2.0.
 ## Para la plaza del parque, plazoletas y entradas de edificios (ref. 4).
 static func herringbone_pavers() -> Material:
+	if ClayStyle.enabled:
+		return brick_sidewalk()   # pueblo de plastilina: senderos de ladrillo rojo
 	return _wet("adoquin_espina", 2.0, {
 		"puddle_color": Color(0.09, 0.095, 0.1),
 		"puddle_coverage": 0.3, "puddle_scale": 0.15,

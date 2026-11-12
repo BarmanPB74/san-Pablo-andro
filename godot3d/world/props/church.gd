@@ -31,6 +31,9 @@ static func _mats() -> void:
 		return
 	_plaster = MatPlaster.stucco(Color(0.95, 0.84, 0.72))
 	_sillar = MatStone.sillar()
+	if ClayStyle.enabled:
+		# pueblo de plastilina: iglesia de ladrillo rojo con remates de piedra
+		_plaster = MatBrick.fachada_vieja(Color(0.92, 0.8, 0.8))
 	_dark = WorldMaterials.dark_opening()
 
 

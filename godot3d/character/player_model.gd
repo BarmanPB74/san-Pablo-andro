@@ -43,7 +43,12 @@ const C_EYE := Color(0.03, 0.02, 0.015)
 const C_IRIS := Color(0.16, 0.09, 0.05)
 const C_SCLERA := Color(0.78, 0.74, 0.68)
 const C_LIP := Color(0.52, 0.32, 0.27)
-const SKIN_TONE := Color(0.76, 0.62, 0.52)      # piel clara, algo pálida
+static var SKIN_TONE := Color(0.76, 0.62, 0.52)  # piel clara, algo pálida (en plastilina: beige mate)
+# Modo plastilina (ClayStyle.enabled): cabeza y manos grandes, ojos saltones, bufanda tejida a rayas.
+const CLAY_HEAD_K := 1.34
+const CLAY_HAND_K := 1.22
+const C_CLAY_SKIN := Color(0.88, 0.78, 0.68)
+const C_CLAY_EYE := Color(0.95, 0.94, 0.9)
 # Traje oscuro + camisa blanca (concepto de Pablo: figura alta y delgada)
 const C_SUIT := Color(0.06, 0.06, 0.068)
 const C_SUIT_LAPEL := Color(0.035, 0.035, 0.042)
@@ -125,6 +130,7 @@ func _ready() -> void:
 
 func _build() -> void:
 	_built = true
+	SKIN_TONE = C_CLAY_SKIN if ClayStyle.enabled else Color(0.76, 0.62, 0.52)
 	root = _pivot("root", self, Vector3.ZERO)
 	hips = _pivot("hips", root, Vector3(0, HIPS_HEIGHT, 0))
 	spine = _pivot("spine", hips, Vector3(0, 0.1, 0))
@@ -173,6 +179,9 @@ func _pivot(pname: String, parent: Node3D, pos: Vector3) -> Node3D:
 
 ## Cuelga del pivote una sola MeshInstance3D con todas sus piezas (cacheada).
 func _dress(pivot: Node3D, key: String, builder: Callable) -> void:
+	var clay := ClayStyle.enabled
+	if clay:
+		key += "_clay"
 	var mesh: ArrayMesh
 	if _mesh_cache.has(key):
 		mesh = _mesh_cache[key]
@@ -192,6 +201,10 @@ func _dress(pivot: Node3D, key: String, builder: Callable) -> void:
 	var mi := MeshInstance3D.new()
 	mi.name = "Mesh"
 	mi.mesh = mesh
+	if clay and key.begins_with("head"):
+		mi.scale = Vector3.ONE * CLAY_HEAD_K
+	elif clay and key.begins_with("hand"):
+		mi.scale = Vector3.ONE * CLAY_HAND_K
 	pivot.add_child(mi)
 
 
@@ -650,6 +663,8 @@ func _geo_chest() -> void:
 		_rr(0.3, 0.056, 0.055, 0.058, 0.002, 2.0),
 		_r(0.301, 0.0, 0.0, 0.002)]
 	_loft(tw, collar, 18, Transform3D.IDENTITY, cw)
+	if ClayStyle.enabled:
+		_clay_scarf(keys)
 
 
 # ---------------------------------------------------------------------
@@ -823,15 +838,20 @@ func _geo_head() -> void:
 	for sx in [-1.0, 1.0]:
 		var ex: float = 0.034 * sx
 		var ez := _head_z(ex, EYE_Y, keys)
-		_ellip(skin_m, Vector3(ex, EYE_Y, ez + 0.0035), Vector3(0.0172, 0.0122, 0.0068), _c(C_SCLERA), Vector3.ZERO, 10, 5)
-		_ellip(skin_m, Vector3(ex - 0.001 * sx, EYE_Y - 0.0005, ez - 0.0018), Vector3(0.0088, 0.0088, 0.002),
-			_c(C_IRIS), Vector3.ZERO, 8, 4)
+		var clay_eyes := ClayStyle.enabled
+		if clay_eyes:
+			_clay_eye(skin_m, hair_m, ex, sx, ez)
+		else:
+			_ellip(skin_m, Vector3(ex, EYE_Y, ez + 0.0035), Vector3(0.0172, 0.0122, 0.0068), _c(C_SCLERA), Vector3.ZERO, 10, 5)
+			_ellip(skin_m, Vector3(ex - 0.001 * sx, EYE_Y - 0.0005, ez - 0.0018), Vector3(0.0088, 0.0088, 0.002),
+				_c(C_IRIS), Vector3.ZERO, 8, 4)
 		var lash := PackedVector3Array()
 		for i in 4:
 			var t := float(i) / 3.0
 			var lx: float = ex + sx * lerpf(-0.0175, 0.0175, t)
 			lash.append(Vector3(lx, EYE_Y + 0.0095 + 0.0025 * sin(t * PI), _head_z(lx, EYE_Y + 0.01, keys) - 0.0005))
-		_tube(hair_m, lash, 0.0018, 0.0022, 3, up_f, _c(C_EYE))
+		if not clay_eyes:
+			_tube(hair_m, lash, 0.0018, 0.0022, 3, up_f, _c(C_EYE))
 		# Ceja recta y algo baja hacia el centro (mirada seria)
 		var brow := PackedVector3Array()
 		var bra: Array = []
@@ -841,7 +861,8 @@ func _geo_head() -> void:
 			var by: float = EYE_Y + 0.024 + 0.005 * sin(t * 2.4) - 0.002 * (1.0 - t)
 			brow.append(Vector3(bx, by, _head_z(bx, by, keys) - 0.0015))
 			bra.append(lerpf(0.0042, 0.0028, t))
-		_tube(hair_m, brow, bra, 0.0026, 4, up_f, _c(C_HAIR))
+		if not clay_eyes:
+			_tube(hair_m, brow, bra, 0.0026, 4, up_f, _c(C_HAIR))
 		# Orejas con hélice marcada
 		var er := _ring_at(keys, 0.115)
 		var eo := Vector3(sx * (float(er["a"]) + 0.004), 0.113, 0.014)
@@ -1474,3 +1495,64 @@ func snap_pose(state: String, speed: float, phase := 0.0) -> void:
 	for i in 40:
 		_phase = phase - speed * (1.0 / 60.0) / maxf(0.01, lerpf(lerpf(1.4, 2.7, _gait_g), 3.7, _gait_s)) * TAU
 		animate(state, speed, 1.0 / 60.0)
+
+
+# ---------------------------------------------------------------------
+#  Modo plastilina: ojos saltones y bufanda tejida
+# ---------------------------------------------------------------------
+
+## Ojo de muñeco de plastilina: globo blanco grande que sobresale, pupila pequeña negra,
+## párpado superior de piel que cae un poco (mirada cansada) y ceja gruesa encima.
+func _clay_eye(skin_m: Material, hair_m: Material, ex: float, sx: float, ez: float) -> void:
+	var up_f := Vector3(0, 0, -1)
+	var c := Vector3(ex * 1.08, EYE_Y + 0.002, ez - 0.002)
+	_ellip(skin_m, c, Vector3(0.0215, 0.0205, 0.016), _c(C_CLAY_EYE), Vector3.ZERO, 14, 8)
+	_ellip(skin_m, c + Vector3(-0.0015 * sx, -0.0015, -0.0158), Vector3(0.0042, 0.0042, 0.0018), _c(C_EYE), Vector3.ZERO, 8, 4)
+	# párpado superior: casquete de piel inclinado hacia adelante
+	_ellip(skin_m, c + Vector3(0, 0.0145, 0.003), Vector3(0.0228, 0.0105, 0.0168), _c(SKIN_TONE * 0.96),
+		Vector3(-0.3, 0.0, 0.0), 14, 7)
+	# ceja gruesa de plastilina, un poco caída hacia afuera
+	var brow := PackedVector3Array()
+	for i in 4:
+		var t := float(i) / 3.0
+		var bx: float = ex * 1.08 + sx * lerpf(-0.02, 0.022, t)
+		brow.append(Vector3(bx, EYE_Y + 0.03 + 0.004 * sin(t * PI) - 0.004 * t, ez - 0.012))
+	_tube(hair_m, brow, [0.0062, 0.0068, 0.006, 0.0045], 0.004, 6, up_f, _c(C_HAIR))
+
+
+## Bufanda tejida a rayas verde/blanco: una vuelta al cuello y dos puntas que cuelgan por delante.
+func _clay_scarf(keys: Array) -> void:
+	var km := _knit()
+	var g := _c(Color(0.05, 0.38, 0.14))
+	var w := _c(Color(0.9, 0.9, 0.84))
+	var stripe := func(u: float) -> Color:
+		return w if fposmod(u, 1.0) < 0.42 else g
+	# vuelta alrededor del cuello (ligeramente caída hacia adelante)
+	var ring := PackedVector3Array()
+	for i in 41:
+		var a := TAU * float(i) / 40.0
+		ring.append(Vector3(sin(a) * 0.098, 0.262 + 0.012 * cos(a) - 0.014 * maxf(-cos(a), 0.0), cos(a) * 0.092 + 0.004))
+	_tube(km, ring, 0.032, 0.026, 10, Vector3(0, 1, 0), func(p: Vector3) -> Color:
+		return stripe.call(atan2(p.x, p.z) / TAU * 9.0), false)
+	# segunda vuelta más baja y floja
+	var ring2 := PackedVector3Array()
+	for i in 41:
+		var a := TAU * float(i) / 40.0
+		ring2.append(Vector3(sin(a) * 0.104, 0.236 - 0.02 * maxf(-cos(a), 0.0), cos(a) * 0.098 + 0.004))
+	_tube(km, ring2, 0.028, 0.022, 10, Vector3(0, 1, 0), func(p: Vector3) -> Color:
+		return stripe.call(atan2(p.x, p.z) / TAU * 9.0 + 0.5), false)
+	# puntas: tiras planas que caen sobre el saco
+	var up_f := Vector3(0, 0, -1)
+	for k in 2:
+		var x0 := -0.03 if k == 0 else 0.035
+		var x1 := -0.045 if k == 0 else 0.06
+		var y_end := -0.09 if k == 0 else -0.02
+		var path := _surf_path(keys, Vector2(x0, 0.24), Vector2(x1, y_end), true, 0.03 - 0.006 * float(k), 18)
+		_tube(km, path, 0.034, 0.009, 8, up_f, func(p: Vector3) -> Color:
+			return stripe.call((0.24 - p.y) / 0.045), true, 3.0)
+		# flecos
+		var end := path[path.size() - 1]
+		for f in 5:
+			var fx := end.x + lerpf(-0.026, 0.026, float(f) / 4.0)
+			_tube(km, PackedVector3Array([Vector3(fx, end.y + 0.004, end.z), Vector3(fx, end.y - 0.022, end.z - 0.003)]),
+				0.0042, 0.0042, 4, up_f, w if f % 2 == 0 else g)

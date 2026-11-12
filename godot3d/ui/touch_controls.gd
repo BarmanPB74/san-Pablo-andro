@@ -17,6 +17,14 @@ var _buttons: Array[Dictionary] = []   # {action, rect, touch, label}
 var _in_vehicle := false
 
 var _draw_root: Control
+# Modo plastilina: discos de piedra modelada con flechas y letras doradas (ui/clay/*.png).
+var _clay := false
+var _tex_disc: Texture2D
+var _tex_dpad: Texture2D
+var _tex_knob: Texture2D
+var _stick_home := Vector2.ZERO
+const GOLD := Color(0.96, 0.84, 0.56)
+const GOLD_INK := Color(0.2, 0.12, 0.08)
 
 
 func _ready() -> void:
@@ -25,11 +33,17 @@ func _ready() -> void:
 	_draw_root.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_draw_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_draw_root.draw.connect(_on_draw)
+	_clay = ClayStyle.enabled and ResourceLoader.exists("res://ui/clay/disc.png")
+	if _clay:
+		_tex_disc = load("res://ui/clay/disc.png")
+		_tex_dpad = load("res://ui/clay/dpad.png")
+		_tex_knob = load("res://ui/clay/knob.png")
 	add_child(_draw_root)
 	get_viewport().size_changed.connect(_layout)
 	_layout()
 	# En escritorio sin pantalla táctil se ocultan, salvo que se fuerce.
-	visible = DisplayServer.is_touchscreen_available() or OS.has_feature("mobile")
+	visible = DisplayServer.is_touchscreen_available() or OS.has_feature("mobile") \
+		or OS.get_environment("SPA_TOUCH") == "1"
 
 
 func set_in_vehicle(v: bool) -> void:
@@ -41,6 +55,7 @@ func _layout() -> void:
 	var s := get_viewport().get_visible_rect().size
 	var r := 70.0
 	_buttons.clear()
+	_stick_home = Vector2(180, s.y - 170)
 	if _in_vehicle:
 		_add_button("move_forward", Vector2(s.x - 110, s.y - 230), r, "GAS")
 		_add_button("move_back", Vector2(s.x - 260, s.y - 120), r, "FRENO")
@@ -92,6 +107,13 @@ func _on_press(idx: int, pos: Vector2) -> void:
 	if pos.x < half and _stick_touch == -1:
 		_stick_touch = idx
 		_stick_origin = pos
+		# en plastilina la base es fija: si se toca cerca de ella, el centro es la base
+		if _clay and pos.distance_to(_stick_home) < STICK_RADIUS * 1.6:
+			_stick_origin = _stick_home
+			_stick_vec = ((pos - _stick_home) / STICK_RADIUS).limit_length(1.0)
+			_apply_stick()
+			_draw_root.queue_redraw()
+			return
 		_stick_vec = Vector2.ZERO
 	elif _look_touch == -1:
 		_look_touch = idx
@@ -138,6 +160,9 @@ func _set_strength(action: String, value: float, respect_button := false) -> voi
 
 
 func _on_draw() -> void:
+	if _clay:
+		_draw_clay()
+		return
 	var font := ThemeDB.fallback_font
 	var amber := Color(1.0, 0.72, 0.3)
 	if _stick_touch != -1:
@@ -156,3 +181,23 @@ func _on_draw() -> void:
 		var w := font.get_string_size(b.label, HORIZONTAL_ALIGNMENT_CENTER, -1, fs).x
 		_draw_root.draw_string(font, b.center + Vector2(-w * 0.5, fs * 0.35), b.label,
 			HORIZONTAL_ALIGNMENT_CENTER, -1, fs, Color(1, 1, 1, 0.9))
+
+
+func _draw_clay() -> void:
+	var font := ThemeDB.fallback_font
+	var base := _stick_origin if _stick_touch != -1 else _stick_home
+	var br := STICK_RADIUS * 1.12
+	_draw_root.draw_texture_rect(_tex_dpad, Rect2(base - Vector2(br, br), Vector2(br, br) * 2.0), false)
+	var kr := STICK_RADIUS * 0.4
+	var kp := base + _stick_vec * STICK_RADIUS * 0.45
+	_draw_root.draw_texture_rect(_tex_knob, Rect2(kp - Vector2(kr, kr), Vector2(kr, kr) * 2.0), false)
+	for b in _buttons:
+		var pressed: bool = b.touch != -1
+		var rr: float = b.radius * (0.94 if pressed else 1.0)
+		var tint := Color(0.82, 0.78, 0.74) if pressed else Color.WHITE
+		_draw_root.draw_texture_rect(_tex_disc, Rect2(b.center - Vector2(rr, rr), Vector2(rr, rr) * 2.0), false, tint)
+		var fs := int(clampf(b.radius * 0.34, 14.0, 26.0))
+		var w := font.get_string_size(b.label, HORIZONTAL_ALIGNMENT_CENTER, -1, fs).x
+		var at: Vector2 = b.center + Vector2(-w * 0.5, fs * 0.36)
+		_draw_root.draw_string_outline(font, at, b.label, HORIZONTAL_ALIGNMENT_CENTER, -1, fs, 5, Color(GOLD_INK, 0.85))
+		_draw_root.draw_string(font, at, b.label, HORIZONTAL_ALIGNMENT_CENTER, -1, fs, GOLD)

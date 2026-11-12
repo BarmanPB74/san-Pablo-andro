@@ -2,7 +2,7 @@ extends Node3D
 ## Escena principal: ensambla los módulos de cada agente según CONTRACT.md.
 ## Se cargan por ruta (load) para que la escena no se rompa si un módulo falta.
 
-@export var time_of_day := "overcast_day"   # overcast_day | golden_hour | rainy_night | tinta_y_papel
+@export var time_of_day := "plastilina"   # plastilina | overcast_day | golden_hour | rainy_night | tinta_y_papel
 
 var look: Node
 var district: Node3D
@@ -13,6 +13,8 @@ var hud: GameHUD
 
 
 func _ready() -> void:
+	# Modo plastilina: se fija ANTES de construir el mundo (árboles, rejas y personaje cambian de forma).
+	ClayStyle.enabled = time_of_day == "plastilina"
 	look = _new_from("res://look/second_son_environment.gd")
 	if look:
 		look.name = "StreetLook"
@@ -38,6 +40,8 @@ func _ready() -> void:
 	add_child(hud)
 	touch = TouchControls.new()
 	add_child(touch)
+	if ClayStyle.enabled:
+		add_child(ClayStyle.new())   # convierte todos los materiales a arcilla (y los que se creen después)
 
 
 func _new_from(path: String) -> Node:
@@ -79,5 +83,5 @@ func _spawn_vehicles() -> void:
 			v.driver_exited.connect(func(_d): touch.set_in_vehicle(false))
 	# De noche los autos prenden faros y luces de posición.
 	var vclass = load("res://vehicles/vehicle.gd")
-	if time_of_day == "rainy_night":
+	if time_of_day == "rainy_night" or time_of_day == "plastilina":
 		vclass.set_night(true, get_tree())

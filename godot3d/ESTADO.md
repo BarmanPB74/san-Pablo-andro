@@ -19,7 +19,30 @@ Plan gráfico anterior (fases 1-5): `PLAN_GRAFICOS.md`. El plan vigente está en
 - Rendimiento medido en el editor del teléfono: ~51 FPS en el parque, ~78 FPS en la calle.
 - Sin APK todavía (a propósito): se juega desde el editor de Godot en el teléfono.
 
-## Última sesión (10 nov 2026) — Fase 3.6: personaje nuevo (traje oscuro, alto y delgado)
+## Última sesión (11 nov 2026) — Fase 4.0: estilo PLASTILINA (stop-motion)
+- Pablo trajo una imagen propia (pueblo de plastilina de noche: iglesia de ladrillo, árboles retorcidos, rejas de lanza,
+  faroles ámbar, cielo morado, muchacho con bufanda verde/blanca, botones de piedra) y pidió transformar todo el juego a ese estilo.
+- Nuevo preset `plastilina` (ahora es el valor por defecto de `time_of_day` en `core/game.gd`). Para volver al look anterior:
+  poner `rainy_night` / `overcast_day` en el nodo Main; todo lo de plastilina se apaga solo.
+- `look/clay_style.gd` (`ClayStyle`): con `ClayStyle.enabled = true` (lo fija game.gd ANTES de construir) recorre el árbol y
+  cambia cada material por `look/clay.gdshader`: mismo color/patrón difuminado + presiones de pulgar y huellas
+  (`art/tex/clay/clay_detail.png`, generador `tools/texgen/clay.py`), brillo ceroso, y gradación de color (naranja→ladrillo
+  frambuesa, grises→rosa ladrillo apagado, verdes→musgo). También convierte lo que se cree después (autos, conos), entibia
+  las luces y pone una luz de relleno sin sombra que sigue a la cámara. Deja igual vidrios, letreros sin luz y cielo.
+- Cambios de forma (solo en modo plastilina): árboles sin hojas con tronco torcido y ramas en rizo (`Trees._clay_tree`),
+  rejas de hierro forjado con punta de lanza (`ParkFurniture._fence_segment_clay`), iglesia de ladrillo, senderos y
+  plazoletas de ladrillo rojo (`MatPaving.hex/herringbone`, `MatStone.laja_plaza`), personaje con cabeza ×1.34, manos ×1.22,
+  ojos saltones con párpado y cejas gruesas, piel beige y bufanda tejida a rayas con flecos (`player_model.gd`, `_clay_eye`,
+  `_clay_scarf`).
+- Controles táctiles: discos de piedra modelada con flechas y letras doradas (`ui/clay/*.png`, generador
+  `tools/texgen/ui_clay.py`); joystick con base fija abajo a la izquierda. `SPA_TOUCH=1` los muestra en escritorio.
+- Desenfoque de maqueta (DOF lejano suave) vía `CameraAttributesPractical` del WorldEnvironment (solo presets con `dof_far`).
+- Pruebas: integration, character_logic, all_spawns_drive PASS. Capturas con lavapipe (`tests/game_shot.gd` modo `vista`).
+- NO probado en el teléfono: medir FPS (el shader de arcilla hace 3 lecturas triplanares + HSV por píxel; el DOF cuesta).
+  Si va lento: bajar `dof_amount` a 0 en el preset o `clay_bump`/`clay_cavity`.
+- Pendiente del estilo: palmeras y follaje bajo aún con forma realista, ventanas de edificios poco cálidas, prado poco verde.
+
+## Sesión anterior (10 nov 2026) — Fase 3.6: personaje nuevo (traje oscuro, alto y delgado)
 - Pablo no quedó contento con Andro y pidió un personaje basado en una ilustración de referencia: hombre alto y delgado, saco
   negro abierto sobre camisa blanca, pantalón entubado, zapatos negros, pelo negro con copete y ojos grandes. Es una versión propia
   adaptada al estilo realista del juego, no un calco de la ilustración (sin cabeza ni cuello exagerados).

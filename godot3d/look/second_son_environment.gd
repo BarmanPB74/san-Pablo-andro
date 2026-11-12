@@ -10,7 +10,7 @@ extends Node
 ## Solo funciones del renderer Mobile: sin SSR, SSAO, SSIL, SDFGI ni volumetric fog.
 
 const SKY_SHADER := "res://look/sky_clouds.gdshader"
-const PRESET_NAMES: Array[String] = ["overcast_day", "golden_hour", "rainy_night", "tinta_y_papel"]
+const PRESET_NAMES: Array[String] = ["overcast_day", "golden_hour", "rainy_night", "tinta_y_papel", "plastilina"]
 
 ## Cada preset: todos los números del look en un solo lugar para calibrar.
 const PRESETS := {
@@ -87,6 +87,27 @@ const PRESETS := {
 		"haze": Color(0.78, 0.76, 0.64), "haze_base": 0.7, "haze_top": 0.4, "night": 0.0,
 		"rain_fx": 0.0, "vignette": 0.4, "grain": 0.045, "aberration": 0.0,
 		"ink": 0.6, "paper": 0.7,
+	},
+	"plastilina": {
+		# Pueblo de plastilina stop-motion: anochecer morado, faroles ámbar, ladrillo frambuesa,
+		# musgo verde y sombras violeta. Va con ClayStyle (materiales de arcilla) y desenfoque de maqueta.
+		"sun_elev": 34.0, "sun_az": 35.0, "sun_color": Color(0.78, 0.74, 0.95), "sun_energy": 0.5,
+		"shadow_opacity": 0.78, "shadow_blur": 2.5,
+		"zenith": Color(0.1, 0.055, 0.19), "horizon": Color(0.42, 0.27, 0.5),
+		"ground": Color(0.07, 0.045, 0.09), "cloud_light": Color(0.56, 0.42, 0.66),
+		"cloud_dark": Color(0.17, 0.1, 0.25), "cloud_cover": 0.72, "sun_glow": 0.25,
+		"sun_disk": 0.0, "silver": 0.7, "sky_energy": 1.0,
+		"amb_color": Color(0.46, 0.41, 0.45), "amb_sky": 0.12, "amb_energy": 1.3,
+		"fog_color": Color(0.25, 0.17, 0.31), "fog_density": 0.006, "fog_sky": 0.12,
+		"fog_height": 1.2, "fog_height_density": 0.05, "fog_scatter": 0.0, "fog_aerial": 0.2,
+		"exposure": 1.95, "white": 6.0,
+		"glow": 0.7, "glow_strength": 1.0, "glow_bloom": 0.02, "glow_threshold": 1.0,
+		"contrast": 1.12, "saturation": 0.97, "brightness": 1.0,
+		"lut_shadow": Color(0.015, -0.008, 0.03), "lut_high": Color(1.08, 0.97, 0.84), "lut_amount": 1.0,
+		"wetness": 0.05, "rain": 0.0, "reflect": Color(0.32, 0.22, 0.42),
+		"haze": Color(0.34, 0.21, 0.42), "haze_base": 0.65, "haze_top": 0.4, "night": 1.0,
+		"rain_fx": 0.0, "vignette": 0.5, "grain": 0.018, "aberration": 0.0, "vignette_color": Color(0.06, 0.02, 0.09),
+		"dof_far": 48.0, "dof_far_t": 30.0, "dof_near": 0.0, "dof_amount": 0.02,
 	},
 }
 
@@ -232,6 +253,8 @@ func _build_environment() -> void:
 	world_env = WorldEnvironment.new()
 	world_env.name = "WorldEnvironment"
 	world_env.environment = environment
+	# Desenfoque de maqueta (solo presets con "dof_far"): lo lejano se ve como una miniatura filmada.
+	world_env.camera_attributes = CameraAttributesPractical.new()
 	add_child(world_env)
 
 
@@ -304,6 +327,19 @@ func _apply(p: Dictionary) -> void:
 	environment.adjustment_saturation = p.saturation
 	environment.adjustment_color_correction = _get_lut(current_preset, p)
 
+	# --- desenfoque tipo maqueta (stop-motion) ---
+	var ca := world_env.camera_attributes as CameraAttributesPractical
+	if ca:
+		var far := float(p.get("dof_far", 0.0))
+		ca.dof_blur_far_enabled = far > 0.0
+		ca.dof_blur_near_enabled = far > 0.0 and float(p.get("dof_near", 0.0)) > 0.0
+		if far > 0.0:
+			ca.dof_blur_far_distance = far
+			ca.dof_blur_far_transition = float(p.get("dof_far_t", 20.0))
+			ca.dof_blur_near_distance = float(p.get("dof_near", 1.0))
+			ca.dof_blur_near_transition = float(p.get("dof_near_t", 0.8))
+			ca.dof_blur_amount = float(p.get("dof_amount", 0.06))
+
 	# --- materiales globales (charcos, reflejo de cielo, luces de laderas) ---
 	Palette.set_weather(p.wetness, p.rain, p.reflect, p.night)
 	if backdrop:
@@ -311,7 +347,7 @@ func _apply(p: Dictionary) -> void:
 	if rain_fx:
 		rain_fx.set_intensity(p.rain_fx)
 	if post_fx:
-		post_fx.set_params(p.vignette, p.grain, p.aberration)
+		post_fx.set_params(p.vignette, p.grain, p.aberration, p.get("vignette_color", Color(0.0, 0.015, 0.02)))
 		post_fx.set_ink(float(p.get("ink", 0.0)), float(p.get("paper", 0.0)))
 
 

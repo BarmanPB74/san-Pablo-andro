@@ -11,7 +11,7 @@ var _fps: Label
 
 func _ready() -> void:
 	layer = 5
-	_zone = _make_label(Vector2(24, 18), 22, Color(1.0, 0.75, 0.35))
+	_zone = _make_label(Vector2(24, 18), 22, Color(0.96, 0.84, 0.56) if ClayStyle.enabled else Color(1.0, 0.75, 0.35))
 	_zone.text = "BOSTON · LA CANDELARIA · MEDELLÍN"
 	_speed = _make_label(Vector2(24, 52), 34, Color(0.6, 0.95, 1.0))
 	_prompt = _make_label(Vector2(0, 0), 22, Color(1, 1, 1))

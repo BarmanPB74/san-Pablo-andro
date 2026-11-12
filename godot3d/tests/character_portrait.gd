@@ -7,6 +7,7 @@ func _ready() -> void:
 	var variant := OS.get_environment("CHAR_SHOT")
 	if variant == "":
 		variant = "lineup"
+	ClayStyle.enabled = OS.get_environment("CLAY") == "1"
 	_env()
 	var floor_mi := MeshInstance3D.new()
 	var pm := PlaneMesh.new()
@@ -93,6 +94,10 @@ func _ready() -> void:
 			_model(Vector3(2.1, 0, 0), -PI * 0.5, "walk", 1.6, 1.25)
 			cam.position = Vector3(0, 1.2, 7.0)
 			cam.look_at(Vector3(0, 0.95, 0))
+
+
+	if ClayStyle.enabled:
+		add_child(ClayStyle.new())
 
 
 func _model(pos: Vector3, yaw: float, state: String, speed: float, phase: float) -> PlayerModel:

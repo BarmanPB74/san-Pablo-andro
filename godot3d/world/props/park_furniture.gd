@@ -37,6 +37,13 @@ static func iron() -> Material:
 
 ## Esmalte verde de las rejas bajas.
 static func fence_paint() -> Material:
+	if ClayStyle.enabled:
+		if not _cache.has("mat_iron_clay"):
+			var m := StandardMaterial3D.new()
+			m.albedo_color = Color(0.2, 0.16, 0.2)   # hierro forjado (malva oscuro en plastilina)
+			m.roughness = 0.5
+			_cache["mat_iron_clay"] = m
+		return _cache["mat_iron_clay"]
 	return MatMetal.green_paint()
 
 
@@ -305,6 +312,8 @@ static func _post(b: MB, x: float) -> void:
 
 
 static func fence_segment() -> ArrayMesh:
+	if ClayStyle.enabled:
+		return _fence_segment_clay()
 	if _cache.has("fence"):
 		return _cache["fence"]
 	var b := MB.new()
@@ -322,6 +331,28 @@ static func fence_segment() -> ArrayMesh:
 		var x := lerpf(0.12, FENCE_LEN - 0.12, float(i) / (n - 1))
 		b.box(m, Transform3D(Basis.IDENTITY, Vector3(x, 0.33, 0)), Vector3(0.016, 0.52, 0.016), 0.0, "xXzZ")
 	return _done("fence", b)
+
+
+## Reja de hierro forjado (modo plastilina): barrotes que pasan el pasamanos y rematan en punta de lanza.
+static func _fence_segment_clay() -> ArrayMesh:
+	if _cache.has("fence_clay"):
+		return _cache["fence_clay"]
+	var b := MB.new()
+	var m := fence_paint()
+	_post(b, 0.0)
+	var x0 := 0.025
+	var x1 := FENCE_LEN - 0.025
+	b.box(m, Transform3D(Basis.IDENTITY, Vector3((x0 + x1) * 0.5, 0.09, 0)), Vector3(x1 - x0, 0.035, 0.02), 0.0, "yYzZ")
+	b.box(m, Transform3D(Basis.IDENTITY, Vector3((x0 + x1) * 0.5, 0.6, 0)), Vector3(x1 - x0, 0.035, 0.02), 0.0, "yYzZ")
+	var n := 11
+	for i in n:
+		var x := lerpf(0.13, FENCE_LEN - 0.13, float(i) / (n - 1))
+		var tall := 0.92 + 0.05 * sin(float(i) * 2.3)
+		b.box(m, Transform3D(Basis.IDENTITY, Vector3(x, tall * 0.5 + 0.04, 0)), Vector3(0.026, tall, 0.026), 0.0, "xXzZ")
+		# punta de lanza (rombo) con collarín
+		b.lathe(m, Transform3D(Basis.IDENTITY, Vector3(x, tall + 0.03, 0)),
+			[Vector2(0.0, -0.01), Vector2(0.028, 0.0), Vector2(0.022, 0.018), Vector2(0.038, 0.05), Vector2(0.0, 0.15)], 4, false, false)
+	return _done("fence_clay", b)
 
 
 static func fence_post() -> ArrayMesh:

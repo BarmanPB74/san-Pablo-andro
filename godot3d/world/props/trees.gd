@@ -167,7 +167,12 @@ static func _bark_tile(sp: Dictionary) -> float:
 static func mesh(kind: int, seed: int) -> ArrayMesh:
 	seed = posmod(seed, VARIANTS)
 	var key := "%d_%d" % [kind, seed]
+	if ClayStyle.enabled:
+		key = "clay_" + key
 	if _meshes.has(key):
+		return _meshes[key]
+	if ClayStyle.enabled:
+		_meshes[key] = _clay_tree(kind, seed)
 		return _meshes[key]
 	var sp := _sp(kind)
 	var rng := RandomNumberGenerator.new()
@@ -494,3 +499,96 @@ static func _leaf_mat(kind: int) -> Material:
 			m.set_shader_parameter("flower_b", Color(0.85, 0.42, 0.66))
 	_leaf_mats[kind] = m
 	return m
+
+
+# ------------------------------------------------------------------ modo plastilina
+## Árbol de plastilina: tronco grueso torcido como soga (lóbulos + torsión fuerte), sin hojas,
+## ramas que se adelgazan y terminan en rizos en espiral. Misma huella/colisión que el árbol normal.
+static func _clay_tree(kind: int, seed: int) -> ArrayMesh:
+	var sp := _sp(kind)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 6151 * (kind + 1) + 7907 * (seed + 1)
+	var g := Geo.new()
+	var tile := 0.8
+	var H: float = float(sp.height) * rng.randf_range(0.62, 0.74)
+	var r_base: float = float(sp.r_base) * 1.35
+	var fork_h := H * rng.randf_range(0.4, 0.5)
+	var lean_a := rng.randf() * TAU
+	var lean_dir := Vector3(cos(lean_a), 0, sin(lean_a))
+	var lb := {"n": 4, "amp": 0.28, "decay": 3.5, "ph": rng.randf() * TAU, "knot": 0.08}
+	var twist := rng.randf_range(0.9, 1.3) * (1.0 if rng.randf() < 0.5 else -1.0)
+	var pts := PackedVector3Array()
+	var rad := PackedFloat32Array()
+	var rings := 14
+	var ph := rng.randf() * TAU
+	for i in rings + 1:
+		var t := float(i) / rings
+		var h := -0.2 + (fork_h + 0.2) * t
+		# curva en S: el tronco se ladea y vuelve
+		var off := lean_dir * (0.55 * sin(t * PI * 0.9) * r_base * 2.2) \
+			+ lean_dir.cross(Vector3.UP) * (0.25 * sin(t * TAU + ph) * r_base)
+		pts.append(Vector3(0, h, 0) + off)
+		rad.append(lerpf(r_base, r_base * 0.62, t) * (1.0 + 0.7 * exp(-maxf(h, 0.0) / 0.5)))
+	_tube(g, pts, rad, 14, tile, twist, lb, false)
+	var top := pts[rings]
+	var top_dir := (pts[rings] - pts[rings - 2]).normalized()
+	# raíces que se hunden en el pasto
+	for k in 4:
+		var a := TAU * float(k) / 4.0 + rng.randf_range(-0.3, 0.3)
+		var dh := Vector3(cos(a), 0, sin(a))
+		var rp := PackedVector3Array()
+		var rr := PackedFloat32Array()
+		for q in 5:
+			var u := float(q) / 4.0
+			rp.append(dh * (r_base * 0.5 + r_base * 2.6 * u) + Vector3(0, 0.45 * r_base * pow(1.0 - u, 1.3) - 0.1 * u, 0))
+			rr.append(lerpf(r_base * 0.55, r_base * 0.12, u))
+		_tube(g, rp, rr, 7, tile, 0.0, {}, true)
+	# ramas principales con rizos
+	var n_main := 3 + (1 if rng.randf() < 0.5 else 0)
+	var phi0 := rng.randf() * TAU
+	for c in n_main:
+		var phi := phi0 + TAU * float(c) / n_main + rng.randf_range(-0.3, 0.3)
+		var side := Vector3(cos(phi), 0, sin(phi))
+		var d := (top_dir * rng.randf_range(0.8, 1.3) + side).normalized()
+		_clay_limb(g, rng, top - top_dir * 0.2, d, rad[rings] * 0.72, (H - fork_h) * rng.randf_range(0.85, 1.15), 2, tile)
+	var am := ArrayMesh.new()
+	_commit(am, g, _clay_bark(), true)
+	am.set_meta("tris", g.tris())
+	return am
+
+
+static func _clay_limb(g: Geo, rng: RandomNumberGenerator, p: Vector3, d: Vector3, r0: float, length: float,
+		depth: int, tile: float) -> void:
+	var steps := 10
+	var axis := d.cross(Vector3.UP)
+	if axis.length() < 0.1:
+		axis = _perp(d)
+	axis = axis.normalized().rotated(d, rng.randf_range(-0.8, 0.8))
+	var curl := rng.randf_range(0.55, 0.9) * (1.0 if rng.randf() < 0.5 else -1.0)
+	var pts := PackedVector3Array([p])
+	var rad := PackedFloat32Array([r0])
+	var q := p
+	var dd := d
+	for i in steps:
+		var t := float(i + 1) / steps
+		dd = (dd.rotated(axis, curl * pow(t, 2.4)) + Vector3.UP * 0.08 * (1.0 - t)).normalized()
+		q += dd * length / steps * lerpf(1.0, 0.55, t)
+		pts.append(q)
+		rad.append(maxf(r0 * pow(1.0 - t * 0.9, 1.15), 0.012))
+	_tube(g, pts, rad, 8 if depth > 0 else 6, tile, 0.6, {}, true)
+	if depth <= 0:
+		return
+	var kids := 1 + (1 if rng.randf() < 0.6 else 0)
+	for k in kids:
+		var i := rng.randi_range(3, 6)
+		var bd := (dd * 0.2 + (pts[i + 1] - pts[i]).normalized() + axis * (0.8 if k == 0 else -0.8)).normalized()
+		_clay_limb(g, rng, pts[i], bd, rad[i] * 0.7, length * rng.randf_range(0.45, 0.6), depth - 1, tile)
+
+
+static func _clay_bark() -> Material:
+	if not _leaf_mats.has("clay_bark"):
+		var m := StandardMaterial3D.new()
+		m.albedo_color = Color(0.36, 0.22, 0.27)   # tronco ciruela oscuro (en arcilla queda morado-café)
+		m.roughness = 0.7
+		_leaf_mats["clay_bark"] = m
+	return _leaf_mats["clay_bark"]

@@ -23,7 +23,8 @@ Esta fase incluye solo **personaje, escenario y vehículos**. Todo está constru
 | Distancia de cámara | C | CAM |
 
 ### Hora del día
-Selecciona el nodo `Main` en `main.tscn` y cambia `time_of_day`: `overcast_day`, `golden_hour` o `rainy_night`.
+Selecciona el nodo `Main` en `main.tscn` y cambia `time_of_day`: `plastilina` (defecto: pueblo de plastilina stop-motion),
+`overcast_day`, `golden_hour`, `rainy_night` o `tinta_y_papel`.
 
 ## Estructura (un módulo por agente)
 | Carpeta | Contenido |

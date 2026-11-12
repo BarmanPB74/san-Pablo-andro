@@ -18,6 +18,8 @@ static func pizarra(wet := false) -> Material:
 ## LAJA de piedra gris en piezas grandes irregulares con juntas anchas de tierra/musgo: piso de las
 ## plazoletas del Parque de Boston (fuente y tarima). tile_m = 3.0.
 static func laja_plaza(wet := false) -> Material:
+	if ClayStyle.enabled:
+		return MatPaving.brick_sidewalk()   # plazoletas de ladrillo en modo plastilina
 	return TexMat.pbr(BASE + "laja_irregular", {"tile_m": 3.0, "rough_add": -0.3 if wet else 0.0})
 
 
