@@ -1,6 +1,6 @@
 # ANDRO_CONTEXTO — Rediseño del personaje (arcilla gótica / stop-motion)
 
-Versión 2.5 · 12-nov-2026 · F0 a F9 hechas · referencia principal: turnaround 68107 · Rama `fase-3d-godot` · Godot 4.3 · renderer Mobile
+Versión 2.6 · 12-nov-2026 · F0 a F9 + ronda 2 de afinado · referencia principal: turnaround 68107 · Rama `fase-3d-godot` · Godot 4.3 · renderer Mobile
 Alcance: SOLO Andro (`godot3d/character/`) y su movimiento. Nada del mapa, vehículos ni UI.
 
 > Antes de empezar: leer `ESTADO.md` y `CONTRACT.md` (reglas del proyecto). De este documento, leer §0–§3 y §9 siempre, y de §8 solo la fase activa. Así cada sesión sale barata en tokens.
@@ -407,6 +407,16 @@ Método: 4 agentes editaron a la vez `player_model.gd`, cada uno solo en sus fun
 - Tris: 27 298 (antes 20 048). Sube por el pelo, las ojeras y las rayas nítidas de la bufanda. Se revisa en F11. Tests: 5 PASS.
 - Pendiente / diferencias que quedan frente a 68107: los ojos se ven algo más pequeños y las ojeras como aros duros (en la referencia son un degradado suave). Falta el hoyuelo del mentón y las arrugas. El abrigo de la referencia es algo más ancho de hombros. El material del pelo es `hoodie_knit` (fibra) y no huella de arcilla. Las bocas M2–M5 siguen con `C_LIP` viejo. Los colores están calibrados con la luz morada del preset: si cambia la luz, hay que recalibrar (pantalón y pelo son muy sensibles).
 - Siguiente paso: F10 (stop-motion: pasos a 8–12 pps, parpadeo y bocas en el juego), o una pasada fina de ojos/ojeras si Pablo lo pide.
+
+### 2026-11-12 · Ronda 2 de afinado contra 68107 (4 agentes) · "la oreja flota"
+- **A · Orejas y cabeza**: `_clay_ear` reescrita (recibe `keys` e `y0`). La raíz va calculada sobre la piel con `_skull_x` y hundida 2 mm, con un puente de piel detrás. Marco propio: la parte de atrás se separa 27° y la de arriba 12°. Lleva concha, hélix, antihélix, trago y lóbulo. Constantes `EAR_Y` 0.107, `EAR_ZF`, `EAR_OPEN`, `EAR_TILT`. **La oreja ya no flota.** Mandíbula más ancha y redonda (semiancho en y 0.033: 0.05 → 0.059), nuca más llena. `_nasolabial` añade el surco nasogeniano, más hoyuelo y mentón redondo. La patilla pintada termina delante de la oreja.
+- **B · Ojos, ojeras, nariz, boca**: `EYE_R` (0.0293, 0.0293/`CLAY_HEAD_SY`, 0.0215), así el globo se ve redondo pese al estirado de la cabeza; pupila centrada. **Bug corregido en `set_face`**: el párpado perdía el estirado en y y el globo asomaba. Ahora escala desde `CLAY_HEAD_S`, con 3 poses que tapan del todo. Las ojeras son un degradado por color de vértice (`_eye_shade`, llamado desde `head_col`); se quitaron los aros (`_eye_rim`/`_bag_ring` quedan sin uso). Cejas más largas y gruesas. Nariz en medio óvalo con bulbo rosado, columela y aletas. M1 con sonrisa amplia. `C_LIP` = piel ×(1.03, 0.86, 0.84) en M1–M5.
+- **C · Pelo y bufanda**: 5 rollos de la misma altura que siguen el perfil de `perfil_cabeza.jpg` (frente → coronilla → nuca), sin alero; surcos de peine en los laterales; bloque ancho por detrás. El "aspecto de fibra" venía del set de textura `pelo`: `GothicClayAdapter.ROLE_SET["hair"]` pasa a `"piel"` (arcilla con huellas; también afecta a las cejas). `HAIR_BLOCK` (0.4, 0.4, 0.365). Bufanda: colas más largas y anchas, 8 flecos de 0.062 y vuelta del cuello más gruesa.
+- **D · Cuerpo**: pivote del brazo x 0.19 → 0.205, hombros cuadrados (0.212 → 0.242), torso recto, mangas más gruesas, faldón más ancho con pliegues, brazos algo más abiertos en `_pose_locomotion` (línea `out`). Costura central en la espalda. Solapas anchas con muesca (`_lapel_col`). Suéter con canalé y cuello alto doblado. `CLAY_HAND_K` 1.4 y dedos en abanico curvados. Bolsillos a la cadera. Se comprobó que antebrazo y mano no atraviesan los faldones al caminar ni al correr.
+- **Coordinador**: patilla del pelo aplanada y hundida en la piel (antes era un palo colgando delante de la oreja).
+- Capturas: `R2_comparacion` (referencia arriba, Andro abajo), `R2_cabeza_angulos`, `R2_cuerpo`, `R2_perfil`, `R2_espalda`, `R2_cara`, `R2_tres_cuartos`, `R2_torso`, `R2_bufanda`, `R2_estudio_*`, `R2_caminar`, `R2_ojos_cerrados`.
+- Tris: **37 152** (antes 27 298; el pelo solo ya suma 11 728). Es mucho para móvil: F11 debe bajarlo (LOD, menos segmentos en los surcos y en el canalé). Tests: 5 PASS. Altura 2.10 m, 3.96 cabezas.
+- Quedan: la nariz se lee como 3 bolitas (bulbo + aletas) en 3/4; la oreja muestra los aros del hélix y del antihélix demasiado marcados; las bocas M2–M5 son estrechas frente a M1; de espalda el bloque de pelo se ve algo alto y estrecho comparado con el cuello; la tapa del pelo queda clara con la luz morada.
 
 ### 9.2 Comandos (desde la raíz del repo; `godot` = 4.3)
 ```

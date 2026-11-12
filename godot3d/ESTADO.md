@@ -19,7 +19,13 @@ Plan gráfico anterior (fases 1-5): `PLAN_GRAFICOS.md`. El plan vigente está en
 - Rendimiento medido en el editor del teléfono: ~51 FPS en el parque, ~78 FPS en la calle.
 - Sin APK todavía (a propósito): se juega desde el editor de Godot en el teléfono.
 
-## Última sesión (12 nov 2026) — Rediseño de Andro, F9 + pelo, cara y bufanda según el turnaround 68107 (4 agentes)
+## Última sesión (12 nov 2026) — Ronda 2 de afinado contra 68107 (4 agentes)
+- Oreja pegada al cráneo (antes flotaba): raíz sobre la piel y puente detrás. Mandíbula más ancha, surco nasogeniano y hoyuelo.
+- Ojos más grandes y redondos, ojeras en degradado (sin aros), cejas largas, nariz carnosa, sonrisa amplia; bug del párpado corregido.
+- Pelo: tupé redondeado de perfil, sin alero, material de arcilla (set `piel`); bufanda con colas más largas. Cuerpo: hombros anchos, mangas gruesas, solapas, canalé, manos grandes.
+- Tris 37 152 (F11 debe bajarlo). Tests PASS (5). Comparación: `docs/andro/shots/R2_comparacion.jpg`. Detalle en `ANDRO_CONTEXTO.md` §9.1.
+
+## Sesión anterior (12 nov 2026) — Rediseño de Andro, F9 + pelo, cara y bufanda según el turnaround 68107 (4 agentes)
 - Referencia principal nueva: `docs/andro/shots/REF_68107_turnaround.jpg`. Comparación final: `docs/andro/shots/F9_comparacion.jpg`.
 - Pelo en bloque (5 rollos de tupé, franjas en la nuca, lados peinados atrás); ojos blancos con pupila pequeña, ojeras malva, cejas negras en arco,
   nariz recta, sonrisa suave, orejas más pequeñas; bufanda verde vivo y crema con rayas regulares y flecos; pantalón negro recto, zapatos café,

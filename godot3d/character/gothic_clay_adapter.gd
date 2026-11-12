@@ -32,7 +32,9 @@ const EYE := Color(0.62, 0.63, 0.66)   # esclerótica gris-blanca (sin blanco pu
 const PUPIL := Color(0.03, 0.03, 0.03)
 
 ## Set de textura de arcilla por pieza (art/tex/clay/<set>_*.png, ver tools/texgen/clay_sets.py)
-const ROLE_SET := {"skin": "piel", "coat": "abrigo", "hair": "pelo", "scarf": "lana", "shoe": "cuero"}
+## Pelo: la ref. 68107 es arcilla mate con huellas (no fibra): usa la misma arcilla que la piel; los surcos de
+## peine los pone la geometría de player_model.gd. (El set "pelo", de rayas de espátula, se veía como fibra.)
+const ROLE_SET := {"skin": "piel", "coat": "abrigo", "hair": "piel", "scarf": "lana", "shoe": "cuero"}
 
 @export var existing_character_root: Node3D          ## vacío = el padre de este nodo
 @export_file("*.glb", "*.gltf", "*.tscn") var gothic_clay_model_path := ""
