@@ -34,6 +34,11 @@ static func sidewalk_concrete_dry() -> Material:
 	return TexMat.pbr(DIR + "anden_concreto", {"tile_m": 2.0})
 
 
+## Calzada de adoquín malva para el modo plastilina (reemplaza al asfalto). tile_m = 2.4.
+static func clay_cobble() -> Material:
+	return _wet("adoquin_espina", 2.4, {"tex_tint": Color(0.7, 0.56, 0.66), "puddle_coverage": 0.1})
+
+
 # ------------------------------------------------------------------ baldosa táctil
 ## Franja táctil GUÍA (barras) amarilla, baldosas de 20 cm (2 x 2 por repetición). tile_m = 0.4.
 ## Las barras corren a lo largo de Z del mundo; along_x = true las gira 90° (textura rotada en

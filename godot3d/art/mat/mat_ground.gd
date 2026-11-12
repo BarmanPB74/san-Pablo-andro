@@ -54,6 +54,8 @@ static func palma(radius := 0.15, height := 8.0, tint := Color.WHITE) -> Materia
 ## en espacio de mundo: úsalo en las cajas/planos de jardineras y zonas verdes.
 ## tint permite variar (más seco: Color(1.05, 1.0, 0.85)).
 static func pasto(tint := Color.WHITE) -> Material:
+	if ClayStyle.enabled and tint == Color.WHITE:
+		tint = Color(0.75, 1.25, 0.6)   # prado de plastilina: verde musgo vivo
 	return TexMat.pbr(DIR + "pasto", {"tile_m": 3.0, "tint": tint})
 
 

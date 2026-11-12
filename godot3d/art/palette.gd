@@ -124,6 +124,8 @@ static func _undim(c: Color) -> Color:
 
 # ---------- Suelo urbano ----------
 static func asphalt() -> Material:          # asfalto mojado (shader con charcos)
+	if ClayStyle.enabled:
+		return MatPaving.clay_cobble()      # arcilla gótica: calles de adoquín
 	if USE_TEXTURES:
 		return MatAsphalt.asphalt_worn()    # Boston: barrio tradicional, asfalto con parches
 	return wet_asphalt()
@@ -221,8 +223,8 @@ static func window_lit() -> Material:       # ventana iluminada cálida (ámbar)
 	return _cached("window_lit", func():
 		var m := _std(Color(1.0, 0.72, 0.42), 0.3)
 		m.emission_enabled = true
-		m.emission = Color(1.0, 0.66, 0.34)
-		m.emission_energy_multiplier = 1.6
+		m.emission = Color(1.0, 0.78, 0.36) if ClayStyle.enabled else Color(1.0, 0.66, 0.34)
+		m.emission_energy_multiplier = 2.4 if ClayStyle.enabled else 1.6
 		return m)
 
 static func metal_dark() -> Material:       # rejas, postes

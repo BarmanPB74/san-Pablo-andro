@@ -45,6 +45,18 @@ func _initialize() -> void:
 		cam.look_at(ch.lerp(church, 0.18) + Vector3(0, 1.6, 0))
 		p.look_at(cam.global_position * Vector3(1, 0, 1) + Vector3(0, p.global_position.y, 0))
 		cam.current = true
+	elif mode == "calle":
+		# de espaldas, caminando por la Cra 38 hacia el norte (como la lámina de la calle)
+		p.global_position = Vector3(40.0, 3.0, 78.0)
+		for i in 40: await physics_frame
+		var cam := Camera3D.new()
+		cam.fov = 58.0
+		root.add_child(cam)
+		var ch := p.global_position
+		p.look_at(ch + Vector3(0, 0, -10))
+		cam.global_position = ch + Vector3(0.0, 1.5, 4.2)
+		cam.look_at(ch + Vector3(0, 1.5, -10))
+		cam.current = true
 	elif mode == "aerial":
 		var cam := Camera3D.new()
 		cam.far = 2600.0

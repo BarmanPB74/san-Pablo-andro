@@ -26,8 +26,9 @@ func _ready() -> void:
 			cam.fov = 40.0
 		"face":
 			var m2 := _model(Vector3.ZERO, deg_to_rad(20.0), "idle", 0.0, 0.0)
-			cam.position = Vector3(0, 1.62, 1.1)
-			cam.look_at(Vector3(0, 1.6, 0))
+			var fy := 1.78 if ClayStyle.enabled else 1.6
+			cam.position = Vector3(0, fy + 0.02, 1.5 if ClayStyle.enabled else 1.1)
+			cam.look_at(Vector3(0, fy, 0))
 			cam.fov = 35.0
 		"gaits":
 			_model(Vector3(-2.4, 0, 0), -PI * 0.5, "walk", 1.6, 1.2)
@@ -92,8 +93,8 @@ func _ready() -> void:
 			_model(Vector3(-0.7, 0, 0), deg_to_rad(35.0), "idle", 0.0, 0.0)
 			_model(Vector3(0.7, 0, 0), PI, "idle", 0.0, 0.0)
 			_model(Vector3(2.1, 0, 0), -PI * 0.5, "walk", 1.6, 1.25)
-			cam.position = Vector3(0, 1.2, 7.0)
-			cam.look_at(Vector3(0, 0.95, 0))
+			cam.position = Vector3(0, 1.15, 5.6)
+			cam.look_at(Vector3(0, 1.0, 0))
 
 
 	if ClayStyle.enabled:

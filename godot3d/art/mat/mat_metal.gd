@@ -28,6 +28,8 @@ static var _sign_cache := {}
 ## Rejas bajas del parque, barandas, marcos de hierro pintados de verde.
 ## Esmalte verde gastado con desconchones, imprimación y óxido chorreado. tile_m = 1.0 (triplanar).
 static func green_paint(opts := {}) -> Material:
+	if ClayStyle.enabled:
+		return TexMat.pbr(DIR + "pintura_verde", _merge({"tile_m": 1.0, "tint": Color(0.5, 0.2, 0.5)}, opts))   # hierro oscuro
 	return TexMat.pbr(DIR + "pintura_verde", _merge({"tile_m": 1.0}, opts))
 
 

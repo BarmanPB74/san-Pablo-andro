@@ -217,6 +217,7 @@ static func _from_base(b: BaseMaterial3D, local: bool) -> Material:
 		if b.emission_texture != null:
 			c.set_shader_parameter("emission_tex", b.emission_texture)
 			c.set_shader_parameter("has_emission_tex", true)
+			c.set_shader_parameter("emission_add", b.emission_operator == BaseMaterial3D.EMISSION_OP_ADD)
 	# Brillos: lo pulido (pintura de auto, metal) queda como plastilina más lisa y cerosa.
 	if b.roughness < 0.35 and b.albedo_texture == null:
 		c.set_shader_parameter("rough", 0.42)

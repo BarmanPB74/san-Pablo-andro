@@ -19,7 +19,20 @@ Plan gráfico anterior (fases 1-5): `PLAN_GRAFICOS.md`. El plan vigente está en
 - Rendimiento medido en el editor del teléfono: ~51 FPS en el parque, ~78 FPS en la calle.
 - Sin APK todavía (a propósito): se juega desde el editor de Godot en el teléfono.
 
-## Última sesión (11 nov 2026) — Fase 4.1: adaptador "arcilla gótica" (port del script de Unity de Pablo)
+## Última sesión (11 nov 2026) — Fase 4.2: personaje y barrio según las láminas "arcilla gótica"
+- Pablo trajo 6 láminas de referencia (hoja de personaje, texturas, mapa gótico, calle, optimización móvil).
+- Personaje (solo modo plastilina, `player_model.gd`): cabeza ×1.6, ojos redondos enormes con pupila pequeña, ojeras malva,
+  cejas gruesas, orejas salidas, saco ciruela CERRADO (sin camisa blanca), pantalón más oscuro, pelo café-ciruela,
+  zapatos gris-café, bandolera cruzada con bolso (`_clay_satchel`) y vivo ocre en el bolsillo.
+- Barrio: calzadas de adoquín malva (`MatPaving.clay_cobble`), prado verde musgo, ventanas encendidas ámbar (se arregló la
+  emisión con textura en `clay.gdshader`; 60 % de ventanas prendidas), ladrillo granate apagado con junta visible
+  (`tex_blur` 0.35), postes/rejas de hierro oscuro, luz más neutra para que se lean verde y ladrillo, DOF más suave.
+- Capturas nuevas: `tests/game_shot.gd` modos `vista` y `calle`; retrato `CLAY=1` (lineup/face).
+- Pruebas PASS (integration, character_logic, gothic_clay_adapter). Sin probar en el teléfono.
+- Falta frente a las láminas: edificios siguen siendo los de Boston (no casas góticas con torres/tejados de pizarra), faroles
+  tipo linterna, cementerio, HUD de miedo/nivel, pelo en mechones más gruesos, nudo de la bufanda, peso de 8 000 tris/LOD.
+
+## Sesión anterior (11 nov 2026) — Fase 4.1: adaptador "arcilla gótica" (port del script de Unity de Pablo)
 - Pablo trajo `GothicClayCharacterAdapter.cs` (Unity/C#). No corre en Godot: se portó a `character/gothic_clay_adapter.gd`
   (`GothicClayAdapter`) con los mismos parámetros, colores, reglas por nombre y generadores de textura (normal de arcilla y
   bufanda a rayas). Se rige por rugosidad = 1 − smoothness (0.88 mate; ojos 0.55).

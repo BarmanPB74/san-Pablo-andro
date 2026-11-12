@@ -616,7 +616,7 @@ static func apartment(d, xf: Transform3D, w: float, dep: float, shop: bool, wall
 		b.box(wall, Vector3(-w * 0.5, yb, -de), Vector3(w * 0.5, yt, -sb - r), PX | NX | NZ | (PZ if r == 0.0 else 0))
 		b.col(Vector3(-w * 0.5, yb, -de), Vector3(w * 0.5, h, -sb))
 	# ---- primer piso
-	var lit_p := 0.3
+	var lit_p := 0.6 if ClayStyle.enabled else 0.3   # pueblo de plastilina: más ventanas encendidas
 	var rc: int = REJA_CELLS[rng.randi_range(0, REJA_CELLS.size() - 1)]
 	if shop:
 		b.box(wall, Vector3(-w * 0.5, -1.2, -r), Vector3(w * 0.5, g, 0.0), PZ | PX | NX)

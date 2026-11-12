@@ -10,8 +10,8 @@ uniform bool has_tex = false;
 uniform int uv_mode = 0;              // 0 = UV de la malla, 1 = triplanar de mundo, 2 = triplanar de objeto
 uniform vec3 uv_scale = vec3(1.0);
 uniform vec3 uv_offset = vec3(0.0);
-uniform float tex_blur = 1.3;         // sesgo de mip: borra el detalle fotográfico fino, deja la forma
-uniform float tex_keep = 0.85;        // cuánto patrón de la textura se conserva (0 = color plano)
+uniform float tex_blur = 0.35;         // sesgo de mip: borra el detalle fotográfico fino, deja la forma
+uniform float tex_keep = 1.0;        // cuánto patrón de la textura se conserva (0 = color plano)
 uniform bool use_vcolor = false;
 uniform bool vcolor_srgb = true;
 uniform float alpha_cut = 0.5;
@@ -29,9 +29,9 @@ uniform float metal = 0.0;
 
 // ---- gradación de color "pueblo de plastilina" ----
 uniform float saturation = 0.95;
-uniform float brick_shift = 0.04;    // naranjas → rojo ladrillo/frambuesa
-uniform vec3 grey_tint : source_color = vec3(0.92, 0.68, 0.66);   // grises → rosa ladrillo apagado
-uniform float grey_amount = 0.7;
+uniform float brick_shift = 0.02;    // naranjas → rojo ladrillo/frambuesa
+uniform vec3 grey_tint : source_color = vec3(0.82, 0.76, 0.86);   // grises → piedra malva fría
+uniform float grey_amount = 0.55;
 uniform vec3 moss_tint : source_color = vec3(0.34, 0.62, 0.22);
 uniform float moss_amount = 0.6;
 uniform float value_lift = 0.04;      // la plastilina nunca es negro puro
@@ -42,6 +42,7 @@ uniform vec4 emission_color : source_color = vec4(0.0, 0.0, 0.0, 1.0);
 uniform float emission_energy = 1.0;
 uniform sampler2D emission_tex : source_color, hint_default_white, filter_linear_mipmap, repeat_enable;
 uniform bool has_emission_tex = false;
+uniform bool emission_add = true;
 
 varying vec3 v_pos;
 varying vec3 v_nrm;
@@ -75,6 +76,9 @@ vec3 clay_grade(vec3 c) {
 	hsv.x = fract(hsv.x - brick_shift * orange + 1.0);
 	float green = smoothstep(0.14, 0.2, hsv.x) * (1.0 - smoothstep(0.48, 0.54, hsv.x)) * smoothstep(0.05, 0.16, hsv.y);
 	hsv.y = clamp(hsv.y * saturation * (1.0 + 0.25 * green), 0.0, 1.0);
+	// ladrillo granate apagado (no rojo chillón)
+	float warm = (1.0 - smoothstep(0.1, 0.16, hsv.x)) + smoothstep(0.9, 0.96, hsv.x);
+	hsv.y *= mix(1.0, 0.68, warm * smoothstep(0.25, 0.5, hsv.y));
 	vec3 o = hsv2rgb(hsv);
 	o = mix(o, moss_tint * clamp(hsv.z / 0.4, 0.0, 1.3), green * moss_amount);   // verdes oscuros (postes) siguen oscuros
 	float grey = (1.0 - smoothstep(0.06, 0.24, hsv.y)) * (1.0 - green);
@@ -144,7 +148,8 @@ void fragment() {
 	if (has_emission) {
 		vec3 e = emission_color.rgb * emission_energy;
 		if (has_emission_tex) {
-			e *= texture(emission_tex, UV).rgb;
+			vec3 et = texture(emission_tex, UV * uv_scale.xy + uv_offset.xy).rgb;
+			e = emission_add ? (emission_color.rgb + et) * emission_energy : e * et;
 		}
 		EMISSION = e;
 	}

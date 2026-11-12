@@ -42,10 +42,10 @@ static var C_HAIR := Color(0.045, 0.035, 0.03)
 const C_EYE := Color(0.03, 0.02, 0.015)
 const C_IRIS := Color(0.16, 0.09, 0.05)
 const C_SCLERA := Color(0.78, 0.74, 0.68)
-const C_LIP := Color(0.52, 0.32, 0.27)
+static var C_LIP := Color(0.52, 0.32, 0.27)
 static var SKIN_TONE := Color(0.76, 0.62, 0.52)  # piel clara, algo pálida (en plastilina: beige mate)
 # Modo plastilina (ClayStyle.enabled): cabeza y manos grandes, ojos saltones, bufanda tejida a rayas.
-const CLAY_HEAD_K := 1.34
+const CLAY_HEAD_K := 1.6
 const CLAY_HAND_K := 1.22
 # Paleta de plastilina = la del adaptador "arcilla gótica" (character/gothic_clay_adapter.gd)
 const C_CLAY_SKIN := GothicClayAdapter.SKIN
@@ -53,8 +53,9 @@ const C_CLAY_EYE := GothicClayAdapter.EYE
 # Traje oscuro + camisa blanca (concepto de Pablo: figura alta y delgada)
 static var C_SUIT := Color(0.06, 0.06, 0.068)
 static var C_SUIT_LAPEL := Color(0.035, 0.035, 0.042)
-const C_SHIRT := Color(0.86, 0.86, 0.83)
-const C_BUTTON := Color(0.03, 0.03, 0.035)
+static var C_SHIRT := Color(0.86, 0.86, 0.83)
+static var C_TROUSER := Color(0.06, 0.06, 0.068)
+static var C_BUTTON := Color(0.03, 0.03, 0.035)
 static var C_DRESS_SHOE := Color(0.035, 0.035, 0.04)
 const BEARD_ON := false         # barba (cáscara de pelo); el concepto actual va afeitado
 const ARM_K := 1.1              # brazos 10 % más largos
@@ -133,10 +134,16 @@ func _build() -> void:
 	_built = true
 	var clay := ClayStyle.enabled
 	SKIN_TONE = C_CLAY_SKIN if clay else Color(0.76, 0.62, 0.52)
-	C_SUIT = GothicClayAdapter.COAT if clay else Color(0.06, 0.06, 0.068)
-	C_SUIT_LAPEL = GothicClayAdapter.COAT * 0.7 if clay else Color(0.035, 0.035, 0.042)
-	C_HAIR = GothicClayAdapter.HAIR if clay else Color(0.045, 0.035, 0.03)
-	C_DRESS_SHOE = GothicClayAdapter.SHOE if clay else Color(0.035, 0.035, 0.04)
+	# Arcilla gótica (láminas de referencia de Pablo): saco ciruela-carbón CERRADO (sin camisa a la vista),
+	# pantalón más oscuro, pelo café-ciruela en mechones gruesos, zapatos gris-café, labios apagados.
+	C_SUIT = Color(0.27, 0.22, 0.27) if clay else Color(0.06, 0.06, 0.068)
+	C_SUIT_LAPEL = Color(0.2, 0.16, 0.2) if clay else Color(0.035, 0.035, 0.042)
+	C_TROUSER = Color(0.17, 0.15, 0.18) if clay else Color(0.06, 0.06, 0.068)
+	C_SHIRT = C_SUIT if clay else Color(0.86, 0.86, 0.83)
+	C_BUTTON = Color(0.3, 0.25, 0.3) if clay else Color(0.03, 0.03, 0.035)
+	C_HAIR = Color(0.25, 0.18, 0.2) if clay else Color(0.045, 0.035, 0.03)
+	C_DRESS_SHOE = Color(0.36, 0.32, 0.3) if clay else Color(0.035, 0.035, 0.04)
+	C_LIP = Color(0.62, 0.47, 0.45) if clay else Color(0.52, 0.32, 0.27)
 	root = _pivot("root", self, Vector3.ZERO)
 	hips = _pivot("hips", root, Vector3(0, HIPS_HEIGHT, 0))
 	spine = _pivot("spine", hips, Vector3(0, 0.1, 0))
@@ -575,7 +582,7 @@ func _geo_pelvis() -> void:
 		_rr(0.06, 0.16, 0.1, 0.11, 0.0, 2.4),
 		_r(0.07, 0.0, 0.0, 0.0),
 	], 1.0, 0.84, 0.9)
-	_loft(_twill(), rings, 20, Transform3D.IDENTITY, _c(C_SUIT))
+	_loft(_twill(), rings, 20, Transform3D.IDENTITY, _c(C_TROUSER))
 	# Cinturón fino con hebilla
 	var rk := rings.slice(1, 6)
 	var rb := _ring_at(rk, 0.045)
@@ -687,6 +694,7 @@ func _geo_chest() -> void:
 	_loft(tw, collar, 18, Transform3D.IDENTITY, cw)
 	if ClayStyle.enabled:
 		_clay_scarf(keys)
+		_clay_satchel(keys)
 
 
 # ---------------------------------------------------------------------
@@ -888,7 +896,7 @@ func _geo_head() -> void:
 		# Orejas con hélice marcada
 		var er := _ring_at(keys, 0.115)
 		var eo := Vector3(sx * (float(er["a"]) + 0.004), 0.113, 0.014)
-		_ellip(skin_m, eo, Vector3(0.008, 0.029, 0.018), skin, Vector3(0.0, -0.35 * sx, 0.12 * sx), 10, 6)
+		_ellip(skin_m, eo + (Vector3(0.006 * sx, 0, 0) if ClayStyle.enabled else Vector3.ZERO), (Vector3(0.011, 0.034, 0.026) if ClayStyle.enabled else Vector3(0.008, 0.029, 0.018)), skin, Vector3(0.0, -0.35 * sx, 0.12 * sx), 10, 6)
 		_tube(skin_m, PackedVector3Array([eo + Vector3(0.006 * sx, 0.024, -0.006), eo + Vector3(0.009 * sx, 0.02, 0.012),
 			eo + Vector3(0.008 * sx, -0.004, 0.018), eo + Vector3(0.006 * sx, -0.022, 0.008)]),
 			0.004, 0.004, 5, Vector3(sx, 0, 0), skin)
@@ -1050,12 +1058,12 @@ func _geo_thigh(sx: float) -> void:
 	var tw := _twill()
 	var keys := _thigh_rings()
 	var ky := THIGH_LEN / 0.43
-	_loft(tw, [_r(0.075, 0.0, 0.0)] + keys + [_r(-0.46 * ky, 0.0, 0.0)], 16, Transform3D.IDENTITY, _c(C_SUIT))
+	_loft(tw, [_r(0.075, 0.0, 0.0)] + keys + [_r(-0.46 * ky, 0.0, 0.0)], 16, Transform3D.IDENTITY, _c(C_TROUSER))
 	# Raya del pantalón (línea al frente)
 	var crease := PackedVector3Array()
 	for yy in [0.02, -0.12, -0.25, -0.36]:
 		crease.append(_on_surf(keys, 0.0, yy * ky, true, 0.0008))
-	_tube(tw, crease, 0.003, 0.0014, 4, Vector3(0, 0, -1), _c(C_SUIT * 1.5))
+	_tube(tw, crease, 0.003, 0.0014, 4, Vector3(0, 0, -1), _c(C_TROUSER * 1.5))
 
 
 func _geo_shin(_sx: float) -> void:
@@ -1071,11 +1079,11 @@ func _geo_shin(_sx: float) -> void:
 		_r(-0.372, 0.056, 0.058, -0.002),
 		_r(-0.376, 0.0, 0.0, -0.002),
 	], ky, 0.8, 0.84)
-	_loft(_twill(), rings, 16, Transform3D.IDENTITY, _c(C_SUIT))
+	_loft(_twill(), rings, 16, Transform3D.IDENTITY, _c(C_TROUSER))
 	var crease := PackedVector3Array()
 	for yy in [0.03, -0.1, -0.22, -0.34]:
 		crease.append(_on_surf(rings.slice(1, 8), 0.0, yy * ky, true, 0.0008))
-	_tube(_twill(), crease, 0.003, 0.0014, 4, Vector3(0, 0, -1), _c(C_SUIT * 1.5))
+	_tube(_twill(), crease, 0.003, 0.0014, 4, Vector3(0, 0, -1), _c(C_TROUSER * 1.5))
 
 
 func _geo_foot(sx: float) -> void:
@@ -1527,19 +1535,26 @@ func snap_pose(state: String, speed: float, phase := 0.0) -> void:
 ## párpado superior de piel que cae un poco (mirada cansada) y ceja gruesa encima.
 func _clay_eye(skin_m: Material, hair_m: Material, ex: float, sx: float, ez: float) -> void:
 	var up_f := Vector3(0, 0, -1)
-	var c := Vector3(ex * 1.08, EYE_Y + 0.002, ez - 0.002)
-	_ellip(_eye(), c, Vector3(0.0215, 0.0205, 0.016), _c(C_CLAY_EYE), Vector3.ZERO, 14, 8)
-	_ellip(_eye(), c + Vector3(-0.0015 * sx, -0.0015, -0.0158), Vector3(0.0042, 0.0042, 0.0018), _c(GothicClayAdapter.PUPIL), Vector3.ZERO, 8, 4)
+	var c := Vector3(ex * 1.06, EYE_Y - 0.002, ez - 0.001)
+	_ellip(_eye(), c, Vector3(0.028, 0.028, 0.02), _c(C_CLAY_EYE), Vector3.ZERO, 14, 8)
+	_ellip(_eye(), c + Vector3(-0.003 * sx, -0.001, -0.0198), Vector3(0.0052, 0.0052, 0.0018), _c(GothicClayAdapter.PUPIL), Vector3.ZERO, 8, 4)
 	# párpado superior: casquete de piel inclinado hacia adelante
-	_ellip(skin_m, c + Vector3(0, 0.0145, 0.003), Vector3(0.0228, 0.0105, 0.0168), _c(SKIN_TONE * 0.96),
+	_ellip(skin_m, c + Vector3(0, 0.0215, 0.004), Vector3(0.029, 0.0105, 0.02), _c(SKIN_TONE * 0.93),
 		Vector3(-0.3, 0.0, 0.0), 14, 7)
+	# ojera: rollito de arcilla más oscuro (malva) bajo el ojo
+	var bag := PackedVector3Array()
+	for i in 5:
+		var t := float(i) / 4.0
+		var a := lerpf(-1.05, 1.05, t)
+		bag.append(c + Vector3(sin(a) * 0.0285, -cos(a) * 0.028, -0.006 - 0.004 * cos(a)))
+	_tube(skin_m, bag, [0.003, 0.0048, 0.0055, 0.0048, 0.003], 0.003, 6, up_f, _c(Color(0.62, 0.5, 0.56)))
 	# ceja gruesa de plastilina, un poco caída hacia afuera
 	var brow := PackedVector3Array()
 	for i in 4:
 		var t := float(i) / 3.0
 		var bx: float = ex * 1.08 + sx * lerpf(-0.02, 0.022, t)
-		brow.append(Vector3(bx, EYE_Y + 0.03 + 0.004 * sin(t * PI) - 0.004 * t, ez - 0.012))
-	_tube(hair_m, brow, [0.0062, 0.0068, 0.006, 0.0045], 0.004, 6, up_f, _c(C_HAIR))
+		brow.append(Vector3(bx, EYE_Y + 0.04 + 0.005 * sin(t * PI) - 0.007 * t, ez - 0.012))
+	_tube(hair_m, brow, [0.0075, 0.0085, 0.0075, 0.005], 0.005, 6, up_f, _c(C_HAIR * 0.8))
 
 
 ## Bufanda tejida a rayas verde/blanco: una vuelta al cuello y dos puntas que cuelgan por delante.
@@ -1578,3 +1593,24 @@ func _clay_scarf(keys: Array) -> void:
 			var fx := end.x + lerpf(-0.026, 0.026, float(f) / 4.0)
 			_tube(km, PackedVector3Array([Vector3(fx, end.y + 0.004, end.z), Vector3(fx, end.y - 0.022, end.z - 0.003)]),
 				0.0042, 0.0042, 4, up_f, w if f % 2 == 0 else g)
+
+
+## Bandolera: correa cruzada (hombro derecho → cadera izquierda, por delante y por detrás) y bolso de arcilla.
+func _clay_satchel(keys: Array) -> void:
+	var tw := _twill()
+	var cs := _c(Color(0.13, 0.11, 0.135))
+	var cbag := _c(Color(0.24, 0.2, 0.22))
+	for front in [true, false]:
+		var path := _surf_path(keys, Vector2(0.12, 0.25), Vector2(-0.165, -0.25), front, 0.008, 14)
+		_tube(tw, path, 0.016, 0.006, 6, Vector3(0, 0, -1.0 if front else 1.0), cs, false, 3.0)
+	# remate de la correa sobre el hombro
+	_tube(tw, PackedVector3Array([_on_surf(keys, 0.12, 0.25, true, 0.008), Vector3(0.125, 0.285, 0.0),
+		_on_surf(keys, 0.12, 0.25, false, 0.008)]), 0.016, 0.006, 6, Vector3(1, 0, 0), cs, false, 3.0)
+	# bolso colgado en la cadera izquierda: cuerpo, tapa y broche
+	var bc := Vector3(-0.2, -0.285, 0.02)
+	_ellip(tw, bc, Vector3(0.045, 0.075, 0.085), cbag, Vector3.ZERO, 12, 7)
+	_ellip(tw, bc + Vector3(-0.012, 0.03, 0.0), Vector3(0.042, 0.05, 0.09), _c(Color(0.2, 0.165, 0.185)), Vector3.ZERO, 12, 6)
+	_ellip(tw, bc + Vector3(-0.05, 0.0, 0.0), Vector3(0.006, 0.01, 0.012), _c(Color(0.5, 0.36, 0.2)), Vector3.ZERO, 6, 4)
+	# vivo ocre del bolsillo de pecho (detalle de la lámina)
+	_tube(tw, _surf_path(keys, Vector2(-0.135, 0.12), Vector2(-0.085, 0.123), true, 0.006, 4), 0.005, 0.003, 5,
+		Vector3(0, 0, -1), _c(Color(0.62, 0.42, 0.18)))
