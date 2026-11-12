@@ -28,7 +28,7 @@ const HAIR := Color(0.08, 0.08, 0.09)
 const SCARF_GREEN := Color(0.13, 0.36, 0.21)
 const SCARF_CREAM := Color(0.88, 0.85, 0.80)
 const SHOE := Color(0.26, 0.21, 0.17)
-const EYE := Color(0.93, 0.92, 0.89)
+const EYE := Color(0.62, 0.63, 0.66)   # esclerótica gris-blanca (sin blanco puro)
 const PUPIL := Color(0.03, 0.03, 0.03)
 
 ## Set de textura de arcilla por pieza (art/tex/clay/<set>_*.png, ver tools/texgen/clay_sets.py)
@@ -36,7 +36,7 @@ const ROLE_SET := {"skin": "piel", "coat": "abrigo", "hair": "pelo", "scarf": "l
 
 @export var existing_character_root: Node3D          ## vacío = el padre de este nodo
 @export_file("*.glb", "*.gltf", "*.tscn") var gothic_clay_model_path := ""
-@export_range(0.0, 1.0) var clay_smoothness := 0.12   ## arcilla mate (rugosidad ~0.88)
+@export_range(0.0, 1.0) var clay_smoothness := 0.2    ## arcilla mate (rugosidad 0.80, dentro de 0.6–0.85)
 @export var normal_bump_scale := 0.65
 @export var skin_tint := SKIN
 @export var coat_tint := COAT
@@ -137,8 +137,8 @@ func _tint(role: String) -> Color:
 
 func _smooth(role: String) -> float:
 	match role:
-		"eye": return 0.45
-		"pupil": return 0.55
+		"eye": return 0.75     # cuenta de cristal brillante (rugosidad 0.25)
+		"pupil": return 0.8
 	return clay_smoothness
 
 

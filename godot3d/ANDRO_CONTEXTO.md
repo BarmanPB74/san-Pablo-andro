@@ -1,6 +1,6 @@
 # ANDRO_CONTEXTO — Rediseño del personaje (arcilla gótica / stop-motion)
 
-Versión 2.0 · 12-nov-2026 · F0 hecha · Rama `fase-3d-godot` · Godot 4.3 · renderer Mobile
+Versión 2.1 · 12-nov-2026 · F0, F1 y F2 hechas · Rama `fase-3d-godot` · Godot 4.3 · renderer Mobile
 Alcance: SOLO Andro (`godot3d/character/`) y su movimiento. Nada del mapa, vehículos ni UI.
 
 > Antes de empezar: leer `ESTADO.md` y `CONTRACT.md` (reglas del proyecto). De este documento, leer §0–§3 y §9 siempre, y de §8 solo la fase activa. Así cada sesión sale barata en tokens.
@@ -16,7 +16,7 @@ Alcance: SOLO Andro (`godot3d/character/`) y su movimiento. Nada del mapa, vehí
 5. Cerrar cada fase con: capturas, tests en PASS, una entrada en §9.1 y la fila de §9.4 actualizada. Resumir también en `ESTADO.md` ("Última sesión").
 6. No renombrar los pivotes (`root, hips, spine, chest, neck, head, upper_arm_l/r, forearm_*, hand_*, thigh_*, shin_*, foot_*`): los usan `player.gd` y los tests.
 7. Móvil primero. Prohibido para el personaje: niebla volumétrica, SSS, SSAO/SSR/GI, reflejos en tiempo real, partículas.
-8. Si cambias rugosidades, actualizar las aserciones (0.88 / 0.55) de `tests/gothic_clay_adapter_test.gd`.
+8. Si cambias rugosidades, actualizar las aserciones (hoy 0.80 piel/tela, 0.25 ojos) de `tests/gothic_clay_adapter_test.gd`.
 9. Si algo no es viable en el teléfono, decirlo y proponer la versión barata.
 10. Si falta un dato: UNA pregunta concreta, o elegir un valor por defecto y anotarlo en §9.1.
 11. No convertir esto en una lista infinita de ideas: cada fase termina en algo demostrable.
@@ -157,13 +157,15 @@ Colores: labio #863E3F (hoy C_LIP = #996666, más rosado).
 
 | Uso | Hex objetivo | En código hoy |
 |---|---|---|
-| Pelo, base / medio / sombra / polvo | #1C1A1A / #322E2E / #241F1C / #78716C | `dark` 0.11 / `mid` 0.2 / `dust` 0.47 en `_clay_hair`: coincide |
+| Pelo, base / medio / sombra / polvo | #1C1A1A / #322E2E / #241F1C / #78716C | `C_HAIR` 0.27; `dark` 0.28 / `mid` 0.38 en `_clay_hair` (F1: subidos porque el render los aplastaba) |
 | Bufanda: verde marchito, blanco sucio, gris, óxido | #2B452B / #B2ACA0 / #3D3B36 / #8C5A3E | `g` #335430, `w` #BDB5A8 en `_clay_scarf` (más claros) |
-| Piel: hueso, sombra | #D1C3B8 / #8E8581 | `C_CLAY_SKIN` #D1C4B5 |
-| Ojeras | #5B4653 | #856178 en `_clay_eye` |
+| Piel: hueso, sombra | #D1C3B8 / #8E8581 | `C_CLAY_SKIN` (0.64, 0.62, 0.59) tras F1: el hex de la hoja es el color RENDERIZADO, no el albedo |
+| Ojeras | #5B4653 | (0.46, 0.40, 0.42) en `_clay_eye` tras F1 (rinde ≈ #663E5A) |
 | Labio | #863E3F | `C_LIP` #996666 |
-| Abrigo, luz de tela | #1E191C / #322D2F | `C_SUIT` #382E30 |
-| Esclerótica | ≈ #CDC8C0 | `EYE` #EDEBE3 (muy blanco) |
+| Abrigo, luz de tela | #1E191C / #322D2F | `C_SUIT` (0.31, 0.29, 0.29), solapa 0.24/0.20/0.21, pantalón 0.22/0.20/0.21 tras F1 |
+| Esclerótica | ≈ #CDC8C0 | `EYE` (0.62, 0.63, 0.66) tras F1 (rinde ≈ #C9B2B5) |
+
+**Regla corregida en F1**: el hex de las hojas es lo que se VE (con luz, exposición 1.95 y filmic), no el albedo. Los colores oscuros se aplastan y los claros se recortan, así que el albedo de los vertex colors se calibra midiendo capturas (`sample.py`), no copiando el hex. Además los vertex colors se tratan como sRGB→linear y las texturas `*_albedo` (~#C8C8C8) multiplican ×0.8.
 
 Criterio de la nota de Pablo: colores apagados con un acento (cielo morado, ladrillo rojizo, faroles amarillos; la bufanda es el acento verde del personaje). Evitar blancos puros.
 
@@ -172,8 +174,7 @@ Criterio de la nota de Pablo: colores apagados con un acento (cielo morado, ladr
 ## 6. Material "plastilina barata"
 
 ### 6.1 Reglas (nota de Pablo) y estado actual
-- Rugosidad entre 0.6 y 0.85, metal en 0. Hoy: `clay_smoothness` 0.12 → rugosidad 0.88 (algo alta); ojos 0.55.
-  - Propuesta F1: `clay_smoothness` 0.2 → rugosidad 0.80; ojos 0.75 → rugosidad 0.25 (brillantes, como las cuentas de la hoja). Actualizar `gothic_clay_adapter_test.gd`.
+- Rugosidad entre 0.6 y 0.85, metal en 0. Hecho en F1: `clay_smoothness` 0.2 → rugosidad 0.80; ojos 0.75 → rugosidad 0.25 (brillantes, como las cuentas de la hoja); pupila 0.8. Aserciones de `gothic_clay_adapter_test.gd` actualizadas.
 - Huellas dactilares: ya vienen por código en los sets `art/tex/clay/*_detail.png` (normal en RG, altura en B) y en `clay_detail.png`. Se mantienen a baja intensidad (`normal_bump_scale` 0.65). Si se quisieran texturas CC0 externas (Poly Haven, Material Maker) habría que revisar la licencia y salir de la regla "sin assets externos" de `CONTRACT.md`. Por defecto se generan con `tools/texgen/clay_sets.py`.
 
 ### 6.2 "Boil" opcional (temblor de plastilina a 8–12 Hz)
@@ -210,6 +211,7 @@ Texto de Pablo (12-nov), puntos relevantes al personaje:
 (Los puntos 4 y 5 —rendimiento y FPS— están en §12.)
 
 ### 7.1 Luz (F1, solo en la escena de estudio)
+- **Resultado F1**: modo `estudio` de `tests/andro_plastilina_shot.gd` (`... -- face ruta.png estudio`): luna (0.66, 0.60, 0.95) energía 0.55; farol Omni (1.0, 0.68, 0.38) energía 1.2, rango 7, pos (1.6, 2.4, 1.4), sin sombra; niebla `FOG_MODE_DEPTH` begin 6, end 40, densidad 0.7, color (0.17, 0.13, 0.25), sin volumétrica ni height fog. Da más relieve y piel más cálida que el preset. NO está en el preset global (pendiente del OK de Pablo).
 - Preset `plastilina` hoy (`look/second_son_environment.gd`): sol (0.84, 0.86, 1.0), energía 0.62, elevación 34°, azimut 35°, ambiente (0.5, 0.5, 0.56) × 1.25, exposición 1.95, niebla exponencial (0.3, 0.25, 0.4) densidad 0.007 + height fog, DOF lejano.
 - Prueba en el estudio: luna morada tenue (≈ (0.66, 0.6, 0.95), energía ~0.5) y un farol `OmniLight3D` ámbar (1, 0.68, 0.38), energía 3–4, rango 12–14, SIN sombra (regla de `CONTRACT.md`).
 - "Sombras solo cerca": ya se cumple en gran parte (solo proyecta la direccional, con `directional_shadow_max_distance` 120 → 70 en baja calidad; luces del parque con `distance_fade`). No tocar el preset global sin permiso.
@@ -247,12 +249,12 @@ Cada fase = una sesión corta = una captura demostrable. Orden mínimo si hay po
 ### F0 · Inventario y línea base — HECHA
 Resultado en §1, §3 y §9.1.
 
-### F1 · Estudio de luz y material
+### F1 · Estudio de luz y material — HECHA (ver §9.1)
 - Hacer: escena/script de estudio de Andro (partir de `tests/andro_plastilina_shot.gd`) con luna morada, farol sin sombra y niebla de profundidad; ajustar `GothicClayAdapter` (rugosidad 0.80, ojos 0.25, esclerótica gris-blanca); bajar la sobreexposición de la piel.
 - Aceptación: piel cerca de #CBBAB0, pelo y abrigo con lectura de material, ojeras cerca de #5B4653; 3 vistas (face, full, side); tests PASS. FPS sin caída > 10 %.
 - No tocar: mallas ni el preset global.
 
-### F2 · Cabeza y cara
+### F2 · Cabeza y cara — HECHA (ver §9.1)
 - Hacer: §4.1 en `_geo_head` / `_head_deform`.
 - Aceptación: perfil y 3/4 acordes a 68009; tris de cabeza ≤ 7 440.
 
@@ -314,6 +316,24 @@ Plantilla (una entrada por fase, la más nueva arriba):
 - Decisiones por defecto: el #044-B reemplaza al pelo anterior (confirmado por Pablo); se mantiene la bandolera.
 - Siguiente paso: F1.
 
+### 2026-11-12 · F1 · Luz de estudio y material
+- Archivos tocados: `character/gothic_clay_adapter.gd`, `character/player_model.gd` (solo constantes de color), `tests/gothic_clay_adapter_test.gd`, `tests/andro_plastilina_shot.gd` (modo `estudio`).
+- Qué cambió: rugosidad piel/tela 0.80, ojos 0.25; albedos de piel, abrigo, pantalón, pelo, ojeras y esclerótica recalibrados midiendo capturas (piel de #FEE8CD recortado a ≈ #C9ADA5; abrigo de #0B0416 a ≈ #22152A; pelo de #07040D a ≈ #110717–#3D2941).
+- Capturas: `F1_plast_face`, `F2_estudio_face`, `F2_estudio_full`.
+- Tris / FPS: sin cambio. FPS sin medir.
+- Efectos colaterales: el mundo no cambia (preset global intacto). Los colores del personaje también cambian en el juego normal, no solo en el estudio.
+- Decisiones por defecto: se corrige la regla "hex = albedo" (§5). Bufanda lima (#417433 renderizado vs #335430 en código) sin resolver: va a F7. Boca rosada y orejas, a F5/F3.
+- Siguiente paso: F2.
+
+### 2026-11-12 · F2 · Cabeza y cara
+- Archivos tocados: `character/player_model.gd` (`_head_keys`, `_head_deform`, `head_col`).
+- Qué cambió: mentón y mandíbula más estrechos (cara más alargada), mejillas hundidas, pómulo y arco superciliar más marcados, cuencas más hondas, punta de mentón; menos rubor y sombra gris ceniza en las mejillas hundidas. No se tocaron las filas `y` de `_head_keys` (ojos, orejas, nariz y labios siguen en posiciones absolutas).
+- Capturas: `F2_plast_face`, `F2_plast_full`, `F2_plast_side`, `F2_estudio_face`.
+- Tris / FPS: 18 228 total, cabeza 7 440 (igual). FPS sin medir.
+- Efectos colaterales: ninguno detectado; 3 tests PASS (el "Parameter m is null" ya existía antes).
+- Decisiones por defecto: la cabeza sigue ×1.6.
+- Siguiente paso: F3 (nariz y orejas) o la fase que indique Pablo.
+
 ### 9.2 Comandos (desde la raíz del repo; `godot` = 4.3)
 ```
 # Importar la primera vez
@@ -324,7 +344,7 @@ godot --headless --path godot3d -s res://tests/character_logic_test.gd
 godot --headless --path godot3d -s res://tests/gothic_clay_adapter_test.gd
 # Inventario: tris, medidas y materiales de Andro
 godot --headless --path godot3d -s res://tests/andro_inventory.gd
-# Captura con luz plastilina (llvmpipe; vistas: face, close, full, side, back; ruta de salida ABSOLUTA)
+# Captura con luz plastilina (llvmpipe; vistas: face, close, full, side, back; ruta de salida ABSOLUTA; 3er argumento opcional: preset | estudio)
 xvfb-run -a -s "-screen 0 1280x720x24" godot --path godot3d --rendering-driver opengl3 --rendering-method gl_compatibility -s res://tests/andro_plastilina_shot.gd -- face /ruta/absoluta/Fxx_face.png
 ```
 Godot 4.3: `https://github.com/godotengine/godot/releases/download/4.3-stable/Godot_v4.3-stable_linux.x86_64.zip`. En este entorno no hay Vulkan: las capturas son GL Compatibility; pedir a Pablo capturas del teléfono para confirmar color y brillo.
@@ -344,8 +364,8 @@ Respetar los nombres existentes. Piezas nuevas sugeridas (hijas del pivote corre
 | Fase | Estado | Notas |
 |---|---|---|
 | F0 | [x] hecha | 12-nov |
-| F1 | [ ] pendiente | |
-| F2 | [ ] pendiente | |
+| F1 | [x] hecha | 12-nov; falta confirmar color en el teléfono |
+| F2 | [x] hecha | 12-nov; tris sin cambio (18 228) |
 | F3 | [ ] pendiente | |
 | F4 | [ ] pendiente | |
 | F5 | [ ] pendiente | |
@@ -389,8 +409,8 @@ Si falta un dato, haz una sola pregunta.
 ---
 
 ## 11. Decisiones abiertas
-1. **Proporciones**: hoy 4.2 cabezas; la hoja ≈ 3. Por defecto se mantiene el cuerpo (cápsula 1.86 m) y, si Pablo quiere el look de la hoja, se agranda la cabeza (hoy ×1.6) en vez de acortar el cuerpo.
-2. **Presupuesto de triángulos**: 18 228 hoy vs 8 000 de la lámina. Por defecto, F11 baja a ≤ 14 000 + LOD lejano.
+1. **Proporciones** (respondida por Pablo): enfocarse en todo el personaje. Hoy 4.2 cabezas; se mantiene el cuerpo y se revisa en F9.
+2. **Presupuesto de triángulos** (respondida por Pablo): se decide en F11. Hasta entonces no se optimiza, pero tampoco se añaden triángulos a lo loco.
 3. **Capturas del teléfono**: las de F0 son de llvmpipe. En F1 dejar una escena de estudio jugable en el editor del teléfono para confirmar color y brillo.
 4. **Pelo**: el 044-B actual se lee como "púas finas"; confirmar en F6 si se prefieren mechones más gruesos y aplanados como en la hoja.
 

@@ -1,11 +1,13 @@
 extends SceneTree
-## F0: retrato de Andro con el preset "plastilina" real (StreetLook + ClayStyle). Uso:
-## godot --path <proyecto> -s <este.gd> -- <vista: face|close|full|side|back> <salida.png>
+## Retrato de Andro con el preset "plastilina" real (StreetLook + ClayStyle). Uso:
+## godot --path <proyecto> -s <este.gd> -- <vista: face|close|full|side|back> <salida.png> [modo: preset|estudio]
+## modo "estudio" (F1): luna morada tenue + farol ámbar sin sombra + niebla de profundidad (solo aquí, no toca el preset global).
 
 func _initialize() -> void:
 	var args := OS.get_cmdline_user_args()
 	var view: String = args[0] if args.size() > 0 else "face"
 	var out: String = args[1] if args.size() > 1 else "/tmp/shot.png"
+	var mode: String = args[2] if args.size() > 2 else "preset"
 	ClayStyle.enabled = true
 	var look := StreetLook.new()
 	look.enable_backdrop = false
@@ -14,6 +16,9 @@ func _initialize() -> void:
 	look.follow_reflection_probe = false
 	look.initial_preset = "plastilina"
 	root.add_child(look)
+	if mode == "estudio":
+		await process_frame   # StreetLook arma su ambiente en _ready()
+		_studio(look)
 	var floor_mi := MeshInstance3D.new()
 	var pm := PlaneMesh.new()
 	pm.size = Vector2(40, 40)
@@ -52,3 +57,25 @@ func _initialize() -> void:
 	root.get_viewport().get_texture().get_image().save_png(out)
 	print("SHOT_OK ", out)
 	quit()
+
+
+## F1: luz de noche barata. Valores de partida (ajustar mirando la captura).
+func _studio(look: StreetLook) -> void:
+	look.sun.light_color = Color(0.66, 0.60, 0.95)      # luna morada tenue
+	look.sun.light_energy = 0.55
+	var lamp := OmniLight3D.new()                       # farol ámbar: sin sombra (regla de CONTRACT.md)
+	lamp.position = Vector3(1.6, 2.4, 1.4)
+	lamp.light_color = Color(1.0, 0.68, 0.38)
+	lamp.light_energy = 1.2
+	lamp.omni_range = 7.0
+	lamp.shadow_enabled = false
+	root.add_child(lamp)
+	var env := look.environment                         # niebla de profundidad simple (sin volumétrica)
+	env.fog_mode = Environment.FOG_MODE_DEPTH
+	env.fog_light_color = Color(0.17, 0.13, 0.25)
+	env.fog_depth_begin = 6.0
+	env.fog_depth_end = 40.0
+	env.fog_depth_curve = 1.0
+	env.fog_density = 0.7
+	env.fog_height_density = 0.0
+	env.volumetric_fog_enabled = false

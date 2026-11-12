@@ -19,7 +19,16 @@ Plan gráfico anterior (fases 1-5): `PLAN_GRAFICOS.md`. El plan vigente está en
 - Rendimiento medido en el editor del teléfono: ~51 FPS en el parque, ~78 FPS en la calle.
 - Sin APK todavía (a propósito): se juega desde el editor de Godot en el teléfono.
 
-## Última sesión (12 nov 2026) — Rediseño de Andro, F0 (inventario y línea base, sin cambios de arte)
+## Última sesión (12 nov 2026) — Rediseño de Andro, F1 (luz y material) y F2 (cabeza y cara)
+- F1: rugosidad piel/tela 0.80 y ojos 0.25; albedos recalibrados midiendo capturas (piel ≈ #C9ADA5, abrigo ≈ #22152A, pelo y ojeras con lectura de material).
+  Corregida la regla "hex de la lámina = albedo": el hex es el color renderizado. Modo `estudio` en `tests/andro_plastilina_shot.gd`
+  (luna morada, farol ámbar sin sombra, niebla de profundidad). El preset global NO se tocó.
+- F2: cara más alargada (mentón/mandíbula estrechos), mejillas hundidas, pómulos, arco superciliar y cuencas más marcados, menos rubor.
+  Tris sin cambio (18 228). Los colores de F1 también afectan al juego normal.
+- Tests PASS (integration, character_logic, gothic_clay_adapter; el "Parameter m is null" ya existía). Capturas: `docs/andro/shots/F1_*`, `F2_*`.
+- Pendiente: confirmar color/brillo en el teléfono (las capturas son GL Compatibility), bufanda lima (F7), boca rosada (F5), orejas/nariz (F3). Siguiente: F3.
+
+## Sesión anterior (12 nov 2026) — Rediseño de Andro, F0 (inventario y línea base, sin cambios de arte)
 - Nuevo `ANDRO_CONTEXTO.md`: contexto maestro del rediseño del personaje (reglas, inventario verificado, diagnóstico medido,
   paleta, plan por fases F0–F11, comandos, registro de cambios). Leerlo antes de tocar `character/`.
 - Medido en F0: Andro = 18 228 tris, 22 superficies, 2.138 m de alto, 4.2 cabezas (la hoja turnaround muestra ≈ 3).

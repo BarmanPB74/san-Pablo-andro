@@ -48,7 +48,7 @@ static var SKIN_TONE := Color(0.76, 0.62, 0.52)  # piel clara, algo pálida (en 
 const CLAY_HEAD_K := 1.6
 const CLAY_HAND_K := 1.22
 # Paleta de plastilina = la del adaptador "arcilla gótica" (character/gothic_clay_adapter.gd)
-const C_CLAY_SKIN := Color(0.82, 0.77, 0.71)   # arcilla pálida "blanco sucio/hueso" (lámina)
+const C_CLAY_SKIN := Color(0.64, 0.62, 0.59)   # arcilla pálida "blanco sucio/hueso" (lámina)
 const C_CLAY_EYE := GothicClayAdapter.EYE
 # Traje oscuro + camisa blanca (concepto de Pablo: figura alta y delgada)
 static var C_SUIT := Color(0.06, 0.06, 0.068)
@@ -136,12 +136,12 @@ func _build() -> void:
 	SKIN_TONE = C_CLAY_SKIN if clay else Color(0.76, 0.62, 0.52)
 	# Arcilla gótica (láminas de referencia de Pablo): saco ciruela-carbón CERRADO (sin camisa a la vista),
 	# pantalón más oscuro, pelo café-ciruela en mechones gruesos, zapatos gris-café, labios apagados.
-	C_SUIT = Color(0.22, 0.18, 0.19) if clay else Color(0.06, 0.06, 0.068)
-	C_SUIT_LAPEL = Color(0.17, 0.14, 0.15) if clay else Color(0.035, 0.035, 0.042)
-	C_TROUSER = Color(0.15, 0.135, 0.14) if clay else Color(0.06, 0.06, 0.068)
+	C_SUIT = Color(0.31, 0.29, 0.29) if clay else Color(0.06, 0.06, 0.068)
+	C_SUIT_LAPEL = Color(0.24, 0.20, 0.21) if clay else Color(0.035, 0.035, 0.042)
+	C_TROUSER = Color(0.22, 0.20, 0.21) if clay else Color(0.06, 0.06, 0.068)
 	C_SHIRT = C_SUIT if clay else Color(0.86, 0.86, 0.83)
 	C_BUTTON = Color(0.36, 0.25, 0.2) if clay else Color(0.03, 0.03, 0.035)   # botones de arcilla café
-	C_HAIR = Color(0.16, 0.145, 0.145) if clay else Color(0.045, 0.035, 0.03)
+	C_HAIR = Color(0.27, 0.25, 0.25) if clay else Color(0.045, 0.035, 0.03)
 	C_DRESS_SHOE = Color(0.3, 0.22, 0.17) if clay else Color(0.035, 0.035, 0.04)  # botines de cuero café
 	C_LIP = Color(0.6, 0.4, 0.4) if clay else Color(0.52, 0.32, 0.27)          # rojo apagado (labio inferior)
 	root = _pivot("root", self, Vector3.ZERO)
@@ -716,15 +716,15 @@ func _geo_neck() -> void:
 ## Anillos clave de la cabeza (frente = -z). y ya escalado por HEAD_Y.
 static func _head_keys() -> Array:
 	var raw := [
-		[0.0, 0.032, 0.022, 0.03, -0.064, 2.4],
-		[0.015, 0.049, 0.04, 0.05, -0.052, 2.4],
-		[0.035, 0.062, 0.056, 0.075, -0.032, 2.4],
-		[0.06, 0.07, 0.075, 0.085, -0.018, 2.4],
-		[0.09, 0.071, 0.088, 0.095, -0.01, 2.4],
-		[0.12, 0.074, 0.093, 0.1, -0.006, 2.5],
+		[0.0, 0.026, 0.02, 0.028, -0.064, 2.3],     # F2: mentón más estrecho
+		[0.015, 0.04, 0.038, 0.048, -0.052, 2.3],
+		[0.035, 0.05, 0.054, 0.072, -0.034, 2.3],   # mandíbula
+		[0.06, 0.058, 0.072, 0.083, -0.019, 2.3],   # mejillas hundidas
+		[0.09, 0.066, 0.088, 0.095, -0.01, 2.4],
+		[0.12, 0.072, 0.093, 0.1, -0.006, 2.5],
 		[0.145, 0.077, 0.095, 0.104, -0.004, 2.5],
-		[0.17, 0.078, 0.094, 0.105, 0.0, 2.4],
-		[0.195, 0.074, 0.087, 0.1, 0.003, 2.3],
+		[0.17, 0.08, 0.094, 0.105, 0.0, 2.4],
+		[0.195, 0.076, 0.087, 0.1, 0.003, 2.3],
 		[0.215, 0.062, 0.073, 0.088, 0.005, 2.2],
 		[0.23, 0.04, 0.048, 0.06, 0.006, 2.0],
 	]
@@ -763,18 +763,19 @@ func _head_deform(p: Vector3) -> Vector3:
 	for sx in [-1.0, 1.0]:
 		var dx: float = p.x - sx * 0.033
 		var dy: float = p.y - EYE_Y
-		q.z += 0.009 * exp(-(dx * dx / 0.00036 + dy * dy / 0.00016)) * fz
-		var dx2: float = p.x - sx * 0.052
-		var dy2: float = p.y - 0.106
-		q.z -= 0.005 * exp(-(dx2 * dx2 + dy2 * dy2) / 0.0004) * fz
+		q.z += 0.011 * exp(-(dx * dx / 0.00036 + dy * dy / 0.00016)) * fz
+		var dx2: float = p.x - sx * 0.054
+		var dy2: float = p.y - 0.102
+		q.z -= 0.008 * exp(-(dx2 * dx2 + dy2 * dy2) / 0.0004) * fz   # pómulo marcado
 		# mejilla hundida bajo el pómulo
-		var dx3: float = p.x - sx * 0.05
-		var dy3: float = p.y - 0.07
-		q.z += 0.004 * exp(-(dx3 * dx3 + dy3 * dy3) / 0.0003) * fz
+		var dx3: float = p.x - sx * 0.044
+		var dy3: float = p.y - 0.066
+		q.z += 0.009 * exp(-(dx3 * dx3 + dy3 * dy3) / 0.00045) * fz
 	var gb := exp(-pow((p.y - 0.152) / 0.011, 2.0)) * clampf(1.0 - absf(p.x) / 0.07, 0.0, 1.0)
-	q.z -= 0.006 * gb * fz
+	q.z -= 0.008 * gb * fz
 	# surco mentolabial y mentón
-	q.z += 0.003 * exp(-pow((p.y - 0.038) / 0.006, 2.0)) * clampf(1.0 - absf(p.x) / 0.03, 0.0, 1.0) * fz
+	q.z += 0.004 * exp(-pow((p.y - 0.038) / 0.006, 2.0)) * clampf(1.0 - absf(p.x) / 0.03, 0.0, 1.0) * fz
+	q.z -= 0.004 * exp(-pow((p.y - 0.012) / 0.012, 2.0)) * clampf(1.0 - absf(p.x) / 0.025, 0.0, 1.0) * fz   # punta del mentón
 	return q
 
 
@@ -823,13 +824,17 @@ func _geo_head() -> void:
 			# rubor de pómulo
 			var cx: float = p.x - sx * 0.05
 			var cy: float = p.y - 0.088
-			shade = shade.lerp(shade * warm, exp(-(cx * cx / 0.0008 + cy * cy / 0.0006)) * 0.55 * fr)
+			shade = shade.lerp(shade * warm, exp(-(cx * cx / 0.0008 + cy * cy / 0.0006)) * 0.3 * fr)
+			# mejilla hundida: gris ceniza (#8E8581 de la lámina)
+			var hx: float = p.x - sx * 0.046
+			var hy: float = p.y - 0.066
+			shade = shade.lerp(shade * Color(0.84, 0.82, 0.85), exp(-(hx * hx / 0.001 + hy * hy / 0.00045)) * 0.75 * fr)
 			# oreja y borde de la oreja más rojizos
 			var ear := clampf((absf(p.x) - 0.078) / 0.012, 0.0, 1.0) * clampf(1.0 - absf(p.y - 0.113) / 0.04, 0.0, 1.0)
-			shade = shade.lerp(shade * Color(1.1, 0.88, 0.84), ear * 0.6)
+			shade = shade.lerp(shade * Color(1.1, 0.88, 0.84), ear * 0.35)
 		# punta de la nariz y aletas más cálidas
 		var nose := exp(-(p.x * p.x / 0.00018 + pow(p.y - 0.088, 2.0) / 0.00012)) * fr
-		shade = shade.lerp(shade * Color(1.08, 0.88, 0.84), nose * 0.6)
+		shade = shade.lerp(shade * Color(1.08, 0.88, 0.84), nose * 0.4)
 		# frente un poco más clara y sombra bajo la mandíbula
 		var fore := clampf((p.y - 0.155) / 0.03, 0.0, 1.0) * fr
 		shade = shade.lerp(shade * Color(1.03, 1.02, 0.98), fore * 0.7)
@@ -1553,7 +1558,7 @@ func _clay_eye(skin_m: Material, hair_m: Material, ex: float, sx: float, ez: flo
 		var t := float(i) / 4.0
 		var a := lerpf(-1.05, 1.05, t)
 		bag.append(c + Vector3(sin(a) * 0.0285, -cos(a) * 0.028, -0.006 - 0.004 * cos(a)))
-	_tube(skin_m, bag, [0.0035, 0.006, 0.007, 0.006, 0.0035], 0.0035, 6, up_f, _c(Color(0.52, 0.38, 0.47)))   # ojera morada/marrón
+	_tube(skin_m, bag, [0.0035, 0.006, 0.007, 0.006, 0.0035], 0.0035, 6, up_f, _c(Color(0.46, 0.40, 0.42)))   # ojera morada/marrón (#5B4653 de la lámina, sin magenta)
 	# ceja gruesa de plastilina, un poco caída hacia afuera
 	var brow := PackedVector3Array()
 	for i in 4:
@@ -1640,8 +1645,8 @@ func _clay_satchel(keys: Array) -> void:
 func _clay_hair(hair_m: Material) -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 44
-	var dark := Color(0.11, 0.1, 0.1)
-	var mid := Color(0.2, 0.18, 0.18)
+	var dark := Color(0.28, 0.26, 0.26)
+	var mid := Color(0.38, 0.35, 0.35)
 	var dust := Color(0.47, 0.44, 0.42)
 	var C := Vector3(0.0, 0.128, 0.004)
 	var R := Vector3(0.092, 0.122, 0.114)

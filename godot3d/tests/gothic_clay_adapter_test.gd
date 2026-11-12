@@ -20,8 +20,8 @@ func _initialize() -> void:
 			var src: Material = mat.get_meta("clay_src", null)
 			roles[PlayerModel.material_key(src)] = r
 	print("rugosidad por pieza: ", roles)
-	ok = ok and is_equal_approx(float(roles.get("skin", 0)), 0.88) and is_equal_approx(float(roles.get("eye", 0)), 0.55)
-	ok = ok and is_equal_approx(float(roles.get("twill", 0)), 0.88)
+	ok = ok and is_equal_approx(float(roles.get("skin", 0)), 0.80) and is_equal_approx(float(roles.get("eye", 0)), 0.25)
+	ok = ok and is_equal_approx(float(roles.get("twill", 0)), 0.80)
 	# 2) Modelo importado con piezas nombradas (reglas por nombre del C#)
 	var glb := Node3D.new()
 	root.add_child(glb)
