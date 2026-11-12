@@ -1,6 +1,6 @@
 # ANDRO_CONTEXTO — Rediseño del personaje (arcilla gótica / stop-motion)
 
-Versión 2.1 · 12-nov-2026 · F0, F1 y F2 hechas · Rama `fase-3d-godot` · Godot 4.3 · renderer Mobile
+Versión 2.2 · 12-nov-2026 · F0 a F4 hechas · Rama `fase-3d-godot` · Godot 4.3 · renderer Mobile
 Alcance: SOLO Andro (`godot3d/character/`) y su movimiento. Nada del mapa, vehículos ni UI.
 
 > Antes de empezar: leer `ESTADO.md` y `CONTRACT.md` (reglas del proyecto). De este documento, leer §0–§3 y §9 siempre, y de §8 solo la fase activa. Así cada sesión sale barata en tokens.
@@ -258,10 +258,10 @@ Resultado en §1, §3 y §9.1.
 - Hacer: §4.1 en `_geo_head` / `_head_deform`.
 - Aceptación: perfil y 3/4 acordes a 68009; tris de cabeza ≤ 7 440.
 
-### F3 · Nariz y orejas
+### F3 · Nariz y orejas — HECHA (ver §9.1)
 - Hacer: §4.2. Aceptación: legibles en perfil y 3/4.
 
-### F4 · Ojos, párpados, ojeras, cejas
+### F4 · Ojos, párpados, ojeras, cejas — HECHA (ver §9.1)
 - Hacer: §4.3; piezas aparte con pivotes para animarlas.
 - Aceptación: parpadeo de 3 poses y mirada con pasos; un solo brillo en el ojo.
 
@@ -334,6 +334,24 @@ Plantilla (una entrada por fase, la más nueva arriba):
 - Decisiones por defecto: la cabeza sigue ×1.6.
 - Siguiente paso: F3 (nariz y orejas) o la fase que indique Pablo.
 
+### 2026-11-12 · F3 · Nariz y orejas
+- Archivos tocados: `character/player_model.gd` (`_geo_head`: bloque de nariz y de orejas; nuevo `_clay_ear`).
+- Qué cambió: nariz con más proyección (punta de 0.017 a 0.026 sobre la cara), más ancha en la base, punta redondeada y levantada, alas más grandes y fosas nasales oscuras. Orejas más grandes con concha oscura, hélix, antihélix y lóbulo; la izquierda es 7 % más grande y 3 mm más alta (asimetría).
+- Capturas: `F3_perfil_antes/F3_perfil/F3_perfil_der`, `F3_tres_cuartos_antes/F3_tres_cuartos`.
+- Tris / FPS: ver F4 (total 19 364). FPS sin medir.
+- Efectos colaterales: el flequillo y las patillas del pelo 044-B tapan casi toda la oreja izquierda en perfil (se ve entera por el otro lado). Ajustar en F6.
+- Siguiente paso: F4.
+
+### 2026-11-12 · F4 · Ojos, párpados, ojeras y cejas
+- Archivos tocados: `character/player_model.gd` (nuevos `_dress_piece`, `_bake`, `_build_face_pieces`, `_geo_eyeball`, `_geo_lid`, `_geo_brow`, `set_face`, `_clay_eye_bag`; `triangle_count` suma las piezas), `tests/andro_face_test.gd` (nuevo), `tests/andro_plastilina_shot.gd` (vistas `hperfil`, `hperfil2`, `h34` y variables de entorno de cara), `tests/andro_inventory.gd` sin cambios.
+- Qué cambió: el globo ocular ya no sobresale tanto (radio z 0.017, antes 0.02); esclerótica gris-blanca, iris oscuro, pupila más grande y un solo brillo. Párpado superior grueso (borde a ≈ 68° desde la vertical, mirada cansada). Ojo, párpado y ceja son 6 piezas hijas de `head` (`eye_l/r`, `lid_l/r`, `brow_l/r`), cacheadas, con la misma escala de cabeza. La ojera sigue en la malla de la cabeza.
+- API: `set_face(blink 0|1|2, gaze Vector2(x, y en rad), brow_l, brow_r en −1..1)`. Aún NO está conectada a `animate` ni al estado del jugador: eso es F10 (parpadeo aleatorio y mirada con `step_fps`).
+- Capturas: `F4_cara`, `F4_estudio_cara`, `F4_pasos` (abierto / entrecerrado / cerrado / mirada+cejas).
+- Tris / FPS: 19 364 total (+1 136 vs F2: cabeza 7 144, piezas de cara ≈ 1 400, orejas más detalladas). Se revisa en F11. FPS sin medir.
+- Efectos colaterales: el hueco de la cabeza que antes ocupaban los ojos pasó de 3 a 2 superficies (piel y pelo); `GothicClayAdapter` estila las piezas sin cambios. Con el parpadeo cerrado el párpado queda algo abultado; se puede afinar en F10.
+- Decisiones por defecto: el brillo del ojo va dentro de la pieza del globo (gira con la mirada); las cejas siguen en el material del pelo.
+- Siguiente paso: F5 (boca y expresiones).
+
 ### 9.2 Comandos (desde la raíz del repo; `godot` = 4.3)
 ```
 # Importar la primera vez
@@ -342,9 +360,11 @@ godot --headless --path godot3d --editor --quit
 godot --headless --path godot3d -s res://tests/integration_test.gd
 godot --headless --path godot3d -s res://tests/character_logic_test.gd
 godot --headless --path godot3d -s res://tests/gothic_clay_adapter_test.gd
+godot --headless --path godot3d -s res://tests/andro_face_test.gd
+# Cara por pasos en las capturas: variables ANDRO_BLINK=0|1|2, ANDRO_GAZE="x,y", ANDRO_BROW="izq,der"
 # Inventario: tris, medidas y materiales de Andro
 godot --headless --path godot3d -s res://tests/andro_inventory.gd
-# Captura con luz plastilina (llvmpipe; vistas: face, close, full, side, back; ruta de salida ABSOLUTA; 3er argumento opcional: preset | estudio)
+# Captura con luz plastilina (llvmpipe; vistas: face, close, full, side, back, hperfil, hperfil2, h34 (cabeza); ruta de salida ABSOLUTA; 3er argumento opcional: preset | estudio)
 xvfb-run -a -s "-screen 0 1280x720x24" godot --path godot3d --rendering-driver opengl3 --rendering-method gl_compatibility -s res://tests/andro_plastilina_shot.gd -- face /ruta/absoluta/Fxx_face.png
 ```
 Godot 4.3: `https://github.com/godotengine/godot/releases/download/4.3-stable/Godot_v4.3-stable_linux.x86_64.zip`. En este entorno no hay Vulkan: las capturas son GL Compatibility; pedir a Pablo capturas del teléfono para confirmar color y brillo.
@@ -366,8 +386,8 @@ Respetar los nombres existentes. Piezas nuevas sugeridas (hijas del pivote corre
 | F0 | [x] hecha | 12-nov |
 | F1 | [x] hecha | 12-nov; falta confirmar color en el teléfono |
 | F2 | [x] hecha | 12-nov; tris sin cambio (18 228) |
-| F3 | [ ] pendiente | |
-| F4 | [ ] pendiente | |
+| F3 | [x] hecha | 12-nov; nariz proyecta en perfil, orejas con hélix/concha/lóbulo |
+| F4 | [x] hecha | 12-nov; ojos, párpados y cejas son piezas con `set_face()`; falta conectarlo a `animate` (F10) |
 | F5 | [ ] pendiente | |
 | F6 | [ ] pendiente | |
 | F7 | [ ] pendiente | |

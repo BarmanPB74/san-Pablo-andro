@@ -89,6 +89,7 @@ var shin_r: Node3D
 var foot_r: Node3D
 
 var _joints: Dictionary = {}       # nombre → Node3D
+var _pieces: Dictionary = {}       # piezas animables de la cara (eye_l, lid_l, brow_l…): nombre → Node3D
 var _state := "idle"
 var _time := 0.0
 var _phase := 0.0
@@ -170,6 +171,8 @@ func _build() -> void:
 	_dress(chest, "chest", _geo_chest)
 	_dress(neck, "neck", _geo_neck)
 	_dress(head, "head", _geo_head)
+	if clay:
+		_build_face_pieces()
 	for side in [-1, 1]:
 		var sfx := "l" if side < 0 else "r"
 		_dress(_joints["upper_arm_" + sfx], "upper_arm_" + sfx, _geo_upper_arm.bind(float(side)))
@@ -194,27 +197,50 @@ func _pivot(pname: String, parent: Node3D, pos: Vector3) -> Node3D:
 	return n
 
 
+## Construye (o recupera de la caché) la malla de un builder.
+func _bake(key: String, builder: Callable) -> ArrayMesh:
+	if _mesh_cache.has(key):
+		return _mesh_cache[key]
+	_sts.clear()
+	_cnt.clear()
+	builder.call()
+	var mesh := ArrayMesh.new()
+	for mat in _sts:
+		var st: SurfaceTool = _sts[mat]
+		st.generate_tangents()
+		st.commit(mesh)
+		mesh.surface_set_material(mesh.get_surface_count() - 1, mat)
+	_sts.clear()
+	_cnt.clear()
+	_mesh_cache[key] = mesh
+	return mesh
+
+
+## Pieza animable de la cara: un Node3D que gira en `origin` (coordenadas de la malla de la cabeza, sin escalar)
+## con una MeshInstance3D "Mesh" cuyos vértices quedan donde los dejó el builder. Escala igual que la cabeza.
+func _dress_piece(nm: String, origin: Vector3, builder: Callable) -> Node3D:
+	var mesh := _bake("piece_" + nm, builder)
+	var pv := Node3D.new()
+	pv.name = nm
+	pv.position = origin * CLAY_HEAD_K
+	pv.scale = Vector3.ONE * CLAY_HEAD_K
+	pv.set_meta("base_pos", pv.position)
+	var mi := MeshInstance3D.new()
+	mi.name = "Mesh"
+	mi.mesh = mesh
+	mi.position = -origin
+	pv.add_child(mi)
+	head.add_child(pv)
+	_pieces[nm] = pv
+	return pv
+
+
 ## Cuelga del pivote una sola MeshInstance3D con todas sus piezas (cacheada).
 func _dress(pivot: Node3D, key: String, builder: Callable) -> void:
 	var clay := ClayStyle.enabled
 	if clay:
 		key += "_clay"
-	var mesh: ArrayMesh
-	if _mesh_cache.has(key):
-		mesh = _mesh_cache[key]
-	else:
-		_sts.clear()
-		_cnt.clear()
-		builder.call()
-		mesh = ArrayMesh.new()
-		for mat in _sts:
-			var st: SurfaceTool = _sts[mat]
-			st.generate_tangents()
-			st.commit(mesh)
-			mesh.surface_set_material(mesh.get_surface_count() - 1, mat)
-		_sts.clear()
-		_cnt.clear()
-		_mesh_cache[key] = mesh
+	var mesh := _bake(key, builder)
 	var mi := MeshInstance3D.new()
 	mi.name = "Mesh"
 	mi.mesh = mesh
@@ -228,9 +254,9 @@ func _dress(pivot: Node3D, key: String, builder: Callable) -> void:
 ## Triángulos totales del modelo (para presupuesto/tests).
 func triangle_count() -> int:
 	var tris := 0
-	for k in _joints:
-		var n: Node3D = _joints[k]
-		var mi := n.get_node_or_null("Mesh") as MeshInstance3D
+	var nodes: Array = _joints.values() + _pieces.values()
+	for n in nodes:
+		var mi := (n as Node3D).get_node_or_null("Mesh") as MeshInstance3D
 		if mi == null:
 			continue
 		for s in mi.mesh.get_surface_count():
@@ -878,7 +904,7 @@ func _geo_head() -> void:
 		var ez := _head_z(ex, EYE_Y, keys)
 		var clay_eyes := ClayStyle.enabled
 		if clay_eyes:
-			_clay_eye(skin_m, hair_m, ex, sx, ez)
+			_clay_eye_bag(skin_m, ex, sx, ez)
 		else:
 			_ellip(skin_m, Vector3(ex, EYE_Y, ez + 0.0035), Vector3(0.0172, 0.0122, 0.0068), _c(C_SCLERA), Vector3.ZERO, 10, 5)
 			_ellip(skin_m, Vector3(ex - 0.001 * sx, EYE_Y - 0.0005, ez - 0.0018), Vector3(0.0088, 0.0088, 0.002),
@@ -901,20 +927,24 @@ func _geo_head() -> void:
 			bra.append(lerpf(0.0042, 0.0028, t))
 		if not clay_eyes:
 			_tube(hair_m, brow, bra, 0.0026, 4, up_f, _c(C_HAIR))
-		# Orejas con hélice marcada
+		# Orejas (F3): concha, hélix, antihélix y lóbulo; la izquierda un poco más grande y alta (asimetría)
 		var er := _ring_at(keys, 0.115)
-		var eo := Vector3(sx * (float(er["a"]) + 0.004), 0.113, 0.014)
-		_ellip(skin_m, eo + (Vector3(0.006 * sx, 0, 0) if ClayStyle.enabled else Vector3.ZERO), (Vector3(0.011, 0.034, 0.026) if ClayStyle.enabled else Vector3(0.008, 0.029, 0.018)), skin, Vector3(0.0, -0.35 * sx, 0.12 * sx), 10, 6)
-		_tube(skin_m, PackedVector3Array([eo + Vector3(0.006 * sx, 0.024, -0.006), eo + Vector3(0.009 * sx, 0.02, 0.012),
-			eo + Vector3(0.008 * sx, -0.004, 0.018), eo + Vector3(0.006 * sx, -0.022, 0.008)]),
-			0.004, 0.004, 5, Vector3(sx, 0, 0), skin)
+		var ek: float = 1.07 if sx < 0.0 else 1.0
+		var eo := Vector3(sx * (float(er["a"]) + 0.004), 0.113 + (0.003 if sx < 0.0 else 0.0), 0.014)
+		if ClayStyle.enabled:
+			_clay_ear(skin_m, eo, sx, ek, skin)
+		else:
+			_ellip(skin_m, eo, Vector3(0.008, 0.029, 0.018), skin, Vector3(0.0, -0.35 * sx, 0.12 * sx), 10, 6)
+			_tube(skin_m, PackedVector3Array([eo + Vector3(0.006 * sx, 0.024, -0.006), eo + Vector3(0.009 * sx, 0.02, 0.012),
+				eo + Vector3(0.008 * sx, -0.004, 0.018), eo + Vector3(0.006 * sx, -0.022, 0.008)]),
+				0.004, 0.004, 5, Vector3(sx, 0, 0), skin)
 	# Nariz: puente → punta, aletas
 	var nose := PackedVector3Array()
 	var nra: Array = []
 	var nrb: Array = []
-	var nys := [0.148, 0.128, 0.106, 0.092, 0.085]
-	var nout := [0.0, 0.005, 0.012, 0.017, 0.014]
-	var nw := [0.0058, 0.0064, 0.0075, 0.0095, 0.0075]
+	var nys := [0.148, 0.128, 0.106, 0.092, 0.087]      # F3: punta redondeada y algo levantada
+	var nout := [0.0, 0.007, 0.017, 0.026, 0.026]
+	var nw := [0.0058, 0.0066, 0.0079, 0.0104, 0.0088]
 	for i in 5:
 		nose.append(Vector3(0, nys[i], _head_z(0.0, nys[i], keys) - nout[i] + 0.006))
 		nra.append(nw[i])
@@ -922,8 +952,11 @@ func _geo_head() -> void:
 	_tube(skin_m, nose, nra, nrb, 8, up_f, skin)
 	for sx in [-1.0, 1.0]:
 		var az := _head_z(0.012 * sx, 0.09, keys)
-		_ellip(skin_m, Vector3(0.0115 * sx, 0.0895, az - 0.003), Vector3(0.0068, 0.0055, 0.0075), skin,
+		_ellip(skin_m, Vector3(0.0125 * sx, 0.0885, az - 0.004), Vector3(0.0072, 0.0058, 0.0082), skin,
 			Vector3(0, 0.3 * sx, 0), 8, 5)
+		if ClayStyle.enabled:    # fosa nasal: punto oscuro bajo el ala
+			_ellip(skin_m, Vector3(0.0062 * sx, 0.0842, _head_z(0.0, 0.087, keys) - 0.0215), Vector3(0.0026, 0.0017, 0.0026),
+				_c(SKIN_TONE * 0.55), Vector3.ZERO, 6, 4)
 	# Labios
 	var lipc := _c(C_LIP)
 	for k in 2:
@@ -1544,28 +1577,112 @@ func snap_pose(state: String, speed: float, phase := 0.0) -> void:
 
 ## Ojo de muñeco de plastilina: globo blanco grande que sobresale, pupila pequeña negra,
 ## párpado superior de piel que cae un poco (mirada cansada) y ceja gruesa encima.
-func _clay_eye(skin_m: Material, hair_m: Material, ex: float, sx: float, ez: float) -> void:
+## Ojera: rollito de arcilla más oscuro (malva) bajo el ojo. Queda en la malla de la cabeza (no se anima).
+func _clay_eye_bag(skin_m: Material, ex: float, _sx: float, ez: float) -> void:
 	var up_f := Vector3(0, 0, -1)
-	var c := Vector3(ex * 1.06, EYE_Y - 0.002, ez - 0.001)
-	_ellip(_eye(), c, Vector3(0.028, 0.028, 0.02), _c(C_CLAY_EYE), Vector3.ZERO, 14, 8)
-	_ellip(_eye(), c + Vector3(-0.003 * sx, -0.001, -0.0198), Vector3(0.0052, 0.0052, 0.0018), _c(GothicClayAdapter.PUPIL), Vector3.ZERO, 8, 4)
-	# párpado superior: casquete de piel inclinado hacia adelante
-	_ellip(skin_m, c + Vector3(0, 0.0215, 0.004), Vector3(0.029, 0.0105, 0.02), _c(SKIN_TONE * 0.93),
-		Vector3(-0.3, 0.0, 0.0), 14, 7)
-	# ojera: rollito de arcilla más oscuro (malva) bajo el ojo
+	var c := _eye_center(ex, ez)
 	var bag := PackedVector3Array()
 	for i in 5:
 		var t := float(i) / 4.0
 		var a := lerpf(-1.05, 1.05, t)
-		bag.append(c + Vector3(sin(a) * 0.0285, -cos(a) * 0.028, -0.006 - 0.004 * cos(a)))
+		bag.append(c + Vector3(sin(a) * 0.0285, -cos(a) * 0.0275, -0.0045 - 0.004 * cos(a)))
 	_tube(skin_m, bag, [0.0035, 0.006, 0.007, 0.006, 0.0035], 0.0035, 6, up_f, _c(Color(0.46, 0.40, 0.42)))   # ojera morada/marrón (#5B4653 de la lámina, sin magenta)
-	# ceja gruesa de plastilina, un poco caída hacia afuera
+
+
+## Centro del globo ocular (hundido en la cuenca: sobresale menos que antes).
+func _eye_center(ex: float, ez: float) -> Vector3:
+	return Vector3(ex * 1.06, EYE_Y - 0.002, ez + 0.001)
+
+const EYE_R := Vector3(0.028, 0.028, 0.017)    # radios del globo ocular
+
+
+## Piezas animables de la cara (F4): globo (mirada), párpado superior (parpadeo) y ceja, por lado.
+func _build_face_pieces() -> void:
+	var keys := _head_keys()
+	for sx in [-1.0, 1.0]:
+		var sfx := "l" if sx < 0.0 else "r"
+		var ex: float = 0.034 * sx
+		var ez := _head_z(ex, EYE_Y, keys)
+		var c := _eye_center(ex, ez)
+		_dress_piece("eye_" + sfx, c, _geo_eyeball.bind(c, sx))
+		_dress_piece("lid_" + sfx, c, _geo_lid.bind(c))
+		var bo := Vector3(ex * 1.08, EYE_Y + 0.04, ez - 0.012)
+		_dress_piece("brow_" + sfx, bo, _geo_brow.bind(ex, ez, sx))
+
+
+## Globo ocular: esclerótica gris-blanca, iris oscuro, pupila y UN solo brillo (esfera de plástico sin vida).
+func _geo_eyeball(c: Vector3, sx: float) -> void:
+	var em := _eye()
+	_ellip(em, c, EYE_R, _c(C_CLAY_EYE), Vector3.ZERO, 14, 8)
+	var g := Vector3(-0.003 * sx, -0.001, 0.0)       # la mirada cae un poco hacia adentro
+	_ellip(em, c + g + Vector3(0, 0, -0.0163), Vector3(0.0108, 0.0108, 0.0024), _c(Color(0.2, 0.17, 0.17)), Vector3.ZERO, 10, 4)
+	_ellip(em, c + g + Vector3(0, 0, -0.0176), Vector3(0.0058, 0.0058, 0.0016), _c(GothicClayAdapter.PUPIL), Vector3.ZERO, 8, 4)
+	_ellip(em, c + Vector3(0.0065, 0.0045, -0.0162), Vector3(0.0029, 0.0029, 0.0011), _c(Color(0.95, 0.95, 0.97)), Vector3.ZERO, 8, 4)
+
+
+## Párpado superior: casquete grueso de arcilla que gira en el centro del ojo (rotation.x < 0 lo baja).
+## Reposo: el borde queda a ≈ 68° desde la vertical (párpado pesado, mirada cansada).
+func _geo_lid(c: Vector3) -> void:
+	var sm := _skin()
+	var col := _c(SKIN_TONE * 0.93)
+	var m := 16
+	var rows: Array = [[0.0, 1.05], [0.35, 1.045], [0.7, 1.045], [0.95, 1.045], [1.1, 1.05], [1.17, 1.1], [1.23, 1.075], [1.32, 0.985]]
+	var P := PackedVector3Array()
+	for r in rows:
+		var ph: float = r[0]
+		var k: float = r[1]
+		for j in m:
+			var th := TAU * float(j) / float(m)
+			P.append(c + Vector3(EYE_R.x * k * sin(ph) * sin(th), EYE_R.y * k * cos(ph), -EYE_R.z * k * sin(ph) * cos(th)))
+	_grid(sm, P, rows.size(), m, Transform3D.IDENTITY, col)
+
+
+## Ceja gruesa de plastilina, un poco caída hacia afuera (pieza propia: sube, baja e inclina).
+func _geo_brow(ex: float, ez: float, sx: float) -> void:
 	var brow := PackedVector3Array()
 	for i in 4:
 		var t := float(i) / 3.0
 		var bx: float = ex * 1.08 + sx * lerpf(-0.02, 0.022, t)
 		brow.append(Vector3(bx, EYE_Y + 0.04 + 0.005 * sin(t * PI) - 0.007 * t, ez - 0.012))
-	_tube(hair_m, brow, [0.0075, 0.0085, 0.0075, 0.005], 0.005, 6, up_f, _c(C_HAIR * 0.8))
+	_tube(_hair(), brow, [0.0075, 0.0085, 0.0075, 0.005], 0.005, 6, Vector3(0, 0, -1), _c(C_HAIR * 0.8))
+
+
+## Cara por pasos (stop-motion). blink: 0 abierto, 1 entrecerrado, 2 cerrado.
+## gaze: x = hacia +x de la cabeza, y = arriba (radianes, ±0.3 es mucho). brow_*: −1 baja … +1 sube.
+func set_face(blink: int, gaze := Vector2.ZERO, brow_l := 0.0, brow_r := 0.0) -> void:
+	if _pieces.is_empty():
+		return
+	var rx: float = [0.0, -0.55, -1.2][clampi(blink, 0, 2)]
+	for sfx in ["l", "r"]:
+		(_pieces["lid_" + sfx] as Node3D).rotation = Vector3(rx, 0.0, 0.0)
+		(_pieces["eye_" + sfx] as Node3D).rotation = Vector3(gaze.y, -gaze.x, 0.0)
+		var b: Node3D = _pieces["brow_" + sfx]
+		var v: float = brow_l if sfx == "l" else brow_r
+		b.position = (b.get_meta("base_pos") as Vector3) + Vector3(0.0, v * 0.007 * CLAY_HEAD_K, 0.0)
+		b.rotation = Vector3(0.0, 0.0, v * 0.25 * (1.0 if sfx == "l" else -1.0))
+
+
+## Oreja de arcilla: concha, hélix, antihélix y lóbulo (alrededor de eo; ek = escala; sx = lado).
+func _clay_ear(skin_m: Material, eo: Vector3, sx: float, ek: float, skin: Color) -> void:
+	var rot := Vector3(0.0, -0.5 * sx, 0.14 * sx)
+	var ec := eo + Vector3(0.006 * sx, 0, 0)
+	_ellip(skin_m, ec, Vector3(0.0105, 0.04, 0.028) * ek, skin, rot, 12, 7)
+	# hélix: aro que sube por delante, rodea la parte alta y cae por detrás
+	var helix := PackedVector3Array()
+	for i in 9:
+		var t := lerpf(deg_to_rad(215.0), deg_to_rad(-35.0), float(i) / 8.0)
+		helix.append(eo + Vector3(0.0105 * sx, 0.0, 0.0) + Vector3(0.0, sin(t) * 0.037, cos(t) * 0.025 - 0.001) * ek)
+	_tube(skin_m, helix, 0.0048 * ek, 0.0048 * ek, 6, Vector3(sx, 0, 0), skin)
+	# antihélix: arco interior más corto
+	var anti := PackedVector3Array()
+	for i in 6:
+		var t := lerpf(deg_to_rad(200.0), deg_to_rad(-10.0), float(i) / 5.0)
+		anti.append(eo + Vector3(0.0092 * sx, 0.004, 0.0) + Vector3(0.0, sin(t) * 0.022, cos(t) * 0.014) * ek)
+	_tube(skin_m, anti, 0.0032 * ek, 0.0032 * ek, 5, Vector3(sx, 0, 0), skin)
+	# concha: hueco oscuro al centro
+	_ellip(skin_m, eo + Vector3(0.0105 * sx, 0.002, 0.0015), Vector3(0.0035, 0.011, 0.008) * ek, skin.darkened(0.28), rot, 8, 5)
+	# lóbulo
+	_ellip(skin_m, eo + Vector3(0.0075 * sx, -0.039 * ek, 0.007), Vector3(0.0072, 0.0095, 0.0095) * ek, skin, Vector3.ZERO, 8, 5)
 
 
 ## Bufanda tejida a rayas verde/blanco: una vuelta al cuello y dos puntas que cuelgan por delante.

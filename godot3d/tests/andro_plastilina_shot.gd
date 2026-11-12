@@ -29,7 +29,9 @@ func _initialize() -> void:
 	root.add_child(m)
 	var yaw := 0.0
 	match view:
-		"side": yaw = -PI * 0.5
+		"side", "hperfil": yaw = -PI * 0.5
+		"hperfil2": yaw = PI * 0.5
+		"h34": yaw = deg_to_rad(-45.0)
 		"back": yaw = PI
 		_: yaw = deg_to_rad(20.0) if view == "face" or view == "close" else 0.0
 	m.rotation.y = yaw + PI
@@ -39,6 +41,10 @@ func _initialize() -> void:
 	cam.far = 2400.0
 	root.add_child(cam)
 	match view:
+		"hperfil", "hperfil2", "h34":
+			cam.fov = 30.0
+			cam.position = Vector3(0, 1.84, 1.5)
+			cam.look_at(Vector3(0, 1.84, 0))
 		"face":
 			cam.fov = 35.0
 			cam.position = Vector3(0, 1.80, 1.5)
@@ -52,7 +58,15 @@ func _initialize() -> void:
 			cam.position = Vector3(0, 1.1, 5.0)
 			cam.look_at(Vector3(0, 1.0, 0))
 	cam.make_current()
-	for i in 60:
+	for i in 8:
+		await process_frame
+	# Cara por pasos para las capturas: ANDRO_BLINK=0|1|2, ANDRO_GAZE="x,y" (rad), ANDRO_BROW="izq,der" (-1..1)
+	var gz := OS.get_environment("ANDRO_GAZE").split(",")
+	var br := OS.get_environment("ANDRO_BROW").split(",")
+	m.set_face(int(OS.get_environment("ANDRO_BLINK")),
+		Vector2(float(gz[0]), float(gz[1])) if gz.size() == 2 else Vector2.ZERO,
+		float(br[0]) if br.size() == 2 else 0.0, float(br[1]) if br.size() == 2 else 0.0)
+	for i in 52:
 		await process_frame
 	root.get_viewport().get_texture().get_image().save_png(out)
 	print("SHOT_OK ", out)

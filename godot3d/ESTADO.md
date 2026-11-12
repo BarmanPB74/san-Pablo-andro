@@ -19,7 +19,14 @@ Plan gráfico anterior (fases 1-5): `PLAN_GRAFICOS.md`. El plan vigente está en
 - Rendimiento medido en el editor del teléfono: ~51 FPS en el parque, ~78 FPS en la calle.
 - Sin APK todavía (a propósito): se juega desde el editor de Godot en el teléfono.
 
-## Última sesión (12 nov 2026) — Rediseño de Andro, F1 (luz y material) y F2 (cabeza y cara)
+## Última sesión (12 nov 2026) — Rediseño de Andro, F3 (nariz y orejas) y F4 (ojos, párpados, cejas)
+- F3: nariz con proyección real en perfil (punta redonda y levantada, fosas nasales); orejas grandes con concha, hélix y lóbulo, la izquierda algo mayor.
+- F4: ojo, párpado y ceja son 6 piezas hijas de `head` (`eye_l/r`, `lid_l/r`, `brow_l/r`). `PlayerModel.set_face(blink 0|1|2, gaze, brow_l, brow_r)` da parpadeo de 3 poses,
+  mirada y cejas; todavía no se llama desde `animate` (F10). Párpado pesado, iris oscuro y un solo brillo.
+- Tris: 19 364 (+1 136 vs F2); se revisa en F11. Nuevo `tests/andro_face_test.gd`; los 4 tests dan PASS. Capturas: `docs/andro/shots/F3_*`, `F4_*`.
+- Pendiente: el pelo actual tapa la oreja izquierda (F6); confirmar el aspecto en el teléfono. Siguiente: F5 (boca).
+
+## Sesión anterior (12 nov 2026) — Rediseño de Andro, F1 (luz y material) y F2 (cabeza y cara)
 - F1: rugosidad piel/tela 0.80 y ojos 0.25; albedos recalibrados midiendo capturas (piel ≈ #C9ADA5, abrigo ≈ #22152A, pelo y ojeras con lectura de material).
   Corregida la regla "hex de la lámina = albedo": el hex es el color renderizado. Modo `estudio` en `tests/andro_plastilina_shot.gd`
   (luna morada, farol ámbar sin sombra, niebla de profundidad). El preset global NO se tocó.
