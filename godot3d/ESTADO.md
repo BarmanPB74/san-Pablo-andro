@@ -19,7 +19,14 @@ Plan gráfico anterior (fases 1-5): `PLAN_GRAFICOS.md`. El plan vigente está en
 - Rendimiento medido en el editor del teléfono: ~51 FPS en el parque, ~78 FPS en la calle.
 - Sin APK todavía (a propósito): se juega desde el editor de Godot en el teléfono.
 
-## Última sesión (12 nov 2026) — Rediseño de Andro, F5 (boca), F6 (pelo) y F7 (bufanda)
+## Última sesión (12 nov 2026) — Rediseño de Andro, F8 (abrigo, chaleco, manos) según el video 68105
+- Nueva referencia principal: video 68105 de Pablo (fotogramas en `docs/andro/shots/REF_video68105_*.jpg`, lectura en `ANDRO_CONTEXTO.md` §2).
+- Abrigo gris carbón neutro a medio muslo: faldones `coat_l/r` hijos de `hips` que siguen al muslo (sin atravesar piernas); chaleco café, 6 botones negros,
+  bolsillos con solapa, solapas cortas, cuello alto negro. Manos más grandes y de dedos gruesos. Bandolera apagada (`SATCHEL_ON = false`).
+- Tris 20 048. Tests PASS (5). Capturas `docs/andro/shots/F8_*`.
+- Pendiente con Pablo: el pelo del video es un bloque plano (no el 044-B con púas) y la bufanda es más verde. Siguiente: F9.
+
+## Sesión anterior (12 nov 2026) — Rediseño de Andro, F5 (boca), F6 (pelo) y F7 (bufanda)
 - F5: 5 bocas como piezas cacheadas (`set_mouth(1..5)`: neutro, asombrado, triste, hablando, tenso).
 - F6: el pelo es la pieza `hair` con 4 variantes (`set_hair_variant(0..3)`: clásico, viento, mojado, caótico); 3 capas, remolino, volumen asimétrico, sin tapar las orejas.
 - F7: bufanda con rayas irregulares, nudo y 2 colas con cadena de pivotes que reaccionan a aceleración y giro (`_update_cloth` en `animate`); 4 variantes (`set_scarf_variant(0..3)`).

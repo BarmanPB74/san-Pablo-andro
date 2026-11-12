@@ -46,7 +46,7 @@ static var C_LIP := Color(0.52, 0.32, 0.27)
 static var SKIN_TONE := Color(0.76, 0.62, 0.52)  # piel clara, algo pálida (en plastilina: beige mate)
 # Modo plastilina (ClayStyle.enabled): cabeza y manos grandes, ojos saltones, bufanda tejida a rayas.
 const CLAY_HEAD_K := 1.6
-const CLAY_HAND_K := 1.22
+const CLAY_HAND_K := 1.28
 # Paleta de plastilina = la del adaptador "arcilla gótica" (character/gothic_clay_adapter.gd)
 const C_CLAY_SKIN := Color(0.64, 0.62, 0.59)   # arcilla pálida "blanco sucio/hueso" (lámina)
 const C_CLAY_EYE := GothicClayAdapter.EYE
@@ -56,6 +56,8 @@ static var C_SUIT_LAPEL := Color(0.035, 0.035, 0.042)
 static var C_SHIRT := Color(0.86, 0.86, 0.83)
 static var C_TROUSER := Color(0.06, 0.06, 0.068)
 static var C_BUTTON := Color(0.03, 0.03, 0.035)
+static var C_VEST := Color(0.86, 0.86, 0.83)     # chaleco café que asoma en la abertura del abrigo (F8)
+const SATCHEL_ON := false      # F8: el video 68105 no lleva bandolera (true la devuelve)
 static var C_DRESS_SHOE := Color(0.035, 0.035, 0.04)
 const BEARD_ON := false         # barba (cáscara de pelo); el concepto actual va afeitado
 const ARM_K := 1.1              # brazos 10 % más largos
@@ -141,11 +143,13 @@ func _build() -> void:
 	SKIN_TONE = C_CLAY_SKIN if clay else Color(0.76, 0.62, 0.52)
 	# Arcilla gótica (láminas de referencia de Pablo): saco ciruela-carbón CERRADO (sin camisa a la vista),
 	# pantalón más oscuro, pelo café-ciruela en mechones gruesos, zapatos gris-café, labios apagados.
-	C_SUIT = Color(0.31, 0.29, 0.29) if clay else Color(0.06, 0.06, 0.068)
-	C_SUIT_LAPEL = Color(0.24, 0.20, 0.21) if clay else Color(0.035, 0.035, 0.042)
-	C_TROUSER = Color(0.22, 0.20, 0.21) if clay else Color(0.06, 0.06, 0.068)
+	# F8 (video 68105): abrigo gris carbón neutro (algo amarillo en albedo para compensar la luz morada), chaleco café oscuro, botones negros, pantalón casi negro
+	C_SUIT = Color(0.30, 0.30, 0.245) if clay else Color(0.06, 0.06, 0.068)
+	C_SUIT_LAPEL = Color(0.225, 0.225, 0.185) if clay else Color(0.035, 0.035, 0.042)
+	C_TROUSER = Color(0.2, 0.2, 0.16) if clay else Color(0.06, 0.06, 0.068)
 	C_SHIRT = C_SUIT if clay else Color(0.86, 0.86, 0.83)
-	C_BUTTON = Color(0.36, 0.25, 0.2) if clay else Color(0.03, 0.03, 0.035)   # botones de arcilla café
+	C_VEST = Color(0.34, 0.31, 0.2) if clay else C_SHIRT
+	C_BUTTON = Color(0.11, 0.11, 0.11) if clay else Color(0.03, 0.03, 0.035)   # botones negros pequeños
 	C_HAIR = Color(0.27, 0.25, 0.25) if clay else Color(0.045, 0.035, 0.03)
 	C_DRESS_SHOE = Color(0.3, 0.22, 0.17) if clay else Color(0.035, 0.035, 0.04)  # botines de cuero café
 	C_LIP = Color(0.42, 0.2, 0.2) if clay else Color(0.52, 0.32, 0.27)          # rojo apagado (labio inferior)
@@ -685,26 +689,50 @@ func _geo_chest() -> void:
 	var csuit := _c(C_SUIT)
 	var cl := _c(C_SUIT_LAPEL)
 	var cw := _c(C_SHIRT)
+	var cv := _c(C_VEST)
 	var cb := _c(C_BUTTON)
+	var clay := ClayStyle.enabled
 	# Semiancho de la abertura (V) en cada altura: ancha arriba, estrecha abajo
 	var hw := func(y: float) -> float:
+		if clay:    # F8: franja estrecha de chaleco hasta la cintura
+			return 0.034 + 0.03 * clampf((y + 0.05) / 0.33, 0.0, 1.0)
 		return 0.03 + 0.04 * clampf((y + 0.1) / 0.38, 0.0, 1.0) if y > -0.1 else 0.03
+	var y_open := -0.24 if clay else -0.29
 	_loft(tw, rings, 26, Transform3D.IDENTITY, func(p: Vector3) -> Color:
-		if p.z < -0.02 and p.y > -0.29 and absf(p.x) < hw.call(p.y):
+		if not clay and p.z < -0.02 and p.y > y_open and absf(p.x) < hw.call(p.y):
 			return cw
 		return csuit)
 	var up_f := Vector3(0, 0, -1)
+	if clay:    # F8: chaleco como pieza sobre el pecho (bordes nítidos) y cantos del abrigo a cada lado
+		var vp := PackedVector3Array()
+		var vw: Array = []
+		for i in 8:
+			var y := lerpf(0.255, y_open, float(i) / 7.0)
+			vp.append(_on_surf(keys, 0.0, y, true, 0.0015))
+			vw.append(float(hw.call(y)))
+		_tube(tw, vp, vw, 0.004, 10, up_f, cv, true, 6.0)
+		for sx in [-1.0, 1.0]:
+			var ep := PackedVector3Array()
+			for i in 8:
+				var y := lerpf(0.2, y_open - 0.06, float(i) / 7.0)
+				ep.append(_on_surf(keys, sx * float(hw.call(y)), y, true, 0.003))
+			_tube(tw, ep, 0.009, 0.005, 6, up_f, csuit)
 	# Solapas: siguen los bordes de la V desde el cuello hasta la cintura
 	for sx in [-1.0, 1.0]:
 		var pts := PackedVector3Array()
+		var y_lap := 0.12 if clay else -0.1     # F8: solapa corta (video 68105)
 		for i in 7:
-			var y := lerpf(0.275, -0.1, float(i) / 6.0)
+			var y := lerpf(0.275, y_lap, float(i) / 6.0)
 			var x: float = sx * (float(hw.call(y)) + 0.012 * (1.0 - float(i) / 6.0))
 			pts.append(_on_surf(keys, x, y, true, 0.004))
 		_tube(tw, pts, [0.012, 0.022, 0.026, 0.024, 0.02, 0.014, 0.008], 0.007, 6, up_f, cl)
-		# Bolsillo con solapa en la cadera
-		_tube(tw, _surf_path(keys, Vector2(0.075 * sx, -0.11), Vector2(0.16 * sx, -0.115), true, 0.003, 4),
-			0.006, 0.004, 5, up_f, cl)
+		if not clay:    # bolsillo con solapa en la cadera (en arcilla va en los faldones)
+			_tube(tw, _surf_path(keys, Vector2(0.075 * sx, -0.11), Vector2(0.16 * sx, -0.115), true, 0.003, 4),
+				0.006, 0.004, 5, up_f, cl)
+		elif sx > 0.0:  # botonadura: borde derecho de la abertura (a la izquierda de quien mira)
+			for y in [0.1, -0.03, -0.155, -0.28]:
+				var bx: float = float(hw.call(y)) + 0.009
+				_ellip(tw, _on_surf(keys, bx, y, true, 0.004), Vector3(0.0085, 0.0085, 0.0038), cb, Vector3.ZERO, 8, 4)
 	# Bolsillito de pecho (ribete)
 	_tube(tw, _surf_path(keys, Vector2(-0.14, 0.14), Vector2(-0.085, 0.145), true, 0.003, 4), 0.004, 0.003, 5, up_f, cl)
 	# Cuello del saco por detrás y a los lados
@@ -714,10 +742,10 @@ func _geo_chest() -> void:
 		var rr := 0.083
 		coll.append(Vector3(sin(ang) * rr, 0.262, cos(ang) * (rr + 0.004) + 0.004))
 	_tube(tw, coll, 0.018, 0.016, 6, Vector3(0, 1, 0), cl)
-	# Botones de la camisa y cuello blanco
-	for i in 5:
-		var y := lerpf(0.235, -0.14, float(i) / 4.0)
-		_ellip(tw, _on_surf(keys, 0.0, y, true, 0.003), Vector3(0.0045, 0.0045, 0.0025), cb, Vector3.ZERO, 8, 4)
+	# Botones de la camisa (o del chaleco) y cuello
+	for i in (3 if clay else 5):
+		var y := lerpf(0.2 if clay else 0.235, -0.14, float(i) / (2.0 if clay else 4.0))
+		_ellip(tw, _on_surf(keys, 0.0, y, true, 0.003), Vector3(0.0045, 0.0045, 0.0025), cv.darkened(0.45) if clay else cb, Vector3.ZERO, 8, 4)
 	var collar := [
 		_r(0.252, 0.0, 0.0, 0.0),
 		_rr(0.255, 0.066, 0.064, 0.068, 0.004, 2.2),
@@ -725,7 +753,7 @@ func _geo_chest() -> void:
 		_rr(0.296, 0.058, 0.057, 0.06, 0.002, 2.1),
 		_rr(0.3, 0.056, 0.055, 0.058, 0.002, 2.0),
 		_r(0.301, 0.0, 0.0, 0.002)]
-	_loft(tw, collar, 18, Transform3D.IDENTITY, cw)
+	_loft(tw, collar, 18, Transform3D.IDENTITY, _c(C_TROUSER) if clay else cw)    # cuello alto negro en arcilla
 	if ClayStyle.enabled:
 		_clay_scarf(keys)
 		_clay_satchel(keys)
@@ -1046,9 +1074,9 @@ func _geo_forearm(_sx: float) -> void:
 		_r(-0.24, 0.0, 0.0),
 	], ARM_K, 0.8, 0.82)
 	var cs := _c(C_SUIT)
-	var cw := _c(C_SHIRT)
+	var cw := _c(C_SUIT_LAPEL) if ClayStyle.enabled else _c(C_SHIRT)
 	_loft(_twill(), rings, 14, Transform3D.IDENTITY, func(p: Vector3) -> Color:
-		return cw if p.y < -0.232 * ARM_K else cs)
+		return cw if p.y < (-0.205 if ClayStyle.enabled else -0.232) * ARM_K else cs)
 
 
 func _geo_hand(sx: float) -> void:
@@ -1070,8 +1098,9 @@ func _geo_hand(sx: float) -> void:
 	_loft(skin_m, palm, 12, Transform3D.IDENTITY, skin)
 	# Dedos largos y delgados, algo curvados
 	var fz := [-0.028, -0.009, 0.009, 0.027]
-	var fl := [0.074, 0.082, 0.076, 0.062]
-	var fr := [0.0078, 0.008, 0.0076, 0.0066]
+	var clay_h := ClayStyle.enabled
+	var fl := [0.066, 0.072, 0.068, 0.056] if clay_h else [0.074, 0.082, 0.076, 0.062]
+	var fr := [0.0104, 0.0108, 0.0104, 0.0094] if clay_h else [0.0078, 0.008, 0.0076, 0.0066]
 	for i in 4:
 		var L: float = fl[i]
 		var z: float = fz[i]
@@ -1083,7 +1112,8 @@ func _geo_hand(sx: float) -> void:
 	var t1 := Vector3(-sx * 0.02, -0.045, -0.044)
 	var t2 := Vector3(-sx * 0.026, -0.068, -0.05)
 	var t3 := Vector3(-sx * 0.028, -0.082, -0.048)
-	_tube(skin_m, PackedVector3Array([t0, t1, t2, t3]), [0.011, 0.0105, 0.0095, 0.0082], 0.0098, 6, Vector3(sx, 0, 0), skin)
+	var tk := 1.25 if ClayStyle.enabled else 1.0
+	_tube(skin_m, PackedVector3Array([t0, t1, t2, t3]), [0.011 * tk, 0.0105 * tk, 0.0095 * tk, 0.0082 * tk], 0.0098 * tk, 6, Vector3(sx, 0, 0), skin)
 
 
 # ---------------------------------------------------------------------
@@ -1693,6 +1723,7 @@ func _build_face_pieces() -> void:
 	_mouth = 1
 	set_hair_variant(0)
 	_build_scarf_tails(0)
+	_build_coat_skirt()
 
 
 ## Globo ocular: esclerótica gris-blanca, iris oscuro, pupila y UN solo brillo (esfera de plástico sin vida).
@@ -1911,9 +1942,89 @@ func get_scarf_variant() -> int:
 	return _scarf_variant
 
 
+## Faldones del abrigo (F8, video 68105): el abrigo baja a medio muslo. Dos mitades (izquierda/derecha) hijas de
+## `hips` que giran en la cadera siguiendo a su muslo (sin atravesar las piernas al caminar). Cada mitad es una
+## concha con grosor: va por fuera de adelante hacia atrás y vuelve por dentro; el dobladillo queda cerrado.
+const SKIRT_ROWS := [    # [y en hips, semiancho, fondo adelante, fondo atrás]
+	[0.05, 0.154, 0.108, 0.109],      # dentro del saco
+	[0.022, 0.164, 0.12, 0.121],      # costura de cintura: el faldón monta por fuera del saco
+	[0.0, 0.165, 0.12, 0.121],
+	[-0.1, 0.167, 0.119, 0.122],
+	[-0.2, 0.173, 0.121, 0.125],
+	[-0.27, 0.177, 0.122, 0.127],
+	[-0.3, 0.178, 0.122, 0.127],
+]
+const SKIRT_PIVOT := Vector3(0.0, -0.04, 0.0)
+
+static func _skirt_pt(row: Array, ang: float, sx: float, inset: float, k := 1.0) -> Vector3:
+	var sn := sin(ang)
+	var cs := cos(ang)
+	var e := 2.0 / 2.6     # mismo exponente que los anillos del saco (_blazer_rings)
+	var a: float = float(row[1]) * k - inset
+	var b: float = (float(row[2]) if cs > 0.0 else float(row[3])) * k - inset
+	return Vector3(sx * a * signf(sn) * pow(absf(sn), e), float(row[0]), -b * signf(cs) * pow(absf(cs), e))
+
+
+func _geo_coat_skirt(sx: float) -> void:
+	var tw := _twill()
+	var cs := _c(C_SUIT)
+	var cl := _c(C_SUIT_LAPEL)
+	var cb := _c(C_BUTTON)
+	var k := 1.02 if sx > 0.0 else 1.0           # la mitad derecha monta sobre la izquierda al frente
+	var a0 := -0.16 if sx > 0.0 else 0.0
+	var a1 := PI - 0.025                          # abertura trasera
+	var K := 12
+	var th := 0.008
+	var P := PackedVector3Array()
+	var rows: Array = [SKIRT_ROWS[0]] + SKIRT_ROWS + [SKIRT_ROWS[SKIRT_ROWS.size() - 1]]
+	for i in rows.size():
+		var cap := i == 0 or i == rows.size() - 1
+		for j in K:
+			P.append(_skirt_pt(rows[i], lerpf(a0, a1, float(j) / float(K - 1)), sx, th * 0.5 if cap else 0.0, k))
+		for j in K:
+			P.append(_skirt_pt(rows[i], lerpf(a1, a0, float(j) / float(K - 1)), sx, th * 0.5 if cap else th, k))
+	var hem_y: float = float(SKIRT_ROWS[SKIRT_ROWS.size() - 1][0])
+	_grid(tw, P, rows.size(), K * 2, Transform3D.IDENTITY, func(p: Vector3) -> Color:
+		return cs.lerp(cl, 0.5 * smoothstep(hem_y + 0.03, hem_y, p.y)))   # dobladillo gastado
+	# bolsillo con solapa
+	var r_p: Array = SKIRT_ROWS[3]
+	var flap := PackedVector3Array()
+	for j in 5:
+		var q := _skirt_pt(r_p, lerpf(0.42, 0.98, float(j) / 4.0), sx, -0.004, k)
+		flap.append(q + Vector3(0, 0.004, 0))
+	_tube(tw, flap, 0.016, 0.006, 6, Vector3(0, 1, 0), cl)
+	# botones que siguen la botonadura del pecho (solo en la mitad derecha)
+	if sx > 0.0:
+		for y in [-0.12, -0.24]:
+			var row := [y, 0.0, 0.0, 0.0]
+			for ri in SKIRT_ROWS.size() - 1:
+				var r0: Array = SKIRT_ROWS[ri]
+				var r1: Array = SKIRT_ROWS[ri + 1]
+				if y <= float(r0[0]) and y >= float(r1[0]):
+					var t: float = (float(r0[0]) - y) / (float(r0[0]) - float(r1[0]))
+					row = [y, lerpf(r0[1], r1[1], t), lerpf(r0[2], r1[2], t), lerpf(r0[3], r1[3], t)]
+			var bp := _skirt_pt(row, asin(0.038 / float(row[1])), sx, -0.003, k)
+			_ellip(tw, bp, Vector3(0.0085, 0.0085, 0.0038), cb, Vector3.ZERO, 8, 4)
+
+
+func _build_coat_skirt() -> void:
+	for side in [-1, 1]:
+		var sfx := "l" if side < 0 else "r"
+		_dress_piece("coat_" + sfx, SKIRT_PIVOT, _geo_coat_skirt.bind(float(side)), hips, 1.0)
+
+
 ## Inercia de las colas: la bufanda es más lenta que el pelo. Se separan del pecho al acelerar, frenar o correr
 ## y se balancean hacia los lados al girar. Cada segmento aporta un poco; la cadena se curva sola.
 func _update_cloth(speed: float, delta: float) -> void:
+	# faldones: siguen a su muslo (un poco menos) y se abren un poco al correr
+	var kc := 1.0 - exp(-14.0 * delta)
+	for sfx in ["l", "r"]:
+		var cp: Node3D = _pieces.get("coat_" + sfx)
+		if cp != null:
+			var th: Node3D = _joints["thigh_" + sfx]
+			var tx := clampf(th.rotation.x * 0.62, -0.95, 0.5)
+			cp.rotation.x = lerpf(cp.rotation.x, tx, kc)
+			cp.rotation.z = lerpf(cp.rotation.z, (0.05 if sfx == "r" else -0.05) * clampf(speed / 6.0, 0.0, 1.0), kc)
 	if _scarf_chain.is_empty():
 		return
 	var run := clampf(speed / 6.0, 0.0, 1.0)
@@ -1939,9 +2050,13 @@ func _clay_satchel(keys: Array) -> void:
 	var cbag := _c(Color(0.36, 0.25, 0.2))
 	var cflap := _c(Color(0.28, 0.19, 0.14))
 	var cmetal := _c(Color(0.43, 0.36, 0.31))
-	for front in [true, false]:
+	for front in ([true, false] if SATCHEL_ON else []):
 		var path := _surf_path(keys, Vector2(0.12, 0.25), Vector2(-0.165, -0.25), front, 0.008, 14)
 		_tube(lm, path, 0.016, 0.006, 6, Vector3(0, 0, -1.0 if front else 1.0), cs, false, 3.0)
+	if not SATCHEL_ON:
+		_tube(tw, _surf_path(keys, Vector2(-0.135, 0.12), Vector2(-0.085, 0.123), true, 0.006, 4), 0.005, 0.003, 5,
+			Vector3(0, 0, -1), _c(Color(0.62, 0.42, 0.18)))
+		return
 	# remate de la correa sobre el hombro
 	_tube(lm, PackedVector3Array([_on_surf(keys, 0.12, 0.25, true, 0.008), Vector3(0.125, 0.285, 0.0),
 		_on_surf(keys, 0.12, 0.25, false, 0.008)]), 0.016, 0.006, 6, Vector3(1, 0, 0), cs, false, 3.0)

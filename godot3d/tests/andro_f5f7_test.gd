@@ -1,5 +1,5 @@
 extends SceneTree
-## F5–F7: bocas M1–M5, variantes de pelo, bufanda con colas encadenadas.
+## F5–F8: bocas M1–M5, variantes de pelo, bufanda con colas encadenadas, faldones del abrigo.
 ## Uso: godot --headless -s res://tests/andro_f5f7_test.gd   → imprime RESULT: PASS/FAIL
 
 func _initialize() -> void:
@@ -55,5 +55,13 @@ func _initialize() -> void:
 	print("tris bufanda: clásica ", before, " · flecos largos ", fr, " · corta ", m.triangle_count())
 	ok = ok and fr > before and m.find_child("scarf_a1", true, false) != null
 	m.set_scarf_variant(0)
+	# F8: faldones del abrigo hijos de hips que siguen a su muslo
+	var cl := m.hips.get_node_or_null("coat_l") as Node3D
+	var cr := m.hips.get_node_or_null("coat_r") as Node3D
+	ok = ok and cl != null and cr != null
+	if cl != null:
+		m.snap_pose("run", 5.0, 1.6)
+		print("faldón izq rot.x=%.2f (muslo %.2f) · der %.2f (muslo %.2f)" % [cl.rotation.x, m.thigh_l.rotation.x, cr.rotation.x, m.thigh_r.rotation.x])
+		ok = ok and signf(cl.rotation.x) == signf(m.thigh_l.rotation.x) and absf(cl.rotation.x) <= absf(m.thigh_l.rotation.x) + 0.01
 	print("RESULT: ", "PASS" if ok else "FAIL")
 	quit(0 if ok else 1)

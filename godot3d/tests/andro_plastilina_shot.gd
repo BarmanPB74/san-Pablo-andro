@@ -34,15 +34,26 @@ func _initialize() -> void:
 		"hback": yaw = PI
 		"h34": yaw = deg_to_rad(-45.0)
 		"back": yaw = PI
-		"bufanda": yaw = deg_to_rad(20.0)
+		"bufanda", "torso": yaw = deg_to_rad(20.0)
+		"torso_back": yaw = PI + deg_to_rad(20.0)
 		_: yaw = deg_to_rad(20.0) if view == "face" or view == "close" else 0.0
 	m.rotation.y = yaw + PI
-	m.snap_pose("idle", 0.0, 0.0)
+	# Pose: ANDRO_POSE="estado,velocidad,fase" (p. ej. "run,5.0,1.2"); por defecto idle
+	await process_frame     # _ready de PlayerModel (construye pivotes) antes de posar
+	var ps := OS.get_environment("ANDRO_POSE").split(",")
+	if ps.size() == 3:
+		m.snap_pose(ps[0], float(ps[1]), float(ps[2]))
+	else:
+		m.snap_pose("idle", 0.0, 0.0)
 	root.add_child(ClayStyle.new())
 	var cam := Camera3D.new()
 	cam.far = 2400.0
 	root.add_child(cam)
 	match view:
+		"torso", "torso_back":
+			cam.fov = 34.0
+			cam.position = Vector3(0, 1.3, 2.3)
+			cam.look_at(Vector3(0, 1.22, 0))
 		"bufanda":
 			cam.fov = 30.0
 			cam.position = Vector3(0, 1.5, 1.7)

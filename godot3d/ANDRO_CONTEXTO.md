@@ -1,6 +1,6 @@
 # ANDRO_CONTEXTO — Rediseño del personaje (arcilla gótica / stop-motion)
 
-Versión 2.3 · 12-nov-2026 · F0 a F7 hechas · Rama `fase-3d-godot` · Godot 4.3 · renderer Mobile
+Versión 2.4 · 12-nov-2026 · F0 a F8 hechas · nueva referencia: video 68105 · Rama `fase-3d-godot` · Godot 4.3 · renderer Mobile
 Alcance: SOLO Andro (`godot3d/character/`) y su movimiento. Nada del mapa, vehículos ni UI.
 
 > Antes de empezar: leer `ESTADO.md` y `CONTRACT.md` (reglas del proyecto). De este documento, leer §0–§3 y §9 siempre, y de §8 solo la fase activa. Así cada sesión sale barata en tokens.
@@ -66,6 +66,7 @@ El pelo, la bufanda y el bolso NO son nodos propios: están horneados dentro de 
 
 | Archivo | Qué es | Autoridad para |
 |---|---|---|
+| **68105.mp4** (12-nov, 10 s) | **Video de Pablo: "cómo debe quedar el personaje"**. Andro en arcilla caminando, saltando un muro y hablando a cámara en un parque gótico de noche. Fotogramas en `docs/andro/shots/REF_video68105_*.jpg` | **Todo el personaje** (manda sobre las láminas) |
 | 68017.jpg | Hoja "Rediseño de cabello gótico despeinado (Asset #044-B)" | Cabello: forma, capas, 4 variantes, paleta, medidas |
 | 68015.jpg | Hoja "Bufanda gótica (Asset #042)" | Bufanda: nudo, rayas, variantes, paleta |
 | 68014.jpg | Hoja "Rostro y expresión (arcilla gótica)" | Cráneo/cara, orejas, ojos, cejas, 5 bocas, paleta de rostro |
@@ -74,14 +75,23 @@ El pelo, la bufanda y el bolso NO son nodos propios: están horneados dentro de 
 
 Capturas base de F0 (en `docs/andro/shots/`): `F0_plast_face.jpg`, `F0_plast_full.jpg` (luz plastilina), `F0_lineup.jpg` y `F0_luzprueba_face.jpg` (luz de prueba del portrait). Todas con GL Compatibility/llvmpipe: sirven de guía, no son idénticas al teléfono (Mobile/Vulkan, HDR).
 
-**Prioridad si hay conflicto**: 1) lo que diga Pablo en el chat → 2) la hoja específica de la parte → 3) el turnaround 68009 → 4) el estado actual del código.
+**Prioridad si hay conflicto**: 1) lo que diga Pablo en el chat → 2) el video 68105 → 3) la hoja específica de la parte → 4) el turnaround 68009 → 5) el estado actual del código.
+
+**Lo que muestra el video 68105 (leído en F8)**
+- Abrigo gris carbón neutro casi negro (nada de morado), largo a medio muslo, una fila de ~6 botones negros pequeños, solapas cortas, 2 bolsillos con solapa abajo, ribete ocre en el pecho. Debajo, chaleco/camisa café oscuro en una franja estrecha y cuello alto negro. → **Hecho en F8.**
+- Manos grandes y pálidas de dedos gruesos tipo plastilina. → **Hecho en F8** (más gruesas; se pueden engordar más).
+- Sin bandolera ni bolso. → **F8 la apaga** (`SATCHEL_ON = false`).
+- **Pelo distinto al #044-B**: bloque plano y cuadrado de arcilla oscura con surcos de dedo arriba (tipo "copete aplanado"), sin púas. → pendiente: decidir con Pablo si reemplaza al 044-B (F6 bis).
+- **Bufanda**: verde más vivo (≈ #3F7A3A) con rayas blancas anchas y regulares, flecos verdes; más saturada que la lámina 042. → pendiente: recalibrar (F7 bis).
+- Cara: ojos grandes redondos con iris gris verdoso claro y pupila pequeña, ojeras marcadas, cejas gruesas y oscuras, nariz larga, boca pequeña. Orejas medianas (más pequeñas que las de F3). → revisar en una pasada de cara.
+- Proporción: cabeza grande (≈ 3.5 cabezas de alto), cuello largo y fino, piernas delgadas, zapatos negros. → F9.
 
 **Erratas y decisiones**
 - Las hojas son imágenes generadas con textos errados ("Un rocurcos…", "scoplamiento", "armaturo"…). Se ignora todo texto ilegible.
 - Cabello: **decidido por Pablo (12-nov): el #044-B reemplaza al peinado anterior.** Ya está implementado en `_clay_hair` (no hace falta `Hair_Legacy`).
 - Medidas de la hoja 044-B: ancho 5.2 cm (dos veces) vs 5.6 cm (recuadro). Se usa 5.2.
 - Las medidas en cm son de la maqueta física. En Godot se usan proporciones: bloque de pelo ≈ 1.0 ancho · 0.92 alto · 1.06 fondo; bufanda ≈ 0.67 de ancho y 3.5 de largo desplegado, en unidades de "ancho de cabeza con pelo".
-- La bandolera con bolso (lámina #043, sesión anterior) no sale en 68009. Se mantiene.
+- La bandolera con bolso (lámina #043, sesión anterior) no sale en 68009 ni en el video 68105: desde F8 está apagada (`SATCHEL_ON = false` en `player_model.gd`).
 
 ---
 
@@ -277,7 +287,7 @@ Resultado en §1, §3 y §9.1.
 - Hacer: §4.6 (nudo, color, colas con pivotes).
 - Aceptación: colores #2B452B / #B2ACA0 en pantalla, colas con retraso en giros y aceleración.
 
-### F8 · Abrigo, camisa, torso, brazos y manos
+### F8 · Abrigo, camisa, torso, brazos y manos — HECHA (ver §9.1)
 - Hacer: §4.7. Aceptación: abrigo negro con tela visible, solapas, botones y bolsillos.
 
 ### F9 · Piernas, zapatos y proporciones finales
@@ -375,6 +385,16 @@ Plantilla (una entrada por fase, la más nueva arriba):
 - Decisiones por defecto: la respiración de las colas usa `Time.get_ticks_msec` (F10 la pasará a pasos de `step_fps`).
 - Siguiente paso: F8 (abrigo, torso, brazos y manos).
 
+### 2026-11-12 · F8 · Abrigo, chaleco, brazos y manos (según video 68105)
+- Archivos tocados: `character/player_model.gd` (colores de ropa, `_geo_chest`, `_clay_satchel` con `SATCHEL_ON`, `_geo_forearm` puños, `_geo_hand` dedos gruesos, `CLAY_HAND_K` 1.28, nuevos `SKIRT_ROWS`, `_skirt_pt`, `_geo_coat_skirt`, `_build_coat_skirt`; `_update_cloth` mueve los faldones), `tests/andro_f5f7_test.gd` (faldones), `tests/andro_plastilina_shot.gd` (vistas `torso`/`torso_back`, variable `ANDRO_POSE`).
+- Qué cambió: abrigo gris carbón neutro (albedo algo amarillo para compensar la luz morada del preset). Baja a medio muslo con dos faldones (`coat_l`, `coat_r`, hijos de `hips`) que siguen a su muslo con factor 0.62. Así no atraviesan las piernas al caminar, correr ni agacharse. Son conchas con grosor, abertura trasera, dobladillo gastado y bolsillo con solapa. Franja de chaleco café como pieza propia con cantos del abrigo, 6 botones negros (4 en el pecho y 2 en el faldón derecho), solapas cortas, cuello alto negro y puños más oscuros. Manos un 5 % más grandes, dedos más cortos y gruesos, pulgar más grueso. Bandolera apagada.
+- Medido (preset, mediana): abrigo ≈ #1E1721 (video #0E0F10, escena más oscura), chaleco ≈ #332324 (video #20201E).
+- Capturas: `F8_torso`, `F8_torso_espalda`, `F8_estudio_torso`, `F8_cuerpo`, `F8_perfil`, `F8_poses` (correr ×2, caminar, agachado). Referencia: `REF_video68105_frente`, `REF_video68105_accion`.
+- Tris / FPS: 20 048 total (+688: faldones 912, pecho −352 sin bandolera). FPS sin medir.
+- Efectos colaterales: agachado, los faldones suben con el muslo y el de atrás se ve como una caja: aceptable por ahora, se puede afinar en F10. Pantalón aún con tinte morado por la luz del preset.
+- Decisiones por defecto: bandolera fuera (el video no la tiene); el video manda sobre las láminas.
+- Siguiente paso: F9 (piernas, zapatos negros y proporciones según el video) y decidir con Pablo el pelo y el verde de la bufanda del video.
+
 ### 9.2 Comandos (desde la raíz del repo; `godot` = 4.3)
 ```
 # Importar la primera vez
@@ -385,10 +405,10 @@ godot --headless --path godot3d -s res://tests/character_logic_test.gd
 godot --headless --path godot3d -s res://tests/gothic_clay_adapter_test.gd
 godot --headless --path godot3d -s res://tests/andro_face_test.gd
 godot --headless --path godot3d -s res://tests/andro_f5f7_test.gd
-# Cara por pasos en las capturas: variables ANDRO_BLINK=0|1|2, ANDRO_GAZE="x,y", ANDRO_BROW="izq,der", ANDRO_MOUTH=1..5, ANDRO_HAIR=0..3, ANDRO_SCARF=0..3
+# Cara por pasos en las capturas: variables ANDRO_BLINK=0|1|2, ANDRO_GAZE="x,y", ANDRO_BROW="izq,der", ANDRO_MOUTH=1..5, ANDRO_HAIR=0..3, ANDRO_SCARF=0..3, ANDRO_POSE="estado,velocidad,fase" (p. ej. run,5.0,1.6)
 # Inventario: tris, medidas y materiales de Andro
 godot --headless --path godot3d -s res://tests/andro_inventory.gd
-# Captura con luz plastilina (llvmpipe; vistas: face, close, full, side, back, hperfil, hperfil2, h34, hback (cabeza), bufanda; ruta de salida ABSOLUTA; 3er argumento opcional: preset | estudio)
+# Captura con luz plastilina (llvmpipe; vistas: face, close, full, side, back, hperfil, hperfil2, h34, hback (cabeza), bufanda, torso, torso_back; ruta de salida ABSOLUTA; 3er argumento opcional: preset | estudio)
 xvfb-run -a -s "-screen 0 1280x720x24" godot --path godot3d --rendering-driver opengl3 --rendering-method gl_compatibility -s res://tests/andro_plastilina_shot.gd -- face /ruta/absoluta/Fxx_face.png
 ```
 Godot 4.3: `https://github.com/godotengine/godot/releases/download/4.3-stable/Godot_v4.3-stable_linux.x86_64.zip`. En este entorno no hay Vulkan: las capturas son GL Compatibility; pedir a Pablo capturas del teléfono para confirmar color y brillo.
@@ -415,7 +435,7 @@ Respetar los nombres existentes. Piezas nuevas sugeridas (hijas del pivote corre
 | F5 | [x] hecha | 12-nov; 5 bocas como piezas, `set_mouth(1..5)` |
 | F6 | [x] hecha | 12-nov; pelo = pieza `hair` con 4 variantes, `set_hair_variant()` |
 | F7 | [x] hecha | 12-nov; colas con cadena de pivotes, lima corregida (filtro de musgo), `set_scarf_variant()` |
-| F8 | [ ] pendiente | |
+| F8 | [x] hecha | 12-nov; abrigo a medio muslo con faldones `coat_l/r`, chaleco, 6 botones, manos gruesas, sin bandolera |
 | F9 | [ ] pendiente | |
 | F10 | [ ] pendiente | |
 | F11 | [ ] pendiente | |
@@ -456,7 +476,8 @@ Si falta un dato, haz una sola pregunta.
 1. **Proporciones** (respondida por Pablo): enfocarse en todo el personaje. Hoy 4.2 cabezas; se mantiene el cuerpo y se revisa en F9.
 2. **Presupuesto de triángulos** (respondida por Pablo): se decide en F11. Hasta entonces no se optimiza, pero tampoco se añaden triángulos a lo loco.
 3. **Capturas del teléfono**: las de F0 son de llvmpipe. En F1 dejar una escena de estudio jugable en el editor del teléfono para confirmar color y brillo.
-4. **Pelo**: el 044-B actual se lee como "púas finas"; confirmar en F6 si se prefieren mechones más gruesos y aplanados como en la hoja.
+4. **Pelo**: el video 68105 muestra un bloque plano con surcos, no el 044-B con puntas. Preguntar a Pablo si se cambia (sería una variante nueva o el nuevo `clasico`).
+5. **Bufanda**: el video tiene un verde más vivo que la lámina 042. Preguntar si se sube la saturación.
 
 ---
 
