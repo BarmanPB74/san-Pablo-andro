@@ -1,7 +1,8 @@
 extends SceneTree
 ## Retrato de Andro con el preset "plastilina" real (StreetLook + ClayStyle). Uso:
-## godot --path <proyecto> -s <este.gd> -- <vista: face|close|full|side|back> <salida.png> [modo: preset|estudio]
+## godot --path <proyecto> -s <este.gd> -- <vista: face|close|full|side|back> <salida.png> [modo: preset|estudio|neutro]
 ## modo "estudio" (F1): luna morada tenue + farol ámbar sin sombra + niebla de profundidad (solo aquí, no toca el preset global).
+## modo "neutro" (P1): fondo gris y luz blanca suave, como la hoja 68107. Sirve para calibrar color y brillo de la ropa sin la luz morada.
 
 func _initialize() -> void:
 	var args := OS.get_cmdline_user_args()
@@ -19,11 +20,20 @@ func _initialize() -> void:
 	if mode == "estudio":
 		await process_frame   # StreetLook arma su ambiente en _ready()
 		_studio(look)
+	elif mode == "neutro":
+		await process_frame
+		_neutral(look)
 	var floor_mi := MeshInstance3D.new()
 	var pm := PlaneMesh.new()
 	pm.size = Vector2(40, 40)
 	floor_mi.mesh = pm
-	floor_mi.material_override = Palette.sidewalk()
+	if mode == "neutro":
+		var gm := StandardMaterial3D.new()
+		gm.albedo_color = Color(0.5, 0.5, 0.51)
+		gm.roughness = 1.0
+		floor_mi.material_override = gm
+	else:
+		floor_mi.material_override = Palette.sidewalk()
 	root.add_child(floor_mi)
 	var m := PlayerModel.new()
 	root.add_child(m)
@@ -119,3 +129,30 @@ func _studio(look: StreetLook) -> void:
 	env.fog_density = 0.7
 	env.fog_height_density = 0.0
 	env.volumetric_fog_enabled = false
+
+
+## P1: luz de estudio neutra (gris/blanco) para comparar con la hoja 68107. Solo en las capturas.
+func _neutral(look: StreetLook) -> void:
+	look.sun.light_color = Color(1.0, 0.98, 0.95)
+	look.sun.light_energy = 1.0
+	look.sun.rotation_degrees = Vector3(-38.0, 35.0, 0.0)
+	var fill := OmniLight3D.new()                       # relleno suave desde el otro lado, sin sombra
+	fill.position = Vector3(-2.0, 1.8, 2.4)
+	fill.light_color = Color(0.9, 0.93, 1.0)
+	fill.light_energy = 0.9
+	fill.omni_range = 9.0
+	fill.shadow_enabled = false
+	root.add_child(fill)
+	var env := look.environment
+	env.background_mode = Environment.BG_COLOR
+	env.background_color = Color(0.5, 0.5, 0.51)
+	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
+	env.ambient_light_color = Color(0.78, 0.78, 0.8)
+	env.ambient_light_energy = 0.8
+	env.fog_enabled = false
+	env.volumetric_fog_enabled = false
+	env.tonemap_exposure = 1.0
+	env.adjustment_enabled = false          # sin LUT ni contraste del preset (llevan sombras moradas)
+	env.reflected_light_source = Environment.REFLECTION_SOURCE_DISABLED
+	env.ambient_light_sky_contribution = 0.0
+	env.glow_enabled = false

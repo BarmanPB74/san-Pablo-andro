@@ -418,6 +418,16 @@ Método: 4 agentes editaron a la vez `player_model.gd`, cada uno solo en sus fun
 - Tris: **37 152** (antes 27 298; el pelo solo ya suma 11 728). Es mucho para móvil: F11 debe bajarlo (LOD, menos segmentos en los surcos y en el canalé). Tests: 5 PASS. Altura 2.10 m, 3.96 cabezas.
 - Quedan: la nariz se lee como 3 bolitas (bulbo + aletas) en 3/4; la oreja muestra los aros del hélix y del antihélix demasiado marcados; las bocas M2–M5 son estrechas frente a M1; de espalda el bloque de pelo se ve algo alto y estrecho comparado con el cuello; la tapa del pelo queda clara con la luz morada.
 
+### 2026-11-15 · P1 · Abrigo (plan en `docs/andro/PLAN_DETALLE.md`)
+- Diagnóstico: con luz gris (modo nuevo `neutro` del script de capturas) el abrigo salía oliva y el pantalón mostaza: los albedos de F8/F9 llevaban tinte cálido para compensar la luz morada. Además el shader sumaba `value_lift` (0.04) con un violeta fijo, que en prendas muy oscuras pesa ~20 %.
+- Archivos tocados: `character/player_model.gd` (colores `C_SUIT`, `C_SUIT_LAPEL`, `C_TROUSER`; nueva `_sleeve_folds`; mangas `_geo_upper_arm`/`_geo_forearm` con más volumen y pliegues; solapa de bolsillo más alta y gruesa; pliegues de faldón con 2.ª onda), `character/gothic_clay_adapter.gd` (`COAT_SMOOTH` 0.38 → rugosidad 0.62, `COAT_SPEC` 0.45, `COAT_BUMP` 0.45, `lift_tint` neutro en abrigo y zapatos, `ROLE_SET["coat"]` = `piel`), `look/clay.gdshader` (uniform `lift_tint`, mismo valor por defecto: el mundo no cambia), `tests/gothic_clay_adapter_test.gd` (rugosidad del twill 0.80 → 0.62), `tests/andro_plastilina_shot.gd` (modo `neutro`).
+- Colores: abrigo `C_SUIT` (0.27, 0.262, 0.262), solapa/puños/dobladillo `C_SUIT_LAPEL` (0.29, 0.285, 0.29) más claro (desgaste), pantalón `C_TROUSER` (0.17, 0.168, 0.172). Con luz neutra el abrigo rinde carbón (ref. #242225 sombra / #514E4D luz).
+- Textura: el set `abrigo` daba poros tipo cuero con granitos; el set `piel` (arcilla lisa con huellas) se parece más a la lámina.
+- Capturas: `P1_comparacion_torso` (referencia | antes | después), `P1_comparacion_cuerpo`, `P1_espalda`, `P1_perfil`.
+- Tris: 37 152 (sin cambio; solo se movieron vértices). Tests: 5 PASS.
+- Efectos colaterales: con el preset `plastilina` (luz morada) la ropa se ve azul-violeta oscura; se corrige solo cuando el cielo pase a nubes grises. Solapas y botón aún poco legibles; en la espalda las ranuras (omóplatos, cintura) son rectas y duras. Los faldones no se comprobaron caminando en esta fase (solo cambió su onda de pliegues).
+- Siguiente paso: P2 (bufanda: rayas más anchas, superficie lisa de arcilla, colas gordas).
+
 ### 9.2 Comandos (desde la raíz del repo; `godot` = 4.3)
 ```
 # Importar la primera vez
@@ -432,7 +442,7 @@ godot --headless --path godot3d -s res://tests/andro_f5f7_test.gd
 # Inventario: tris, medidas y materiales de Andro
 godot --headless --path godot3d -s res://tests/andro_inventory.gd
 # Captura con luz plastilina (llvmpipe; vistas: face, close, full, side, back, hperfil, hperfil2, h34, hback (cabeza), bufanda, torso, torso_back; ruta de salida ABSOLUTA; 3er argumento opcional: preset | estudio)
-xvfb-run -a -s "-screen 0 1280x720x24" godot --path godot3d --rendering-driver opengl3 --rendering-method gl_compatibility -s res://tests/andro_plastilina_shot.gd -- face /ruta/absoluta/Fxx_face.png
+xvfb-run -a -s "-screen 0 1280x720x24" godot --path godot3d --rendering-driver opengl3 --rendering-method gl_compatibility -s res://tests/andro_plastilina_shot.gd -- face /ruta/absoluta/Fxx_face.png   # modo `neutro` (fondo y luz gris, para calibrar color de ropa): añadir `neutro` como 3.er argumento
 ```
 Godot 4.3: `https://github.com/godotengine/godot/releases/download/4.3-stable/Godot_v4.3-stable_linux.x86_64.zip`. En este entorno no hay Vulkan: las capturas son GL Compatibility; pedir a Pablo capturas del teléfono para confirmar color y brillo.
 
@@ -460,6 +470,7 @@ Respetar los nombres existentes. Piezas nuevas sugeridas (hijas del pivote corre
 | F7 | [x] hecha | 12-nov; colas con cadena de pivotes, lima corregida (filtro de musgo), `set_scarf_variant()` |
 | F8 | [x] hecha | 12-nov; abrigo a medio muslo con faldones `coat_l/r`, chaleco, 6 botones, manos gruesas, sin bandolera |
 | F9 | [x] hecha | 12-nov; con 4 agentes en paralelo según 68107: pelo en bloque, cara, bufanda, piernas/zapatos/abrigo abierto, cabeza ×1.13 en y (3.88 cabezas) |
+| P1 | [x] hecha | 15-nov; abrigo neutro, satinado, mangas con pliegues; ver `docs/andro/PLAN_DETALLE.md` (P2, P3, Z1–Z2, C1–C2, R1–R3 pendientes) |
 | F10 | [ ] pendiente | |
 | F11 | [ ] pendiente | |
 

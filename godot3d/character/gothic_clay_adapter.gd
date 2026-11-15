@@ -34,7 +34,10 @@ const PUPIL := Color(0.03, 0.03, 0.03)
 ## Set de textura de arcilla por pieza (art/tex/clay/<set>_*.png, ver tools/texgen/clay_sets.py)
 ## Pelo: la ref. 68107 es arcilla mate con huellas (no fibra): usa la misma arcilla que la piel; los surcos de
 ## peine los pone la geometría de player_model.gd. (El set "pelo", de rayas de espátula, se veía como fibra.)
-const ROLE_SET := {"skin": "piel", "coat": "abrigo", "hair": "piel", "scarf": "lana", "shoe": "cuero"}
+const COAT_SMOOTH := 0.38    ## abrigo/pantalón: rugosidad 0.62 (satinado)
+const COAT_SPEC := 0.45
+const COAT_BUMP := 0.45
+const ROLE_SET := {"skin": "piel", "coat": "piel", "hair": "piel", "scarf": "lana", "shoe": "cuero"}
 
 @export var existing_character_root: Node3D          ## vacío = el padre de este nodo
 @export_file("*.glb", "*.gltf", "*.tscn") var gothic_clay_model_path := ""
@@ -146,6 +149,7 @@ func _smooth(role: String) -> float:
 	match role:
 		"eye": return 0.75     # cuenta de cristal brillante (rugosidad 0.25)
 		"pupil": return 0.8
+		"coat": return COAT_SMOOTH     # P1: arcilla satinada (la hoja 68107 muestra brillos suaves y anchos en el abrigo)
 	return clay_smoothness
 
 
@@ -156,7 +160,9 @@ func _styled(m: Material, role: String, recolor: bool) -> Material:
 		var c := (m as ShaderMaterial).duplicate() as ShaderMaterial
 		c.set_meta("clay", true)
 		c.set_shader_parameter("rough", rough)
-		c.set_shader_parameter("spec", 0.5 if role == "eye" or role == "pupil" else 0.25)
+		c.set_shader_parameter("spec", 0.5 if role == "eye" or role == "pupil" else (COAT_SPEC if role == "coat" else 0.25))
+		if role == "coat" or role == "shoe":    # P1: negros sin el levantado violeta del mundo
+			c.set_shader_parameter("lift_tint", Vector3(0.14, 0.14, 0.14))
 		c.set_shader_parameter("clay_bump", 0.0 if role == "eye" or role == "pupil" else normal_bump_scale)
 		c.set_shader_parameter("sheen", 0.15 if role == "eye" else 0.3)
 		# el personaje conserva sus colores (blancos de camisa/bufanda/ojos no se vuelven rosados)
@@ -170,6 +176,9 @@ func _styled(m: Material, role: String, recolor: bool) -> Material:
 			c.set_shader_parameter("clay_bump", float(ClayStyle.SETS[set_name][1]) * normal_bump_scale / 0.65)
 			c.set_shader_parameter("grey_amount", 0.0)
 			c.set_shader_parameter("brick_shift", 0.0)
+			if role == "coat":    # P1: poros suaves; con el relieve de fábrica el abrigo parecía cuero con granitos
+				c.set_shader_parameter("clay_bump", COAT_BUMP)
+				c.set_shader_parameter("clay_cavity", 0.12)
 		if recolor:
 			c.set_shader_parameter("base_color", _tint(role))
 			if role == "scarf":

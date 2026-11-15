@@ -36,6 +36,7 @@ uniform float grey_amount = 0.55;
 uniform vec3 moss_tint : source_color = vec3(0.34, 0.62, 0.22);
 uniform float moss_amount = 0.6;
 uniform float value_lift = 0.04;      // la plastilina nunca es negro puro
+uniform vec3 lift_tint = vec3(0.16, 0.12, 0.17);   // color del "levantado" de negros; Andro lo pone neutro (P1)
 
 // ---- emisión ----
 uniform bool has_emission = false;
@@ -84,7 +85,7 @@ vec3 clay_grade(vec3 c) {
 	o = mix(o, moss_tint * clamp(hsv.z / 0.4, 0.0, 1.3), green * moss_amount);   // verdes oscuros (postes) siguen oscuros
 	float grey = (1.0 - smoothstep(0.06, 0.24, hsv.y)) * (1.0 - green);
 	o = mix(o, hsv.z * grey_tint * 1.08, grey * grey_amount);
-	return o * (1.0 - value_lift) + value_lift * vec3(0.16, 0.12, 0.17);
+	return o * (1.0 - value_lift) + value_lift * lift_tint;
 }
 
 vec3 tri_w(vec3 n) {

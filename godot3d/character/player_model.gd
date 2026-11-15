@@ -146,9 +146,10 @@ func _build() -> void:
 	# Arcilla gótica (láminas de referencia de Pablo): saco ciruela-carbón CERRADO (sin camisa a la vista),
 	# pantalón más oscuro, pelo café-ciruela en mechones gruesos, zapatos gris-café, labios apagados.
 	# F8 (video 68105): abrigo gris carbón neutro (algo amarillo en albedo para compensar la luz morada), chaleco café oscuro, botones negros, pantalón casi negro
-	C_SUIT = Color(0.30, 0.30, 0.245) if clay else Color(0.06, 0.06, 0.068)
-	C_SUIT_LAPEL = Color(0.225, 0.225, 0.185) if clay else Color(0.035, 0.035, 0.042)
-	C_TROUSER = Color(0.33, 0.328, 0.205) if clay else Color(0.06, 0.06, 0.068)    # F9: carbón neutro (albedo cálido contra la luz morada)
+	# P1 (15-nov): albedos NEUTROS (antes llevaban tinte cálido para compensar la luz morada y con luz gris salían oliva/mostaza)
+	C_SUIT = Color(0.27, 0.262, 0.262) if clay else Color(0.06, 0.06, 0.068)
+	C_SUIT_LAPEL = Color(0.29, 0.285, 0.29) if clay else Color(0.035, 0.035, 0.042)
+	C_TROUSER = Color(0.17, 0.168, 0.172) if clay else Color(0.06, 0.06, 0.068)    # carbón neutro; la forma y las arrugas van en P3
 	C_SHIRT = C_SUIT if clay else Color(0.86, 0.86, 0.83)
 	C_VEST = Color(0.42, 0.36, 0.215) if clay else C_SHIRT    # F9: suéter café de punto (68107, se ve ≈#4D3730)
 	C_BUTTON = Color(0.11, 0.11, 0.11) if clay else Color(0.03, 0.03, 0.035)   # botones negros pequeños
@@ -1173,6 +1174,24 @@ func _geo_head() -> void:
 #  Brazos y manos
 # ---------------------------------------------------------------------
 
+## P1: pliegues de arcilla en las mangas. y_crease = altura del pliegue del codo; lado = +1 (antebrazo, el pliegue está arriba)
+## o −1 (brazo, el pliegue está abajo). Solo si el modo plastilina está activo; en el modo normal no toca la malla.
+func _sleeve_folds(p: Vector3, y_crease: float, lado: float) -> Vector3:
+	if not ClayStyle.enabled:
+		return p
+	var rad := Vector3(p.x, 0.0, p.z)
+	var r := rad.length()
+	if r < 0.0001:
+		return p
+	var ang := atan2(p.z, p.x)
+	var dy := (p.y - y_crease) / ARM_K
+	var elbow := exp(-pow(dy / 0.028, 2.0))                      # banda de arrugas junto al codo
+	var f := 0.0042 * elbow * sin(ang * 3.0 + p.y * 70.0)          # arrugas inclinadas, más fuertes en el codo
+	f += 0.0024 * sin(p.y * 31.0 + ang * 2.0) * smoothstep(0.0, 1.0, absf(dy) / 0.12)    # ondas largas a lo largo de la manga
+	f -= 0.0035 * elbow * maxf(0.0, cos(ang - (PI * 0.5 if lado > 0.0 else -PI * 0.5)))   # pellizco en la cara interior del codo
+	return p + rad / r * f
+
+
 func _geo_upper_arm(sx: float) -> void:
 	var rings := _sc([
 		# R2 (68107): manga gruesa de abrigo, copa de hombro cuadrada (hombrera)
@@ -1187,8 +1206,8 @@ func _geo_upper_arm(sx: float) -> void:
 		_r(-0.29, 0.057, 0.057, 0.0, 2.0, 0.03),
 		_r(-0.315, 0.05, 0.05),
 		_r(-0.32, 0.0, 0.0),
-	], ARM_K, 0.97, 0.95)
-	_loft(_twill(), rings, 14, Transform3D.IDENTITY, _c(C_SUIT))
+	], ARM_K, 1.04, 1.03)    # P1: manga con más volumen
+	_loft(_twill(), rings, 14, Transform3D.IDENTITY, _c(C_SUIT), Callable(), _sleeve_folds.bind(-0.29 * ARM_K, -1.0))
 
 
 func _geo_forearm(_sx: float) -> void:
@@ -1204,11 +1223,12 @@ func _geo_forearm(_sx: float) -> void:
 		_r(-0.238, 0.051, 0.049),
 		_r(-0.245, 0.043, 0.041),
 		_r(-0.24, 0.0, 0.0),
-	], ARM_K, 0.97, 0.97)    # R2 (68107): manga gruesa hasta el puño
+	], ARM_K, 1.03, 1.03)    # R2 (68107): manga gruesa hasta el puño (P1: más volumen)
 	var cs := _c(C_SUIT)
 	var cw := _c(C_SUIT_LAPEL) if ClayStyle.enabled else _c(C_SHIRT)
 	_loft(_twill(), rings, 14, Transform3D.IDENTITY, func(p: Vector3) -> Color:
-		return cw if p.y < (-0.205 if ClayStyle.enabled else -0.232) * ARM_K else cs)
+		return cw if p.y < (-0.205 if ClayStyle.enabled else -0.232) * ARM_K else cs, Callable(),
+		_sleeve_folds.bind(0.02 * ARM_K, 1.0))
 
 
 func _geo_hand(sx: float) -> void:
@@ -2333,7 +2353,7 @@ func _geo_coat_skirt(sx: float) -> void:
 	var rows: Array = [SKIRT_ROWS[0]] + SKIRT_ROWS + [SKIRT_ROWS[SKIRT_ROWS.size() - 1]]
 	# R2: pliegues verticales suaves de arcilla que crecen hacia el dobladillo (misma onda por fuera y por dentro)
 	var fold := func(q: Vector3, ang: float) -> Vector3:
-		var f := 0.0035 * sin(ang * 7.0 + 0.6 * sx) * smoothstep(0.0, -0.3, q.y)
+		var f := (0.0045 * sin(ang * 7.0 + 0.6 * sx) + 0.002 * sin(ang * 13.0 + 1.3 * sx)) * smoothstep(0.0, -0.3, q.y)
 		return q + Vector3(q.x, 0.0, q.z).normalized() * f
 	for i in rows.size():
 		var cap := i == 0 or i == rows.size() - 1
@@ -2357,24 +2377,24 @@ func _geo_coat_skirt(sx: float) -> void:
 				return [y, lerpf(r0[1], r1[1], t), lerpf(r0[2], r1[2], t), lerpf(r0[3], r1[3], t)]
 		return SKIRT_ROWS[3]
 	var y_p := -0.085
-	var fys := [y_p + 0.014, y_p + 0.002, y_p - 0.01, y_p - 0.02]
+	var fys := [y_p + 0.026, y_p + 0.008, y_p - 0.012, y_p - 0.03]    # P1: solapa más alta
 	var NCp := 7
 	var FP := PackedVector3Array()
 	for i in fys.size() + 2:
 		var ii := clampi(i - 1, 0, fys.size() - 1)
 		var cap := i == 0 or i == fys.size() + 1
 		var rp: Array = row_at.call(float(fys[ii]))
-		var off := lerpf(0.003, 0.0085, float(ii) / float(fys.size() - 1))
+		var off := lerpf(0.004, 0.013, float(ii) / float(fys.size() - 1))    # P1: más grosor
 		for j in NCp:
 			var f := float(j) / float(NCp - 1)
-			var ang := lerpf(0.7, 1.3, f if sx > 0.0 else 1.0 - f)
+			var ang := lerpf(0.66, 1.34, f if sx > 0.0 else 1.0 - f)
 			FP.append(fold.call(_skirt_pt(rp, ang, sx, -(0.003 + off) * 0.5 if cap else -off, k), ang))
 		for j in NCp:
 			var f := 1.0 - float(j) / float(NCp - 1)
-			var ang := lerpf(0.7, 1.3, f if sx > 0.0 else 1.0 - f)
+			var ang := lerpf(0.66, 1.34, f if sx > 0.0 else 1.0 - f)
 			FP.append(fold.call(_skirt_pt(rp, ang, sx, -(0.003 + off) * 0.5 if cap else -0.001, k), ang))
 	_grid(tw, FP, fys.size() + 2, NCp * 2, Transform3D.IDENTITY, func(p: Vector3) -> Color:
-		return cs.lerp(cl, 0.6 * smoothstep(y_p - 0.008, y_p - 0.02, p.y)))   # canto inferior más oscuro
+		return cs.lerp(cl, 0.6 * smoothstep(y_p - 0.018, y_p - 0.03, p.y)))   # canto inferior más oscuro
 	if sx > 0.0:    # R2: canto de la abertura trasera (el faldón derecho monta sobre el izquierdo)
 		var vp := PackedVector3Array()
 		for i in 6:

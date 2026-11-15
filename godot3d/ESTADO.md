@@ -19,7 +19,13 @@ Plan gráfico anterior (fases 1-5): `PLAN_GRAFICOS.md`. El plan vigente está en
 - Rendimiento medido en el editor del teléfono: ~51 FPS en el parque, ~78 FPS en la calle.
 - Sin APK todavía (a propósito): se juega desde el editor de Godot en el teléfono.
 
-## Última sesión (12 nov 2026) — Ronda 2 de afinado contra 68107 (4 agentes)
+## Última sesión (15 nov 2026) — P1: abrigo de Andro (plan por bloques en `docs/andro/PLAN_DETALLE.md`)
+- Plan nuevo por bloques: ropa (P1 abrigo, P2 bufanda, P3 suéter y pantalón), zapatos (Z1, Z2), cuerpo (C1, C2), rostro (R1–R3). Cada fase es una sesión corta.
+- Abrigo: albedos neutros (antes oliva/mostaza con luz gris), acabado satinado de arcilla lisa, mangas con más volumen y pliegues, bolsillos más legibles. Pantalón en carbón neutro.
+- Causa del tinte morado: `value_lift` del shader sumaba un violeta fijo; nuevo parámetro `lift_tint` (el mundo no cambia) puesto en neutro solo en ropa y zapatos.
+- Captura nueva `neutro` (fondo y luz gris) para calibrar sin la luz morada. Tris 37 152 (sin cambio). Tests PASS (5). Comparación: `docs/andro/shots/P1_comparacion_torso.jpg`.
+
+## Sesión anterior (12 nov 2026) — Ronda 2 de afinado contra 68107 (4 agentes)
 - Oreja pegada al cráneo (antes flotaba): raíz sobre la piel y puente detrás. Mandíbula más ancha, surco nasogeniano y hoyuelo.
 - Ojos más grandes y redondos, ojeras en degradado (sin aros), cejas largas, nariz carnosa, sonrisa amplia; bug del párpado corregido.
 - Pelo: tupé redondeado de perfil, sin alero, material de arcilla (set `piel`); bufanda con colas más largas. Cuerpo: hombros anchos, mangas gruesas, solapas, canalé, manos grandes.
