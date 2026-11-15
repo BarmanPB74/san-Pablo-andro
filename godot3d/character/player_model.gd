@@ -322,6 +322,9 @@ static func _leather() -> Material: # bolso y correa (cuero de arcilla)
 static func _skin() -> Material:
 	return _vcmat("skin", MatActors.skin(Color.WHITE, Vector3.ONE), 0.12)
 
+static func _hand_skin() -> Material:    # F1.1: piel de las manos (pieza propia: el adaptador le baja los poros sin tocar la cara)
+	return _vcmat("skin_hand", MatActors.skin(Color.WHITE, Vector3.ONE), 0.12)
+
 static func _hair() -> Material:    # el punto a escala fina da fibra de pelo
 	return _vcmat("hair", MatActors.hoodie_knit(Color.WHITE, Vector3.ONE), 0.045)
 
@@ -1231,7 +1234,94 @@ func _geo_forearm(_sx: float) -> void:
 		_sleeve_folds.bind(0.02 * ARM_K, 1.0))
 
 
+## Curva cúbica de Bézier muestreada en n puntos (dedos y pulgar suaves).
+static func _bez3(a: Vector3, b: Vector3, c: Vector3, d: Vector3, n: int) -> PackedVector3Array:
+	var out := PackedVector3Array()
+	for i in n:
+		var t := float(i) / float(n - 1)
+		var u := 1.0 - t
+		out.append(a * u * u * u + b * 3.0 * u * u * t + c * 3.0 * u * t * t + d * t * t * t)
+	return out
+
+
+## F1.1 (68107): mano de arcilla. Palma redondeada, dedos gruesos con curva suave y punta redonda, nudillos en el dorso,
+## pulgar grueso con eminencia, tinte rosado en nudillos y pliegues. Pivote en la muñeca, dedos hacia −y, pulgar en −sx, frente = −z.
+func _geo_hand_clay(sx: float) -> void:
+	var sm := _hand_skin()
+	var skin := _c(SKIN_TONE)
+	var rosy := Color(skin.r * 1.04, skin.g * 0.94, skin.b * 0.94)       # nudillos y yemas
+	var crease := Color(skin.r * 0.9, skin.g * 0.82, skin.b * 0.8)   # pliegues de las articulaciones
+	# Muñeca (cuello redondo que entra en la manga)
+	_loft(sm, [_r(0.034, 0.0, 0.0), _r(0.03, 0.021, 0.027, 0.0, 2.3), _r(0.0, 0.0215, 0.03, 0.0, 2.4), _r(-0.016, 0.0215, 0.033, 0.0, 2.5)],
+		10, Transform3D.IDENTITY, skin)
+	# Palma: se ensancha hacia los nudillos, dorso algo abombado (hacia +sx)
+	var bx := sx * 0.0025
+	var palm := [
+		_r(0.0, 0.0, 0.0),
+		_r(-0.006, 0.021, 0.03, 0.0, 2.4, 0.0, bx),
+		_r(-0.026, 0.0215, 0.036, -0.001, 2.6, 0.0, bx),
+		_r(-0.052, 0.02, 0.041, -0.002, 2.8, 0.0, bx),
+		_r(-0.076, 0.0185, 0.043, -0.002, 2.8, 0.0, bx),
+		_r(-0.093, 0.0165, 0.042, -0.002, 2.6, 0.0, bx),
+		_r(-0.102, 0.012, 0.037, -0.002, 2.3, 0.0, bx),
+		_r(-0.106, 0.0, 0.0, -0.002),
+	]
+	_loft(sm, palm, 14, Transform3D.IDENTITY, func(p: Vector3) -> Color:
+		var k := exp(-pow((p.y + 0.092) / 0.012, 2.0))    # rubor en la línea de nudillos
+		return skin.lerp(rosy, 0.4 * k))
+	# Nudillos (4 bultos achatados en el dorso)
+	var fz := [-0.03, -0.01, 0.01, 0.029]
+	for i in 4:
+		_ellip(sm, Vector3(sx * 0.0165, -0.09, float(fz[i])), Vector3(0.0056, 0.0075, 0.0098), skin, Vector3.ZERO, 8, 4)
+	# Dedos: índice → meñique (largos y curvados con suavidad, abanico leve)
+	var fl := [0.078, 0.086, 0.08, 0.066]
+	var fr := [0.0122, 0.0127, 0.0121, 0.0108]
+	var fc := [0.8, 1.0, 1.15, 1.3]
+	for i in 4:
+		var L: float = fl[i]
+		var z: float = fz[i]
+		var cu: float = float(fc[i]) * 1.6
+		var y0 := -0.094
+		var a := Vector3(sx * 0.002, y0, z)
+		var b := Vector3(-sx * 0.002 * cu, y0 - L * 0.36, z * 1.1)
+		var c := Vector3(-sx * 0.015 * cu, y0 - L * 0.72, z * 1.22)
+		var d := Vector3(-sx * 0.03 * cu, y0 - L * 0.95, z * 1.3)
+		var path := _bez3(a, b, c, d, 6)
+		var ra := []
+		var rb := []
+		for k in path.size():
+			var t := float(k) / float(path.size() - 1)
+			var r: float = float(fr[i]) * (1.0 - 0.17 * t * t)
+			ra.append(r)
+			rb.append(r * 0.93)
+		var j1 := y0 - L * 0.4
+		var j2 := y0 - L * 0.74
+		var fcol := func(p: Vector3) -> Color:
+			var w1 := exp(-pow((p.y - j1) / 0.005, 2.0))
+			var w2 := exp(-pow((p.y - j2) / 0.0045, 2.0))
+			var base := skin.lerp(rosy, 0.35 * exp(-pow((p.y - y0) / 0.012, 2.0)) + 0.25 * smoothstep(y0 - L * 0.86, y0 - L, p.y))
+			return base.lerp(crease, 0.4 * maxf(w1, w2))
+		_tube(sm, path, ra, rb, 8, Vector3(0, 0, -1), fcol, true, 2.3)
+	# Pulgar: grueso, con eminencia en la base y punta redonda
+	var t0 := Vector3(-sx * 0.014, -0.02, -0.03)
+	var t1 := Vector3(-sx * 0.022, -0.036, -0.046)
+	var t2 := Vector3(-sx * 0.03, -0.062, -0.054)
+	var t3 := Vector3(-sx * 0.036, -0.088, -0.05)
+	var tp := _bez3(t0, t1, t2, t3, 6)
+	var tra := []
+	for k in tp.size():
+		tra.append(0.0158 * (1.0 - 0.28 * pow(float(k) / float(tp.size() - 1), 1.5)))
+	var tcol := func(p: Vector3) -> Color:
+		var w1 := exp(-pow((p.y + 0.06) / 0.005, 2.0))
+		return skin.lerp(crease, 0.35 * w1).lerp(rosy, 0.3 * smoothstep(-0.075, -0.095, p.y))
+	_tube(sm, tp, tra, 0.0148, 8, Vector3(sx, 0, 0), tcol, true, 2.3)
+	_ellip(sm, Vector3(-sx * 0.016, -0.034, -0.03), Vector3(0.013, 0.03, 0.02), skin, Vector3(0.0, 0.0, -sx * 0.25), 10, 5)
+
+
 func _geo_hand(sx: float) -> void:
+	if ClayStyle.enabled:
+		_geo_hand_clay(sx)
+		return
 	var skin_m := _skin()
 	var skin := _c(SKIN_TONE)
 	# Muñeca y palma (manos descubiertas)

@@ -39,7 +39,7 @@ func _initialize() -> void:
 	root.add_child(m)
 	var yaw := 0.0
 	match view:
-		"side", "hperfil": yaw = -PI * 0.5
+		"side", "hperfil", "mano_perfil": yaw = -PI * 0.5
 		"hperfil2": yaw = PI * 0.5
 		"hback": yaw = PI
 		"h34": yaw = deg_to_rad(-45.0)
@@ -68,6 +68,11 @@ func _initialize() -> void:
 			cam.fov = 30.0
 			cam.position = Vector3(0, 1.5, 1.7)
 			cam.look_at(Vector3(0, 1.47, 0))
+		"mano", "mano_perfil":     # F1.1: primer plano de la mano izquierda (frente o perfil)
+			var hc: Vector3 = (m._joints["hand_l"] as Node3D).global_position + Vector3(0, -0.09, 0)
+			cam.fov = 24.0
+			cam.position = hc + Vector3(0, 0.02, 1.35)
+			cam.look_at(hc)
 		"hback":
 			cam.fov = 30.0
 			cam.position = Vector3(0, 1.9, 1.5)

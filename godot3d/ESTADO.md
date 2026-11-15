@@ -19,7 +19,11 @@ Plan gráfico anterior (fases 1-5): `PLAN_GRAFICOS.md`. El plan vigente está en
 - Rendimiento medido en el editor del teléfono: ~51 FPS en el parque, ~78 FPS en la calle.
 - Sin APK todavía (a propósito): se juega desde el editor de Godot en el teléfono.
 
-## Última sesión (15 nov 2026) — P1: abrigo de Andro (plan por bloques en `docs/andro/PLAN_DETALLE.md`)
+## Última sesión (15 nov 2026) — F1.1: manos de Andro
+- Manos rehechas: palma redondeada, dedos gruesos con curva y punta redonda, nudillos, pulgar con eminencia, piel de mano casi lisa. 488 → 1 172 tris por mano (total 38 440). Tests PASS (5).
+- Vistas nuevas de captura `mano` y `mano_perfil`. Comparación: `docs/andro/shots/F1.1_comparacion_manos.jpg`. Detalle en `ANDRO_CONTEXTO.md` §9.1.
+
+## Sesión anterior (15 nov 2026) — P1: abrigo de Andro (plan por bloques en `docs/andro/PLAN_DETALLE.md`)
 - Plan nuevo por bloques: ropa (P1 abrigo, P2 bufanda, P3 suéter y pantalón), zapatos (Z1, Z2), cuerpo (C1, C2), rostro (R1–R3). Cada fase es una sesión corta.
 - Abrigo: albedos neutros (antes oliva/mostaza con luz gris), acabado satinado de arcilla lisa, mangas con más volumen y pliegues, bolsillos más legibles. Pantalón en carbón neutro.
 - Causa del tinte morado: `value_lift` del shader sumaba un violeta fijo; nuevo parámetro `lift_tint` (el mundo no cambia) puesto en neutro solo en ropa y zapatos.

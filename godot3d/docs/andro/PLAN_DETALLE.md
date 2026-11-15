@@ -32,6 +32,12 @@ Cada fase es una sesión corta e independiente. Se hace UNA por vez y se cierra 
 | P2 Bufanda | Rayas anchas, superficie lisa de arcilla, colas gordas, flecos | `STRIPE_W`, `SCARF_G/W`, `_clay_scarf`, `_geo_scarf_seg` | Se lee como arcilla y no como punto |
 | P3 Suéter y pantalón | Suéter liso con dobladillo acanalado; pantalón carbón con arrugas; piernas con más volumen | `C_VEST`, `_knit`, `C_TROUSER`, `_geo_thigh`, `_geo_shin`, `_geo_pelvis` | Color neutro en ambas luces |
 
+### F1.1 · MANOS (fase propia; sale de C1)
+| Alcance | Dónde (grep) | Listo cuando |
+|---|---|---|
+| Palma redondeada, dedos gruesos con curva suave y punta redonda, nudillos, pulgar con eminencia, tinte rosado en nudillos y pliegues, piel de mano casi lisa y brillo suave | `_geo_hand_clay`, `_bez3`, `_hand_skin`, `CLAY_HAND_K`; en `gothic_clay_adapter.gd`: rol `hand`, `HAND_BUMP` | Primer plano de frente y de perfil comparado con 68107 (`F1.1_comparacion_manos.jpg`); tris de la mano ≤ 1 200 |
+Vistas de captura nuevas: `mano` (frente) y `mano_perfil`, con 3.er argumento `neutro`. Estado: **HECHA (15-nov)**. Pendiente para otra fase: color de piel más gris-rosado (es de R2, comparte color con la cara), posturas de mano (puño, agarrar) en F10.
+
 ### Z · ZAPATOS
 | Fase | Alcance | Dónde | Listo cuando |
 |---|---|---|---|
@@ -41,7 +47,7 @@ Cada fase es una sesión corta e independiente. Se hace UNA por vez y se cierra 
 ### C · CUERPO
 | Fase | Alcance | Dónde | Listo cuando |
 |---|---|---|---|
-| C1 Hombros, brazos, manos | Hombros más anchos, brazos con volumen, manos más gruesas | `_geo_upper_arm`, `_geo_hand`, `CLAY_HAND_K` | Silueta frontal igual a 68107 |
+| C1 Hombros y brazos | Hombros más anchos, brazos con volumen (las manos van en F1.1) | `_geo_upper_arm`, `_geo_hand`, `CLAY_HAND_K` | Silueta frontal igual a 68107 |
 | C2 Proporción y cuello | 3.96 → ≈ 3.7 cabezas sin romper la cápsula de 1.86 m | `CLAY_HEAD_S*`, `THIGH_LEN`, `SHIN_LEN`, `HIPS_HEIGHT`, `_geo_neck` | `player.gd` y tests siguen en PASS |
 
 ### R · ROSTRO
@@ -73,5 +79,6 @@ xvfb-run -a -s "-screen 0 1280x720x24" $G --path godot3d --rendering-driver open
 | P2 Bufanda | pendiente |
 | P3 Suéter y pantalón | pendiente |
 | Z1/Z2 Zapatos | pendiente |
+| F1.1 Manos | HECHA (15-nov) |
 | C1/C2 Cuerpo | pendiente |
 | R1/R2/R3 Rostro | pendiente |

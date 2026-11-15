@@ -37,7 +37,8 @@ const PUPIL := Color(0.03, 0.03, 0.03)
 const COAT_SMOOTH := 0.38    ## abrigo/pantalón: rugosidad 0.62 (satinado)
 const COAT_SPEC := 0.45
 const COAT_BUMP := 0.45
-const ROLE_SET := {"skin": "piel", "coat": "piel", "hair": "piel", "scarf": "lana", "shoe": "cuero"}
+const HAND_BUMP := 0.22
+const ROLE_SET := {"skin": "piel", "hand": "piel", "coat": "piel", "hair": "piel", "scarf": "lana", "shoe": "cuero"}
 
 @export var existing_character_root: Node3D          ## vacío = el padre de este nodo
 @export_file("*.glb", "*.gltf", "*.tscn") var gothic_clay_model_path := ""
@@ -126,6 +127,7 @@ static func _role_from_player_material(m: Material) -> String:
 	var key := PlayerModel.material_key(src)
 	match key:
 		"skin": return "skin"
+		"skin_hand": return "hand"     # F1.1: manos con la misma arcilla de la piel pero con menos poros
 		"eye": return "eye"
 		"hair": return "hair"
 		"twill", "rip": return "coat"
@@ -176,6 +178,9 @@ func _styled(m: Material, role: String, recolor: bool) -> Material:
 			c.set_shader_parameter("clay_bump", float(ClayStyle.SETS[set_name][1]) * normal_bump_scale / 0.65)
 			c.set_shader_parameter("grey_amount", 0.0)
 			c.set_shader_parameter("brick_shift", 0.0)
+			if role == "hand":    # F1.1: piel de mano casi lisa, con huellas suaves (la hoja 68107 no tiene poros visibles)
+				c.set_shader_parameter("clay_bump", HAND_BUMP)
+				c.set_shader_parameter("clay_cavity", 0.06)
 			if role == "coat":    # P1: poros suaves; con el relieve de fábrica el abrigo parecía cuero con granitos
 				c.set_shader_parameter("clay_bump", COAT_BUMP)
 				c.set_shader_parameter("clay_cavity", 0.12)

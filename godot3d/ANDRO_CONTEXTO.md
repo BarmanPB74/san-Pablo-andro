@@ -428,6 +428,14 @@ Método: 4 agentes editaron a la vez `player_model.gd`, cada uno solo en sus fun
 - Efectos colaterales: con el preset `plastilina` (luz morada) la ropa se ve azul-violeta oscura; se corrige solo cuando el cielo pase a nubes grises. Solapas y botón aún poco legibles; en la espalda las ranuras (omóplatos, cintura) son rectas y duras. Los faldones no se comprobaron caminando en esta fase (solo cambió su onda de pliegues).
 - Siguiente paso: P2 (bufanda: rayas más anchas, superficie lisa de arcilla, colas gordas).
 
+### 2026-11-15 · F1.1 · Manos
+- Diagnóstico (68107): la mano era una losa con aristas (palma de 12 segmentos, dedos de 6 lados, poros marcados). La referencia tiene dedos gruesos y redondos que se tocan, curva relajada, nudillos, pulgar grueso, piel suave con rubor en nudillos.
+- Archivos tocados: `character/player_model.gd` (nuevas `_hand_skin`, `_bez3`, `_geo_hand_clay`; `_geo_hand` la usa en modo plastilina y conserva la versión anterior para el modo normal), `character/gothic_clay_adapter.gd` (rol `hand` con el set `piel`, `HAND_BUMP` 0.22, cavidad 0.06), `tests/andro_plastilina_shot.gd` (vistas `mano` y `mano_perfil`).
+- Forma: muñeca y palma de 14 segmentos con dorso abombado; dedos = curva Bézier de 6 puntos, sección redonda de 8 lados, radio que baja un 17 %, punta redonda; 4 nudillos en el dorso; pulgar grueso con eminencia; vértices con rubor en nudillos/yemas y pliegues en articulaciones. `CLAY_HAND_K` sin cambio (1.4).
+- Tris por mano: 488 → 1 172. Total: 37 152 → 38 440 (+3.5 %). Tests: 5 PASS.
+- Capturas: `F1.1_comparacion_manos.jpg` (referencia | antes | después).
+- Pendiente: la piel sigue más amarilla que la referencia (gris-rosada); es el color de piel compartido con la cara (R2). Los nudillos se leen como una hilera de bolitas de perfil. Sin probar en poses de correr o agacharse.
+
 ### 9.2 Comandos (desde la raíz del repo; `godot` = 4.3)
 ```
 # Importar la primera vez
@@ -471,6 +479,7 @@ Respetar los nombres existentes. Piezas nuevas sugeridas (hijas del pivote corre
 | F8 | [x] hecha | 12-nov; abrigo a medio muslo con faldones `coat_l/r`, chaleco, 6 botones, manos gruesas, sin bandolera |
 | F9 | [x] hecha | 12-nov; con 4 agentes en paralelo según 68107: pelo en bloque, cara, bufanda, piernas/zapatos/abrigo abierto, cabeza ×1.13 en y (3.88 cabezas) |
 | P1 | [x] hecha | 15-nov; abrigo neutro, satinado, mangas con pliegues; ver `docs/andro/PLAN_DETALLE.md` (P2, P3, Z1–Z2, C1–C2, R1–R3 pendientes) |
+| F1.1 | [x] hecha | 15-nov; manos de arcilla (ver §9.1) |
 | F10 | [ ] pendiente | |
 | F11 | [ ] pendiente | |
 
