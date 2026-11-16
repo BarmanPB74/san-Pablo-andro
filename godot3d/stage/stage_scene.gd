@@ -236,11 +236,16 @@ func conjure_portal(target: String, pos: Vector3, yaw := 0.0, open_time := 1.8) 
 	var p := Portal.new(target, portal_size)
 	p.position = pos
 	p.rotation.y = yaw
-	add_child(p)
+	portal_parent().add_child(p)
 	p.entered.connect(func(_p): portal_entered.emit(target))
 	p.open(open_time)
 	portals.append(p)
 	return p
+
+
+## Dónde cuelgan los portales conjurados (la casa los cuelga del cuarto actual para liberarlos con él).
+func portal_parent() -> Node:
+	return self
 
 
 func clear_portals() -> void:

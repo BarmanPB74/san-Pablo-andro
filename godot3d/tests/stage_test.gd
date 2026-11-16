@@ -81,7 +81,7 @@ func _initialize() -> void:
 		check(player.global_position.y > -0.5 and player.global_position.y < 2.5, "  altura sana")
 		var geo := count_geometry(stage.current)
 		check(geo.x < TRI_BUDGET and geo.y < MESH_BUDGET, "  presupuesto: %d triángulos, %d mallas" % [geo.x, geo.y])
-		check(stage.current.env != null and stage.current.sun != null, "  tiene ambiente y luz propios")
+		check(stage.current.env != null and (id == "casa" or stage.current.sun != null), "  tiene ambiente y luz propios")
 		check(stage.get_child_count() == 1, "  solo una escena viva")
 
 		story.skip()
@@ -96,8 +96,9 @@ func _initialize() -> void:
 		check(portal.target == target, "  el portal lleva a %s" % target)
 		check(portal.size == stage.current.portal_size, "  el portal tiene el tamaño de la escena")
 		if id == "casa":
-			check(portal.global_position.y + portal.size.y + 1.0 < HouseScene.H, "  el portal cabe bajo el techo")
-			check(absf(portal.global_position.x) < 11.0 and absf(portal.global_position.z) < 7.0, "  el portal queda dentro de la casa")
+			var dim: Vector3 = HouseRooms.DEFS[(stage.current as HouseScene).room_id]["dim"]
+			check(portal.global_position.y + portal.size.y + 1.0 < dim.y, "  el portal cabe bajo el techo")
+			check(absf(portal.global_position.x) < dim.x * 0.5 - 1.0 and absf(portal.global_position.z) < dim.z * 0.5 - 1.0, "  el portal queda dentro del cuarto")
 		var t := 0
 		while not portal.monitoring and t < 400:
 			await physics_frame

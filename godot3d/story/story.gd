@@ -80,6 +80,8 @@ func _on_scene_entered(id: String) -> void:
 	can_conjure = false
 	_door = null
 	hud.show_title(stage.current.title)
+	if stage.current.has_signal("room_changed") and not stage.current.is_connected("room_changed", _on_room_changed):
+		stage.current.connect("room_changed", _on_room_changed)
 	if chapter >= CHAPTERS.size():
 		_run_free(id, _gen)
 		return
@@ -91,6 +93,12 @@ func _on_scene_entered(id: String) -> void:
 	if (ch["objective"] as String) != "":
 		stage.current.objective_reached.connect(_on_objective)
 	_run_intro(ch, _gen)
+
+
+## En la casa, cada cuarto nuevo muestra su nombre (el primero ya lo cubre el título de la escena).
+func _on_room_changed(_room_id: String, room_title: String) -> void:
+	if stage.current != null and stage.current.id == "casa" and hud != null and (stage.current.get("room") != null):
+		hud.show_title(room_title)
 
 
 func _run_intro(ch: Dictionary, gen: int) -> void:
