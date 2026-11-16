@@ -8,9 +8,9 @@ extends Node3D
 @export var touch_sensitivity := 0.005
 @export var pitch_min := deg_to_rad(-70.0)
 @export var pitch_max := deg_to_rad(45.0)
-@export var foot_distances: Array[float] = [2.3, 3.8]
+@export var foot_distances: Array[float] = [4.2, 6.4]
 @export var vehicle_distances: Array[float] = [6.0, 9.0]
-@export var shoulder_offset := 0.55          # cámara a la derecha del hombro
+@export var shoulder_offset := 0.35          # cámara a la derecha del hombro
 @export var base_fov := 70.0
 @export var sprint_fov := 79.0
 
@@ -82,6 +82,16 @@ func follow(new_target: Node3D, new_mode: String) -> void:
 	var body := _find_body(target)
 	if body:
 		spring.add_excluded_object(body.get_rid())
+
+
+## Coloca la cámara detrás del objetivo mirando hacia `yaw` (tras un cambio de escena).
+func snap_behind(yaw: float, pitch := deg_to_rad(-9.0)) -> void:
+	_yaw = yaw
+	_pitch = clampf(pitch, pitch_min, pitch_max)
+	if target and is_instance_valid(target) and target.is_inside_tree():
+		global_position = target.global_position
+		_prev_target_pos = target.global_position
+	_apply_rotation()
 
 
 func get_yaw() -> float:

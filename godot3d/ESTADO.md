@@ -1,25 +1,35 @@
 # ESTADO — San Pablo Andro 3D (leer esto primero)
 
 Una sola página para empezar cada sesión sin releer todo el proyecto.
-Actualiza la sección "Última sesión" al terminar cada paso del plan.
+Actualiza la sección "Última sesión" al terminar cada paso.
 
-## Qué es
-Juego 3D en Godot 4.3 (renderer Mobile), barrio Boston de Medellín. Todo se construye por código GDScript.
-Reglas globales, capas de física, grupos y entradas: `CONTRACT.md` (71 líneas).
-Plan gráfico anterior (fases 1-5): `PLAN_GRAFICOS.md`. El plan vigente está en Obsidian (fases 2.x a 10.x).
+## Qué es (cambio de rumbo, 15 nov 2026)
+Juego 3D en Godot 4.x, todo construido por código GDScript (sin assets). Andro es una figura alta de tela negra sin rostro que
+**levita** con esferas pálidas orbitando (`docs/refs/REF_83527`). Ya no hay mapa de ciudad: hay una **base plana** (El Umbral) desde la
+que Andro **conjura puertas-portal** (galaxia, `REF_83528`) y viaja por sus recuerdos buscando al demonio que le enseñó su poder de niño.
+Reglas globales, capas de física, grupos y entradas: `CONTRACT.md`. Arquitectura nueva y cómo agregar escenas: `docs/NUEVO_RUMBO.md`.
 
 ## Mapa de carpetas
-- `core/` entradas y juego · `character/` jugador, modelo y cámara · `vehicles/` autos y fábrica
-- `world/` mapa (`boston_district.gd`) y `world/props/` (árboles, postes, semáforos, edificios, mobiliario)
-- `art/` paleta, materiales y texturas PBR · `look/` cielo, lluvia, post-proceso · `ui/` HUD y controles táctiles
-- `tests/` pruebas headless y capturas (`integration_test.gd`, `character_logic_test.gd`, `vehicle_physics_test.gd`, `world_test.gd`)
+- `core/` entradas y `game.gd` (arma Stage, cámara, jugador, HUD, controles, Story)
+- `stage/` Stage (gestor de escenas), Portal, TransitionFX, Geo (geometría procedural), `shaders/` y `scenes/` (umbral, planetas, fuente, anillos, cubo)
+- `story/story.gd` capítulos, subtítulos telepáticos, objetivos y puerta
+- `character/` Player (física de caminar + flote visual), `andro_cloak.gd` (capas de tela, campo de fuerza y esferas de cromo), camera_rig, `shaders/` (capa y esferas)
+- `ui/` HUD (título, subtítulos, aviso) y controles táctiles (botón PUERTA)
+- `vehicles/`, `art/`, `look/`: módulos del juego anterior, **dormidos** (nada los carga; los tests de vehículos siguen pasando)
+- `tests/` pruebas headless: `stage_test.gd` (recorrido completo), `cloak_test.gd` (tela/esferas), `character_logic_test.gd`, `vehicle_physics_test.gd`; capturas: `stage_shot.gd`, `andro_cloak_shot.gd`, `transition_shot.gd`
 
-## Estado (9 nov 2026)
-- Hecho: texturas PBR (fase 1), modelos (fase 2), personaje que camina/corre/salta, entrar y manejar autos.
-- Rendimiento medido en el editor del teléfono: ~51 FPS en el parque, ~78 FPS en la calle.
-- Sin APK todavía (a propósito): se juega desde el editor de Godot en el teléfono.
+## Estado (15 nov 2026)
+- Hecho: Andro = tres capas de tela sobre una esfera invisible (campo de fuerza, sin rasgos humanos) con resorte (se arrastra, rebota al frenar, se ladea al girar) + 5 esferas de cromo gris + golpe telequinético; Umbral plano con niebla gris y 34 m de área jugable; portal con
+  galaxia y remolino de viaje; 4 escenas de recuerdos (Camino de los Planetas, La Fuente, Cámara de los Anillos, El Cubo); historia con
+  subtítulos, objetivos y modo libre; mapa de Boston, modelo viejo de Andro y pruebas atadas a ellos eliminados.
+- Presupuesto medido (headless): máx. 29 k triángulos y 47 mallas por escena; luces: 1 direccional con sombra + 1–3 locales sin sombra (la cámara de anillos
+  usa 1 foco con sombra).
+- **Sin medir en el teléfono**: FPS reales en Compatibility (aquí solo hay GL por software). Primero probar escena por escena en el teléfono.
+- Pendiente a futuro: sonido, más escenas/portales, enemigos o puzles por escena, vehículos/aviones como forma de viaje (código dormido en `vehicles/`).
 
-## Última sesión (15 nov 2026) — F1.1: manos de Andro
+## Historial (diseño anterior del personaje y del barrio Boston — archivado)
+
+### Sesión (15 nov 2026) — F1.1: manos de Andro
 - Manos rehechas: palma redondeada, dedos gruesos con curva y punta redonda, nudillos, pulgar con eminencia, piel de mano casi lisa. 488 → 1 172 tris por mano (total 38 440). Tests PASS (5).
 - Vistas nuevas de captura `mano` y `mano_perfil`. Comparación: `docs/andro/shots/F1.1_comparacion_manos.jpg`. Detalle en `ANDRO_CONTEXTO.md` §9.1.
 

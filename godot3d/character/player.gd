@@ -34,19 +34,26 @@ signal punched(body: Node3D, idx: int)
 @export var push_speed := 1.5          # rapidez máxima empujando algo pesado
 
 const GRAVITY_MULT := 1.35
-const CAPSULE_RADIUS := 0.3             # caída más "pesada" que la gravedad del mundo
+const CAPSULE_RADIUS := 0.66            # = campo de fuerza de Andro: nada se acerca a la tela más que esto
 const CAPSULE_H := 1.86
-const CAPSULE_H_CROUCH := 1.2
+const CAPSULE_H_CROUCH := 1.4
 const PUNCH_DUR := [0.34, 0.38, 0.5]    # duración de cada golpe del combo
 const PUNCH_HIT := [0.12, 0.14, 0.2]    # instante en que conecta
 const PUNCH_POWER := [4.5, 5.5, 9.0]    # velocidad (m/s) que recibe un objeto liviano
+
+## Levitación (ref. 83525): Andro flota en vez de caminar. Es una capa VISUAL sobre la física de caminar
+## (que no cambia: escalones, rampas, saltos, empujar y golpear siguen igual): el modelo sube HOVER_H sobre
+## la cápsula con suavizado y usa su pose de levitación. Poner `levitate = false` para volver a caminar.
+@export var levitate := true
+const HOVER_H := 0.42                   # altura de los pies sobre el suelo (m)
+const HOVER_RATE := 7.0                 # 1/s: suavizado de subida y bajada del flote
 
 ## Vehículo actual (VehicleBody3D que cumple la API Vehicle del contrato) o null.
 var current_vehicle: VehicleBody3D = null
 ## Estado de animación actual (idle, walk, run, sprint, jump, fall, land, stumble,
 ## enter_vehicle, in_vehicle).
 var state := "idle"
-var model: PlayerModel
+var model: AndroCloak
 var camera_rig: Node3D
 
 var _facing := 0.0                     # yaw del cuerpo (0 = mirando a -Z)
@@ -59,6 +66,7 @@ var _approach_vehicle: VehicleBody3D = null
 var _approach_timer := 0.0
 var _entering_vehicle: VehicleBody3D = null
 var _step_smooth := 0.0                # compensación visual al subir escalones
+var _hover := 0.0                      # altura actual del flote (m)
 # Interpolación visual: la física corre a 60 Hz pero la pantalla (p. ej. 120 Hz) se
 # redibuja más seguido. El modelo se anima y se desplaza entre ticks para que no "salte".
 var _vp_prev := Vector3.ZERO
@@ -83,7 +91,7 @@ var _punch_hit_done := false
 var _combo_timer := 0.0                # tiempo restante para encadenar el siguiente golpe
 var _push_t := 0.0                     # >0 mientras empuja un objeto
 var _exit_t := 1.0                     # <0.4: animación de bajar del auto
-var _anchor_y := 1.55
+var _anchor_y := 1.7
 
 
 func _ready() -> void:
@@ -108,16 +116,16 @@ func _ready() -> void:
 		cs.position = Vector3(0, CAPSULE_H * 0.5, 0)
 		add_child(cs)
 
-	model = get_node_or_null("Model") as PlayerModel
+	model = get_node_or_null("Model") as AndroCloak
 	if model == null:
-		model = PlayerModel.new()
+		model = AndroCloak.new()
 		model.name = "Model"
 		add_child(model)
 	model.rotation.y = _facing
 
 	_anchor = Marker3D.new()
 	_anchor.name = "CameraAnchor"
-	_anchor.position = Vector3(0, 1.55, 0)
+	_anchor.position = Vector3(0, 1.7, 0)
 	add_child(_anchor)
 
 	# Sensor de atropellos: detecta vehículos (capa 3) alrededor del cuerpo
@@ -128,7 +136,7 @@ func _ready() -> void:
 	_hit_area.monitorable = false
 	var hs := CollisionShape3D.new()
 	var hcap := CapsuleShape3D.new()
-	hcap.radius = 0.45
+	hcap.radius = CAPSULE_RADIUS + 0.1     # un poco más grande que el campo de fuerza
 	hcap.height = 1.9
 	hs.shape = hcap
 	hs.position = Vector3(0, 0.95, 0)
@@ -200,20 +208,23 @@ func _physics_process(delta: float) -> void:
 	_vp_cur = global_position
 	_vf_cur = _facing
 	_vh_cur = hv
-	_anchor_y = lerpf(_anchor_y, 1.1 if _crouching else 1.55, 1.0 - exp(-9.0 * delta))
-	_anchor.position.y = _anchor_y
+	_anchor_y = lerpf(_anchor_y, 1.25 if _crouching else 1.7, 1.0 - exp(-9.0 * delta))
+	_anchor.position.y = _anchor_y + _hover    # la cámara sube con el flote
 
 
 ## Animación a la frecuencia de la pantalla: interpola posición, giro y velocidad entre
 ## los dos últimos ticks de física y avanza los pasos con el delta real del fotograma.
 func _process(delta: float) -> void:
 	if current_vehicle != null or not _vp_ready or not visible:
+		_hover = 0.0      # al volver a pie (bajar del auto) empieza desde el suelo y vuelve a subir suave
 		return
 	var dt := 1.0 / float(Engine.physics_ticks_per_second)
 	var a := clampf(Engine.get_physics_interpolation_fraction(), 0.0, 1.0)
 	_step_smooth = lerpf(_step_smooth, 0.0, 1.0 - exp(-12.0 * delta))
+	_hover = lerpf(_hover, _hover_target(), 1.0 - exp(-HOVER_RATE * delta))
+	model.levitate = levitate
 	var off := (_vp_prev - _vp_cur) * (1.0 - a)
-	model.position = Vector3(0.0, _step_smooth, 0.0) + global_transform.basis.inverse() * off
+	model.position = Vector3(0.0, _step_smooth + _hover, 0.0) + global_transform.basis.inverse() * off
 	model.rotation.y = lerp_angle(_vf_prev, _vf_cur, a)
 	var hv := lerpf(_vh_prev, _vh_cur, a)
 	var pt := _punch_t
@@ -222,6 +233,31 @@ func _process(delta: float) -> void:
 	model.punch_t = pt
 	model.punch_idx = _punch_idx
 	model.animate(state, hv, delta)
+
+
+## Reubica a Andro (cambio de escena): posición, rumbo (yaw 0 = mira a -Z) y sin inercia.
+func teleport(pos: Vector3, yaw: float) -> void:
+	global_position = pos
+	velocity = Vector3.ZERO
+	_facing = yaw
+	_speed = 0.0
+	_skidding = false
+	_vp_ready = false
+	_hover = 0.0
+	if model:
+		model.rotation.y = yaw
+
+
+## Altura de flote deseada según el estado: sin flote al subir/bajar del auto o al tropezar; agachado casi pegado al suelo.
+func _hover_target() -> float:
+	if not levitate:
+		return 0.0
+	match state:
+		"stumble", "enter_vehicle", "exit_vehicle", "in_vehicle":
+			return 0.0
+		"crouch", "crouch_walk":
+			return HOVER_H * 0.3
+	return HOVER_H
 
 
 func _process_on_foot(delta: float) -> void:

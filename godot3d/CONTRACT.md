@@ -1,12 +1,12 @@
-# Contrato técnico — San Pablo Andro 3D (Godot 4.3, renderer Mobile)
+# Contrato técnico — San Pablo Andro 3D (Godot 4.x; objetivo: renderer Compatibility en el teléfono)
 
 Este documento es la fuente de verdad entre los agentes. Si algo no está aquí, NO lo asumas de otro módulo.
 
 ## Convenciones globales
 - 1 unidad = 1 metro. Y arriba. **-Z = Norte**, +X = Este.
-- Origen (0,0,0) = centro del Parque de Boston (pie de la estatua de José María Córdova), a nivel del andén del parque.
+- Cada escena tiene su propio origen: el piso está en y = 0 y Andro aparece en `spawn_pos` (cada `StageScene` lo define; yaw 0 = mira a -Z).
 - Todo se construye **por código** (GDScript) con primitivas (BoxMesh, CylinderMesh, CapsuleMesh, PrismMesh, CSG prohibido por rendimiento móvil salvo en editor). No hay assets externos ni descargas.
-- Materiales SIEMPRE desde `Palette` (`res://art/palette.gd`), p. ej. `Palette.asphalt()`. No crees materiales sueltos salvo shaders del agente LOOK.
+- Materiales: shaders propios en `stage/shaders/` y `character/shaders/` (cielo, piso, roca, agua, galaxia…). `Palette` y `ClayStyle` pertenecen al juego anterior y no se usan (`ClayStyle.enabled = false`).
 - Tipado estático en GDScript (`var x: float`), tabs para indentar, comentarios en español.
 - Objetivo de rendimiento: teléfono Android gama alta (Poco F8 Pro). Pocos draw calls: usa MultiMeshInstance3D para elementos repetidos (ventanas, árboles, postes), sombras solo de la luz direccional, luces Omni con `shadow_enabled=false` y rango corto.
 
@@ -22,12 +22,12 @@ Este documento es la fuente de verdad entre los agentes. Si algo no está aquí,
 
 ## Grupos
 - `"player"` — el CharacterBody3D del jugador.
-- `"vehicle"` — cada vehículo conducible.
-- `"spawn_player"` — Marker3D donde aparece el jugador (lo pone WORLD).
-- `"spawn_vehicle"` — Marker3D donde aparecen autos estacionados (lo pone WORLD, con metadata `"kind"`: "taxi" | "sedan" | "pickup" | "buseta").
+- `"vehicle"` — cada vehículo conducible (módulo dormido).
+- `"portal"` — cada `Portal` conjurado (Area3D que viaja al cruzarlo).
+- `"camera_rig"` — la cámara. (`spawn_player`/`spawn_vehicle` del juego anterior ya no se usan.)
 
 ## Entradas (autoload `Inputs`, ya existe)
-Acciones: `move_forward, move_back, move_left, move_right, sprint, jump, handbrake, interact, camera_toggle, horn`.
+Acciones: `move_forward, move_back, move_left, move_right, sprint, jump, handbrake, interact, camera_toggle, horn, crouch, punch`. `interact` = **PUERTA** (conjura el portal hacia el siguiente recuerdo).
 `Inputs.move_vector()` → Vector2 (x derecha, y adelante). `Inputs.take_touch_look()` → delta de cámara del dedo (píxeles) a sumar al mouse.
 En auto: move_forward = acelerar, move_back = frenar/reversa, left/right = dirección, handbrake = freno de mano.
 
@@ -56,16 +56,22 @@ func get_camera_anchor() -> Node3D
 - La cámara es `res://character/camera_rig.gd` (`class_name CameraRig extends Node3D`) con `func follow(target: Node3D, mode: String)` donde mode = "on_foot" | "vehicle". El Player crea/busca el CameraRig en el grupo `"camera_rig"`.
 - Atropellos: si un Vehicle golpea al jugador a > 15 km/h, el jugador entra en estado `"stumble"` (cae, se levanta) — estilo GTA IV.
 
-## Mundo (agente WORLD) — `res://world/boston_district.gd`
-`class_name BostonDistrict extends Node3D` — construye en `_ready()` todo el barrio: terreno, calles, andenes, parque, iglesia, edificios, mobiliario, colisiones, spawns.
+## Escenarios — `res://stage/`
+- `Stage` (`stage.gd`): `go(id)` viaja a una escena (remolino de `TransitionFX`), `current`, `current_id`, señales `scene_entered/scene_leaving`. Ids: `umbral, planetas, fuente, anillos, cubo` (tabla `Stage.SCENES`).
+- `StageScene` (`stage_scene.gd`): base de cada escena. Define `title`, `spawn_pos`, `spawn_yaw`, `spawn_pitch`; rellena `build()`; es dueña de su `WorldEnvironment` y su luz. Ayudantes: `make_environment`, `add_ground/box/cylinder/sphere`, `add_bounds_circle`, `add_trigger(objetivo, pos, tamaño)`, `conjure_portal(destino, pos, yaw)`. Señales `objective_reached(nombre)` y `portal_entered(destino)`.
+- `Portal` (`portal.gd`): Area3D con marco de bronce y galaxia; `open()/close()`; emite `entered` al cruzarlo el jugador.
+- Geometría procedural compartida: `Geo` (`geo.gd`: rejillas, columnas, riscos, rocas, superficies de revolución).
 
-## Look (agente LOOK) — `res://look/`
-- `res://look/second_son_environment.gd`: `class_name StreetLook extends Node` que en `_ready()` crea WorldEnvironment + DirectionalLight3D y expone `func set_time_of_day(preset: String)` con presets `"overcast_day" | "golden_hour" | "rainy_night"`.
-- Dueño de `res://art/palette.gd` (puede mejorar el interior, no las firmas).
+## Andro — `res://character/andro_cloak.gd`
+`class_name AndroCloak extends Node3D`: tres capas de tela sobre una esfera invisible (campo de fuerza = cápsula del jugador, `Player.CAPSULE_RADIUS` 0.66; shader con resorte-amortiguador) + 5 esferas de cromo gris que orbitan fuera del campo. Sin rasgos humanos. API que usa `Player`: `levitate`, `punch_t`, `punch_idx`, `animate(state, speed, delta)`.
+`Player` conserva su física de caminar y suma `teleport(pos, yaw)`; el flote es solo visual (`HOVER_H`). `CameraRig` suma `snap_behind(yaw, pitch)`.
 
-## Escena principal (integrador) — `res://main.tscn`
-Instancia: StreetLook, BostonDistrict, CameraRig, Player en `spawn_player`, vehículos en cada `spawn_vehicle`, HUD táctil.
+## Historia — `res://story/story.gd`
+`class_name Story extends Node`: capítulos (`CHAPTERS`), subtítulos vía `GameHUD.say()`, objetivos por escena y puerta bloqueada hasta cumplirlos; `skip()` salta el diálogo; tras el último capítulo, modo libre.
+
+## Escena principal — `res://main.tscn` (`core/game.gd`)
+Instancia CameraRig, Player, TransitionFX, Stage, GameHUD, TouchControls y Story. `start_scene` exportado permite empezar en cualquier escena.
 
 ## Herramienta de validación
-Godot headless: `/tmp/godot/Godot_v4.3-stable_linux.x86_64 --headless --path /home/claude/san-pablo-andro/godot3d ...`
+Godot headless: `godot --headless --path godot3d --import` y luego `godot --headless --fixed-fps 60 --path godot3d -s res://tests/stage_test.gd` (también `cloak_test.gd`, `character_logic_test.gd`).
 Antes del primer uso corre una vez `--headless --editor --quit` para importar/registrar class_name.

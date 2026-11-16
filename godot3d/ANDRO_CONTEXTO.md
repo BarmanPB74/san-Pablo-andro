@@ -1,5 +1,7 @@
 # ANDRO_CONTEXTO — Rediseño del personaje (arcilla gótica / stop-motion)
 
+> **ARCHIVADO (15 nov 2026).** Describe el Andro anterior (humano de arcilla, `player_model.gd`, ya eliminado). El Andro vigente es la figura de tela con esferas (`character/andro_cloak.gd`); ver `ESTADO.md` y `docs/NUEVO_RUMBO.md`. Se conserva como historia del diseño.
+
 Versión 2.6 · 12-nov-2026 · F0 a F9 + ronda 2 de afinado · referencia principal: turnaround 68107 · Rama `fase-3d-godot` · Godot 4.3 · renderer Mobile
 Alcance: SOLO Andro (`godot3d/character/`) y su movimiento. Nada del mapa, vehículos ni UI.
 

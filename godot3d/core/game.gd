@@ -1,47 +1,47 @@
 extends Node3D
-## Escena principal: ensambla los módulos de cada agente según CONTRACT.md.
+## Escena principal: Andro flota por el Umbral y viaja por sus recuerdos a través de puertas-portal.
+## Ensambla Stage (escenarios), AndroCloak vía Player, cámara, HUD y controles táctiles.
 ## Se cargan por ruta (load) para que la escena no se rompa si un módulo falta.
 
-@export var time_of_day := "plastilina"   # plastilina | overcast_day | golden_hour | rainy_night | tinta_y_papel
+@export var start_scene := "umbral"
 
-var look: Node
-var district: Node3D
+var stage: Stage
+var fx: TransitionFX
 var camera_rig: Node3D
 var player: Node3D
 var touch: TouchControls
 var hud: GameHUD
+var story: Node
 
 
 func _ready() -> void:
-	# Modo plastilina: se fija ANTES de construir el mundo (árboles, rejas y personaje cambian de forma).
-	ClayStyle.enabled = time_of_day == "plastilina"
-	look = _new_from("res://look/second_son_environment.gd")
-	if look:
-		look.name = "StreetLook"
-		add_child(look)
-		if look.has_method("set_time_of_day"):
-			look.set_time_of_day(time_of_day)
-
-	district = _new_from("res://world/boston_district.gd")
-	if district:
-		district.name = "BostonDistrict"
-		add_child(district)
-
+	ClayStyle.enabled = false        # el estilo plastilina queda fuera: ahora la tela y la galaxia mandan
 	camera_rig = _new_from("res://character/camera_rig.gd")
-	if camera_rig:
-		camera_rig.name = "CameraRig"
-		add_child(camera_rig)
+	camera_rig.name = "CameraRig"
+	add_child(camera_rig)
 
-	_spawn_vehicles()
 	_spawn_player()
+
+	fx = TransitionFX.new()
+	add_child(fx)
+	stage = Stage.new()
+	stage.name = "Stage"
+	add_child(stage)
+	stage.setup(player, camera_rig, fx)
 
 	hud = GameHUD.new()
 	hud.player = player
 	add_child(hud)
 	touch = TouchControls.new()
 	add_child(touch)
-	if ClayStyle.enabled:
-		add_child(ClayStyle.new())   # convierte todos los materiales a arcilla (y los que se creen después)
+
+	if ResourceLoader.exists("res://story/story.gd"):
+		story = _new_from("res://story/story.gd")
+		story.name = "Story"
+		add_child(story)
+		story.call("setup", stage, player, hud, start_scene)
+	else:
+		stage.go(start_scene)
 
 
 func _new_from(path: String) -> Node:
@@ -62,26 +62,6 @@ func _spawn_player() -> void:
 	if player == null:
 		return
 	player.name = "Player"
-	# El transform se asigna ANTES de add_child: Player lee su orientación en _ready().
-	var spawns := get_tree().get_nodes_in_group("spawn_player")
-	if spawns.size() > 0:
-		player.transform = (spawns[0] as Node3D).global_transform
-	else:
-		player.position = Vector3(0, 2, 8)
+	player.position = Vector3(0, 0.2, 6)
 	add_child(player)
-
-
-func _spawn_vehicles() -> void:
-	if not ResourceLoader.exists("res://vehicles/vehicle_factory.gd"):
-		return
-	var factory = load("res://vehicles/vehicle_factory.gd")
-	for m in get_tree().get_nodes_in_group("spawn_vehicle"):
-		var kind: String = m.get_meta("kind", "sedan")
-		var v: Node = factory.spawn(kind, (m as Node3D).global_transform, self)
-		if v and v.has_signal("driver_entered"):
-			v.driver_entered.connect(func(_d): touch.set_in_vehicle(true))
-			v.driver_exited.connect(func(_d): touch.set_in_vehicle(false))
-	# De noche los autos prenden faros y luces de posición.
-	var vclass = load("res://vehicles/vehicle.gd")
-	if time_of_day == "rainy_night" or time_of_day == "plastilina":
-		vclass.set_night(true, get_tree())
+	camera_rig.call("follow", player.get_camera_anchor(), "on_foot")

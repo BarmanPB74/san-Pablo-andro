@@ -244,7 +244,7 @@ func _run() -> void:
 	var cap := (player.get_node("CollisionShape3D") as CollisionShape3D).shape as CapsuleShape3D
 	await _tap("crouch")
 	await _frames(6)
-	_check(player.state == "crouch" and cap.height < 1.3, "agachado: estado %s, cápsula %.2f" % [player.state, cap.height])
+	_check(player.state == "crouch" and cap.height < 1.5, "agachado: estado %s, cápsula %.2f" % [player.state, cap.height])
 	Input.action_press("move_forward")
 	await _frames(60)
 	_check(player.state == "crouch_walk" and _hspeed() < 1.4 and _hspeed() > 0.5, "agachado caminando lento (%.2f m/s, %s)" % [_hspeed(), player.state])
@@ -258,11 +258,11 @@ func _run() -> void:
 	ccs.shape = cb
 	ceil.add_child(ccs)
 	scene.add_child(ceil)
-	ceil.global_position = player.global_position + Vector3(0, 1.45, 0)
+	ceil.global_position = player.global_position + Vector3(0, 1.6, 0)
 	await _frames(3)
 	await _tap("crouch")
 	await _frames(6)
-	_check(player.state.begins_with("crouch"), "bajo un techo de 1.35 m no se levanta (%s)" % player.state)
+	_check(player.state.begins_with("crouch"), "bajo un techo de 1.5 m no se levanta (%s)" % player.state)
 	ceil.queue_free()
 	await _frames(3)
 	await _tap("crouch")
