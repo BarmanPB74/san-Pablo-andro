@@ -111,17 +111,35 @@ func _initialize() -> void:
 	check(min_z < -0.8, "el golpe lanza las esferas al frente (z = %.2f)" % min_z)
 	check(float(m._orb_mat.get_shader_parameter("glow")) > 0.2, "las esferas brillan al golpear")
 
-	# estelas: cada esfera tiene su estela y su cabeza coincide con la esfera
-	var trail_err := 0.0
-	var trails := 0
+	# movimiento natural: quietas, ninguna esfera recorre un círculo exacto (el radio y la altura varían por su cuenta)
+	m.position = Vector3.ZERO
+	var rmin := [9.0, 9.0, 9.0, 9.0, 9.0]
+	var rmax := [0.0, 0.0, 0.0, 0.0, 0.0]
+	var ymin := [9.0, 9.0, 9.0, 9.0, 9.0]
+	var ymax := [-9.0, -9.0, -9.0, -9.0, -9.0]
+	for f in 1620:
+		m.animate("idle", 0.0, dt)
+		if f < 120:
+			continue        # el golpe anterior tarda un poco en asentarse
+		for i in 5:
+			var o := m.get_node("Orb%d" % i) as Node3D
+			var rr := Vector2(o.position.x, o.position.z).length()
+			rmin[i] = minf(rmin[i], rr)
+			rmax[i] = maxf(rmax[i], rr)
+			ymin[i] = minf(ymin[i], o.position.y)
+			ymax[i] = maxf(ymax[i], o.position.y)
+	var natural := true
 	for i in 5:
-		var orb := m.get_node_or_null("Orb%d" % i) as Node3D
-		var tr := m.get_node_or_null("Trail%d" % i) as Node3D
-		if orb and tr:
-			trails += 1
-			var head: Vector3 = tr.global_transform * Vector3(0, 0, 1)
-			trail_err = maxf(trail_err, head.distance_to(orb.global_position))
-	check(trails == 5 and trail_err < 0.02, "5 estelas con la cabeza en su esfera (error %.3f m)" % trail_err)
+		if rmax[i] - rmin[i] < 0.1 or ymax[i] - ymin[i] < 0.2:
+			natural = false
+	check(natural, "órbitas naturales (quietas, 25 s): el radio varía %.2f / %.2f / %.2f m y la altura %.2f / %.2f / %.2f m (esferas 0, 1 y 2)" % [rmax[0] - rmin[0], rmax[1] - rmin[1], rmax[2] - rmin[2], ymax[0] - ymin[0], ymax[1] - ymin[1], ymax[2] - ymin[2]])
+
+	# no hay estelas ni rastro blanco: solo las 5 esferas
+	var extra := 0
+	for c in m.get_children():
+		if c is MeshInstance3D and (c.name as String).begins_with("Trail"):
+			extra += 1
+	check(extra == 0, "sin estelas (%d)" % extra)
 
 	# campo de fuerza: ninguna esfera entra, ni corriendo ni al golpear
 	var worst := 9.0

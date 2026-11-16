@@ -25,8 +25,8 @@ Nota: `docs/` lleva `.gdignore`, así que Godot no importa esas imágenes.
   las esferas orbitan siempre por fuera (`ORB_CLEARANCE`, se aplica después del golpe). Nada toca la tela. (No subir el radio por encima de ~0.7: la parte baja de la cápsula
   es una esfera y deja de subir sardineles de 0.35 m; si hace falta más, cambiar la cápsula por un cilindro.)
 - Resorte-amortiguador en GDScript (k = 58, c = 6.5, subpasos de 8 ms): corre → el borde queda atrás (máx. 0.5 m); frena → rebota hacia adelante; gira → se ladea.
-- 5 esferas de **cromo plateado en grises** (`orb.gdshader`: metálico, rugosidad 0.06, "estudio" procedural de grises además del reflejo del cielo), con arrastre propio;
-  el golpe (`punch`) las dispara al frente y las hace brillar. Cada esfera deja una **estela de vidrio** (`orb_trail.gdshader`, arco de tubo que se desvanece) centrada en el cuerpo.
+- 5 esferas de **cromo plateado en grises** (`orb.gdshader`: metálico, rugosidad 0.06, "estudio" procedural de grises además del reflejo del cielo), con arrastre propio y deriva natural e independiente (cada una adelanta/se retrasa, respira y sube/baja con frecuencias distintas; sin estelas ni rieles);
+  el golpe (`punch`) las dispara al frente y las hace brillar.
 - Luz de personaje (Omni sin sombra) para que la tela se lea en escenas oscuras. La capa no recibe sombras (evita acné) pero sí las proyecta.
 - `Player` mantiene la física de caminar (escalones, saltos, agacharse, golpear, empujar); el flote (`HOVER_H` = 0.42 m) es solo visual.
 

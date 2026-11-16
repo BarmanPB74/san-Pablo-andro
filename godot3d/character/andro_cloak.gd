@@ -5,14 +5,13 @@ extends Node3D
 ## interior larga (dobladillo en puntas) y, encima, un manto exterior abierto al frente (la abertura nace en la cúpula y se
 ## cierra hacia abajo) con ribetes ornamentados en los bordes y en el dobladillo. Nada puede tocar la tela: el campo de
 ## fuerza es la cápsula de colisión del jugador (Player.CAPSULE_RADIUS) y las esferas orbitan por fuera de él.
-## Cinco esferas de cromo gris orbitan alrededor, cada una con su estela de vidrio.
+## Cinco esferas de cromo gris orbitan alrededor, cada una por su cuenta y sin dejar rastro.
 ## La tela se mueve con un resorte-amortiguador: al avanzar el borde se queda atrás, al frenar se adelanta
 ## y oscila, al girar se balancea; la capa interior y el manto se separan al moverse.
 ## API que usa Player: levitate, punch_t, punch_idx, animate(state, speed, delta).
 
 const CLOAK_SHADER := preload("res://character/shaders/cloak.gdshader")
 const ORB_SHADER := preload("res://character/shaders/orb.gdshader")
-const TRAIL_SHADER := preload("res://character/shaders/orb_trail.gdshader")
 
 const N_SEG := 44                       # puntos alrededor de la capa interior (cerrada)
 const N_PANEL := 40                     # puntos alrededor del manto exterior (abierto al frente)
@@ -28,15 +27,14 @@ const GAP_EQUATOR := 0.80
 const GAP_HEM := 0.24
 ## [escala, radio de órbita, altura, velocidad, fase, arrastre]. Todas orbitan FUERA del campo de fuerza.
 const ORBS := [
-	[0.16, 1.16, 1.65, 0.50, 0.0, 0.07],
-	[0.10, 1.02, 1.15, -0.70, 1.7, 0.10],
-	[0.13, 1.26, 1.45, 0.40, 3.2, 0.05],
-	[0.08, 0.98, 2.00, -0.90, 4.4, 0.12],
-	[0.11, 1.10, 0.90, 0.60, 5.6, 0.08],
+	[0.16, 1.05, 1.55, 0.50, 0.0, 0.07],
+	[0.10, 0.92, 1.00, -0.70, 1.7, 0.10],
+	[0.13, 1.15, 1.30, 0.40, 3.2, 0.05],
+	[0.08, 0.88, 1.85, -0.90, 4.4, 0.12],
+	[0.11, 1.00, 0.75, 0.60, 5.6, 0.08],
 ]
 ## Distancia mínima (horizontal, desde el eje) a la que puede estar el centro de una esfera: borde del campo + su radio.
 const ORB_CLEARANCE := 0.76
-const TRAIL_ARC := 4.0                  # largo de la estela (rad)
 const PUNCH_DUR := [0.34, 0.38, 0.5]
 
 # --- API de Player
@@ -49,8 +47,6 @@ var _cloak: MeshInstance3D
 var _cloak_mat: ShaderMaterial
 var _orb_mat: ShaderMaterial
 var _orb_nodes: Array[MeshInstance3D] = []
-var _trail_nodes: Array[MeshInstance3D] = []
-var _trail_mat: ShaderMaterial
 var _drift := Vector3.ZERO
 var _drift_vel := Vector3.ZERO
 var _prev_pos := Vector3.ZERO
@@ -102,17 +98,6 @@ func _build() -> void:
 		mi.scale = Vector3.ONE * float(ORBS[i][0])
 		add_child(mi)
 		_orb_nodes.append(mi)
-	_trail_mat = ShaderMaterial.new()
-	_trail_mat.shader = TRAIL_SHADER
-	var trail_mesh := build_trail_mesh()
-	for i in ORBS.size():
-		var tm := MeshInstance3D.new()
-		tm.name = "Trail%d" % i
-		tm.mesh = trail_mesh
-		tm.material_override = _trail_mat
-		tm.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		add_child(tm)
-		_trail_nodes.append(tm)
 	# luz de personaje: fría y suave, sin sombras; mantiene legible la tela en escenas oscuras
 	var key := OmniLight3D.new()
 	key.name = "CharacterLight"
@@ -245,47 +230,20 @@ static func build_cloak_mesh() -> ArrayMesh:
 	return mesh
 
 
-## Estela de una esfera: arco de tubo triangular (radio 1, en el plano XZ) que se adelgaza y se desvanece hacia atrás.
-## El punto s = 0 está en +Z (donde está la esfera); el tubo se extiende hacia ángulos negativos.
-static func build_trail_mesh() -> ArrayMesh:
-	const SEG := 36
-	var verts := PackedVector3Array()
-	var cols := PackedColorArray()
-	var idx := PackedInt32Array()
-	for k in SEG + 1:
-		var f := float(k) / float(SEG)
-		var al := -f * TRAIL_ARC
-		var radial := Vector3(sin(al), 0.0, cos(al))
-		var rho := 0.018 * pow(1.0 - f, 0.6) + 0.002
-		for q in 3:
-			var ang := TAU * float(q) / 3.0
-			verts.append(radial * (1.0 + cos(ang) * rho) + Vector3.UP * sin(ang) * rho)
-			cols.append(Color(1, 1, 1, pow(1.0 - f, 1.5)))
-	for k in SEG:
-		for q in 3:
-			var q2 := (q + 1) % 3
-			var a := k * 3 + q
-			var b := k * 3 + q2
-			var c := (k + 1) * 3 + q
-			var d := (k + 1) * 3 + q2
-			idx.append_array([a, b, c, b, d, c])
-	var arrays := []
-	arrays.resize(Mesh.ARRAY_MAX)
-	arrays[Mesh.ARRAY_VERTEX] = verts
-	arrays[Mesh.ARRAY_COLOR] = cols
-	arrays[Mesh.ARRAY_INDEX] = idx
-	var mesh := ArrayMesh.new()
-	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
-	return mesh
-
-
 func _place_orbs(delta: float) -> void:
 	var swell := _pulse
 	for i in _orb_nodes.size():
 		var o: Array = ORBS[i]
-		var th: float = float(o[4]) + _time * float(o[3])
-		var orbit_r: float = float(o[1]) * (1.0 - 0.35 * swell)
-		var bob := sin(_time * 1.3 + float(i) * 1.9) * 0.07
+		# Movimiento natural e independiente: además de su órbita, cada esfera deriva por su cuenta (adelanta y
+		# se retrasa, respira hacia adentro y afuera, sube y baja) con frecuencias que no coinciden entre sí,
+		# así que nunca repiten el mismo recorrido ni se ven sobre un riel.
+		var fi := float(i)
+		var th: float = float(o[4]) + _time * float(o[3]) \
+				+ 0.22 * sin(_time * (0.31 + 0.07 * fi) + fi * 2.1) + 0.10 * sin(_time * (0.79 + 0.11 * fi) + fi * 4.7)
+		var breathe := 1.0 + 0.07 * sin(_time * (0.47 + 0.05 * fi) + fi * 1.3) + 0.04 * sin(_time * (1.05 + 0.09 * fi) + fi * 3.9)
+		var orbit_r: float = float(o[1]) * breathe * (1.0 - 0.35 * swell)
+		var bob := sin(_time * 1.3 + fi * 1.9) * 0.07 \
+				+ 0.10 * sin(_time * (0.43 + 0.06 * fi) + fi * 5.3) + 0.05 * sin(_time * (0.97 + 0.08 * fi) + fi * 0.9)
 		var p := Vector3(sin(th) * orbit_r, float(o[2]) + bob - _crouch * 0.3, cos(th) * orbit_r)
 		# arrastre: las esferas se quedan atrás al moverse, cada una a su ritmo
 		p -= _vel_local * float(o[5])
@@ -307,18 +265,8 @@ func _place_orbs(delta: float) -> void:
 			p.x = hxz.x
 			p.z = hxz.y
 		_orb_nodes[i].position = p
-		# estela: un arco centrado en el cuerpo (con el mismo arrastre), con la esfera en su cabeza
-		var c := Vector3(-_vel_local.x * float(o[5]), 0.0, -_vel_local.z * float(o[5]))
-		var rel := Vector2(p.x - c.x, p.z - c.z)
-		var rl := maxf(rel.length(), 0.05)
-		var tr := _trail_nodes[i]
-		tr.position = Vector3(c.x, p.y, c.z)
-		tr.rotation.y = atan2(rel.x, rel.y)
-		tr.scale = Vector3(rl if float(o[3]) >= 0.0 else -rl, 1.0, rl)
 	if _orb_mat:
 		_orb_mat.set_shader_parameter("glow", swell * 0.55)
-	if _trail_mat:
-		_trail_mat.set_shader_parameter("glow", swell)
 
 
 func animate(state: String, speed: float, delta: float) -> void:
