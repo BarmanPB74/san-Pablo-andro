@@ -1,4 +1,4 @@
-# Contrato técnico — San Pablo Andro 3D (Godot 4.x; objetivo: renderer Compatibility en el teléfono)
+# Contrato técnico — Noctis (antes San Pablo Andro 3D) (Godot 4.x; objetivo: renderer Compatibility en el teléfono)
 
 Este documento es la fuente de verdad entre los agentes. Si algo no está aquí, NO lo asumas de otro módulo.
 
@@ -64,6 +64,8 @@ func get_camera_anchor() -> Node3D
 
 ## Andro — `res://character/andro_cloak.gd`
 `class_name AndroCloak extends Node3D`: cúpula + capa interior + manto abierto al frente con ribetes, sobre una esfera invisible (campo de fuerza = cápsula del jugador, `Player.CAPSULE_RADIUS` 0.66; shader con resorte-amortiguador) + 5 esferas de cromo gris que orbitan fuera del campo. Sin rasgos humanos. API que usa `Player`: `levitate`, `punch_t`, `punch_idx`, `animate(state, speed, delta)`.
+- `MapWheel` (`ui/map_wheel.gd`): rueda circular de mapas; señales `opened/closed/chosen`, `open()/close()/choose(i)`. `MapCatalog` (`story/map_catalog.gd`): sectores y `START_UNLOCKED`. `Story`: `unlocked`, `is_unlocked`, `unlock_map(id)` (señal `map_unlocked`), `can_travel()`, `travel_block_reason(id)`, `conjure_to(id)`. `UiLock.blocked` (`core/ui_lock.gd`): true mientras la rueda está abierta. Acción de entrada nueva: `map_wheel` (Tab/M/Select; botón MAPAS).
+
 `Player` conserva su física de caminar y suma `teleport(pos, yaw)`; el flote es solo visual (`HOVER_H`). `CameraRig` suma `snap_behind(yaw, pitch)`.
 
 ## Historia — `res://story/story.gd`

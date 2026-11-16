@@ -12,6 +12,7 @@ var player: Node3D
 var touch: TouchControls
 var hud: GameHUD
 var story: Node
+var wheel: MapWheel
 
 
 func _ready() -> void:
@@ -40,6 +41,11 @@ func _ready() -> void:
 		story.name = "Story"
 		add_child(story)
 		story.call("setup", stage, player, hud, start_scene)
+		wheel = MapWheel.new()
+		wheel.name = "MapWheel"
+		add_child(wheel)
+		wheel.setup(story as Story)
+		wheel.opened.connect(touch.cancel_all)
 	else:
 		stage.go(start_scene)
 

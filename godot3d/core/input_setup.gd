@@ -16,6 +16,7 @@ const ACTIONS := {
 	"horn": [KEY_H],
 	"crouch": [KEY_CTRL, KEY_X],  # a pie: agacharse (alterna)
 	"punch": [KEY_J, KEY_Q],      # a pie: golpear (combo de 3)
+	"map_wheel": [KEY_TAB, KEY_M],   # abre la rueda circular de mapas
 }
 
 const PAD_BUTTONS := {
@@ -27,6 +28,7 @@ const PAD_BUTTONS := {
 	"horn": JOY_BUTTON_LEFT_SHOULDER,
 	"crouch": JOY_BUTTON_B,
 	"punch": JOY_BUTTON_X,
+	"map_wheel": JOY_BUTTON_BACK,
 }
 
 ## Vector de cámara inyectado por el HUD táctil (arrastre con el dedo).
@@ -60,6 +62,8 @@ func _add_axis(action: String, axis: JoyAxis, value: float) -> void:
 
 ## Vector de movimiento normalizado: x = derecha, y = adelante.
 func move_vector() -> Vector2:
+	if UiLock.blocked:
+		return Vector2.ZERO
 	return Input.get_vector("move_left", "move_right", "move_back", "move_forward")
 
 
@@ -67,4 +71,4 @@ func move_vector() -> Vector2:
 func take_touch_look() -> Vector2:
 	var v := touch_look
 	touch_look = Vector2.ZERO
-	return v
+	return Vector2.ZERO if UiLock.blocked else v

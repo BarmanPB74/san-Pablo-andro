@@ -23,9 +23,13 @@ const CHAPTERS := [
 
 ## La trama completa se escribe después de los mapas (decisión de Pablo, 16 nov): por ahora solo está el diálogo del Umbral.
 const EPILOGUE: Array = []
-## Mapas a los que se viaja desde el Umbral. Provisional: cada puerta lleva al siguiente de la lista; la rueda de mapas
-## (fase 2) reemplazará esta rotación con la elección del jugador. Desde cualquier otro mapa la puerta vuelve al Umbral.
+## El botón PUERTA lleva, desde el Umbral, al siguiente mapa abierto de esta lista (rotación); desde cualquier otro mapa
+## vuelve al Umbral. Para ir a un mapa concreto (desde cualquier mapa) está la rueda circular (`MapWheel` → `conjure_to`).
 const MAPS := ["casa", "anillos"]
+## Partida guardada: mapas desbloqueados (se puede apagar en pruebas con `Story.save_enabled = false`).
+const SAVE_PATH := "user://noctis.cfg"
+static var save_enabled := true
+signal map_unlocked(id: String)
 
 var stage: Stage
 var player: Node3D
@@ -34,12 +38,14 @@ var chapter := 0                 # capítulo actual (índice en CHAPTERS), o CHA
 var objective_done := false
 var can_conjure := false
 var free_index := 0
+var unlocked: Array = MapCatalog.START_UNLOCKED.duplicate()
 
 var _gen := 0                    # invalida corutinas viejas al cambiar de escena
 var _door: Portal = null
 
 
 func setup(p_stage: Stage, p_player: Node3D, p_hud: GameHUD, start := "umbral") -> void:
+	_load_progress()
 	stage = p_stage
 	player = p_player
 	hud = p_hud
@@ -157,19 +163,87 @@ func _allow_conjure(hint: String) -> void:
 
 
 func _process(_delta: float) -> void:
-	if stage == null or stage.busy or stage.current == null:
+	if stage == null or stage.busy or stage.current == null or UiLock.blocked:
 		return
 	if Input.is_action_just_pressed("interact"):
 		_try_conjure()
 
 
-## Destino al que lleva la próxima puerta: desde el Umbral, el siguiente mapa; desde cualquier mapa, de vuelta al Umbral.
+## Destino al que lleva la próxima puerta: desde el Umbral, el siguiente mapa abierto; desde cualquier mapa, de vuelta al Umbral.
 func next_target() -> String:
 	if stage.current_id != "umbral":
 		return "umbral"
 	if chapter < CHAPTERS.size():
 		return CHAPTERS[chapter]["next"]
+	for i in MAPS.size():
+		var id: String = MAPS[(free_index + i) % MAPS.size()]
+		if is_unlocked(id):
+			return id
 	return MAPS[free_index % MAPS.size()]
+
+
+# ------------------------------------------------------------------ mapas desbloqueados y rueda
+
+func is_unlocked(id: String) -> bool:
+	return unlocked.has(id)
+
+
+## Abre un mapa (la historia lo llama al pasar su parte). Se guarda en disco.
+func unlock_map(id: String) -> void:
+	if unlocked.has(id):
+		return
+	unlocked.append(id)
+	_save_progress()
+	map_unlocked.emit(id)
+
+
+func _load_progress() -> void:
+	if not save_enabled:
+		return
+	var cf := ConfigFile.new()
+	if cf.load(SAVE_PATH) != OK:
+		return
+	for id in cf.get_value("mapas", "desbloqueados", []):
+		if not unlocked.has(id):
+			unlocked.append(id)
+
+
+func _save_progress() -> void:
+	if not save_enabled:
+		return
+	var cf := ConfigFile.new()
+	cf.load(SAVE_PATH)
+	cf.set_value("mapas", "desbloqueados", unlocked)
+	cf.save(SAVE_PATH)
+
+
+## ¿Se puede abrir la rueda y viajar ahora? (no durante un viaje, ni antes de que la historia dé la puerta)
+func can_travel() -> bool:
+	return can_conjure and stage != null and not stage.busy and stage.current != null
+
+
+## Por qué no se puede ir a `id` ahora ("" = se puede). Mensaje listo para mostrar.
+func travel_block_reason(id: String) -> String:
+	if not stage.has_scene(id):
+		return "Aún no existe esta dimensión."
+	if not is_unlocked(id):
+		return "Aún no. Hay que pasar la historia."
+	if id == stage.current_id:
+		return "Ya estás aquí."
+	if not can_travel():
+		return "Aún no."
+	return ""
+
+
+## Elegido en la rueda: conjura (o reemplaza) el portal hacia `id`, desde el mapa en que se esté. Devuelve si lo hizo.
+func conjure_to(id: String) -> bool:
+	if travel_block_reason(id) != "":
+		return false
+	if _door != null and is_instance_valid(_door):
+		stage.current.clear_portals()
+		_door = null
+	_spawn_portal(id)
+	return true
 
 
 ## A qué distancia delante de Andro aparece el portal: la que pide la escena, pero sin meterse en una pared.
@@ -191,11 +265,14 @@ func _try_conjure() -> void:
 		return
 	if _door != null and is_instance_valid(_door):
 		return
+	_spawn_portal(next_target())
+
+
+func _spawn_portal(target: String) -> void:
 	var f: float = player.call("get_facing")
 	var fwd := Vector3(-sin(f), 0.0, -cos(f))
 	var pos: Vector3 = player.global_position + fwd * _portal_distance(fwd)
 	pos.y = player.global_position.y - 0.05
-	var target := next_target()
 	_door = stage.current.conjure_portal(target, pos, f)
 	hud.set_prompt("")
 	# al cruzarla se avanza el capítulo

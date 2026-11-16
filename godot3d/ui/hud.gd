@@ -57,6 +57,7 @@ func _make_label(pos: Vector2, size: int, color: Color) -> Label:
 
 func _process(_delta: float) -> void:
 	_fps.text = "%d FPS" % Engine.get_frames_per_second()
+	_prompt.modulate.a = 0.0 if UiLock.blocked else 1.0         # con la rueda de mapas abierta el aviso estorba
 
 
 ## Muestra el nombre de la escena y lo desvanece.

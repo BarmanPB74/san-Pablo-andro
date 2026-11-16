@@ -1,4 +1,6 @@
-# San Pablo Andro 3D — Fase 3D (Godot 4.3)
+# Noctis — Fase 3D (Godot 4.3)
+
+> El juego se llama **Noctis** desde el 16 nov 2026 (antes "San Pablo Andro 3D"); el protagonista es Andro. El repositorio y la carpeta conservan el nombre viejo.
 
 Mundo abierto en Medellín. Primer escenario: **Parque de Boston** (barrio Boston, La Candelaria).
 Esta fase incluye solo **personaje, escenario y vehículos**. Todo está construido por código (sin assets externos), así se puede editar desde el teléfono.

@@ -68,6 +68,7 @@ func _layout() -> void:
 		_add_button("crouch", Vector2(s.x - 395, s.y - 130), r * 0.65, "AGACHAR")
 	_add_button("interact", Vector2(s.x - 110, s.y - 380), r * 0.8, "PUERTA")
 	_add_button("camera_toggle", Vector2(s.x - 70, 70), r * 0.5, "CAM")
+	_add_button("map_wheel", Vector2(s.x - 70, 185), r * 0.62, "MAPAS")
 	_draw_root.queue_redraw()
 
 
@@ -75,8 +76,21 @@ func _add_button(action: String, center: Vector2, radius: float, label: String) 
 	_buttons.append({"action": action, "center": center, "radius": radius, "touch": -1, "label": label})
 
 
+## Suelta el joystick y todos los botones (al abrir la rueda de mapas, que se queda con los toques).
+func cancel_all() -> void:
+	for b in _buttons:
+		if b.touch != -1:
+			b.touch = -1
+			Input.action_release(b.action)
+	_stick_touch = -1
+	_stick_vec = Vector2.ZERO
+	_look_touch = -1
+	_apply_stick()
+	_draw_root.queue_redraw()
+
+
 func _input(event: InputEvent) -> void:
-	if not visible:
+	if not visible or UiLock.blocked:
 		return
 	if event is InputEventScreenTouch:
 		var t := event as InputEventScreenTouch

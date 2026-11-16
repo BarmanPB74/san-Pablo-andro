@@ -3,8 +3,8 @@ config_version=5
 
 [application]
 
-config/name="San Pablo Andro 3D"
-config/description="Mundo abierto en Medellín — Fase 3D: personaje, Parque de Boston y vehículos"
+config/name="Noctis"
+config/description="Noctis — Andro, un hombre-demonio que levita, viaja por sus recuerdos y dimensiones buscando al demonio que le enseñó su poder"
 run/main_scene="res://main.tscn"
 config/features=PackedStringArray("4.3", "Mobile")
 

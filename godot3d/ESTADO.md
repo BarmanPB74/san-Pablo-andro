@@ -1,4 +1,4 @@
-# ESTADO — San Pablo Andro 3D (leer esto primero)
+# ESTADO — Noctis (antes "San Pablo Andro 3D"; el protagonista sigue siendo Andro) (leer esto primero)
 
 Una sola página para empezar cada sesión sin releer todo el proyecto.
 Actualiza la sección "Última sesión" al terminar cada paso.
@@ -29,7 +29,15 @@ Reglas globales, capas de física, grupos y entradas: `CONTRACT.md`. Arquitectur
 - **Sin medir en el teléfono**: FPS reales en Compatibility (aquí solo hay GL por software). Primero probar escena por escena en el teléfono.
 - Pendiente a futuro: sonido, más escenas/portales, enemigos o puzles por escena, vehículos/aviones como forma de viaje (código dormido en `vehicles/`).
 
-## Última sesión (16 nov 2026) — Fase 1: Umbral = centro de habilidades + La Casa
+## Última sesión (16 nov 2026, tarde) — Fase 2: rueda circular de mapas + el juego se llama **Noctis**
+- **Nombre**: el juego es **Noctis** (`config/name` en `project.godot`, README, ESTADO, CONTRACT). El protagonista sigue siendo Andro; repo y carpeta conservan el nombre viejo.
+- **Rueda de mapas** (`ui/map_wheel.gd`, `MapWheel`; catálogo en `story/map_catalog.gd`): estilo GTA V, 6 sectores desde arriba en sentido horario (Umbral, Casa, Anillos y 3 dimensiones por descubrir con candado). Se abre con el botón **MAPAS** (táctil, arriba a la derecha), Tab/M (teclado) o Select (mando); el tiempo va a 0.2× y Andro/cámara quedan quietos (`UiLock.blocked`). Tocar/soltar sobre un sector conjura un portal hacia ese mapa **desde donde esté Andro** (sin pasar por el Umbral); tocar el centro o fuera del aro cierra; teclado ← → Enter Esc; mando palanca derecha + A/B. Un sector bloqueado o inexistente avisa el motivo y no viaja. Elegir otro destino reemplaza el portal.
+- **Desbloqueo** (`Story`): `unlocked`, `is_unlocked`, `unlock_map(id)` (la historia lo llamará al pasar su parte; se guarda en `user://noctis.cfg`), `conjure_to(id)`, `travel_block_reason(id)`. Hoy están abiertos Umbral, Casa y Anillos (`MapCatalog.START_UNLOCKED`) porque aún no existe la trama que los cierra. PUERTA desde el Umbral rota entre los mapas abiertos.
+- Pruebas: `map_wheel_test` NUEVA (geometría, abrir/cerrar, toque/ratón/teclado, bloqueados, viaje directo Casa → Anillos, reemplazo del portal, rotación); `stage_test`, `house_test`, `cloak_test`, `character_logic_test`: PASS. Capturas: `tests/wheel_shot.gd`.
+- Nota de pruebas: `parse_input_event` espera coordenadas de ventana; en headless la ventana es diminuta, por eso `map_wheel_test` multiplica por `root.get_final_transform()`.
+- **Sin medir en el teléfono**: sensación del toque en la rueda y FPS. Pendiente: **F3** poderes (carga de energía tipo ki, barra de magia por hechizo, bola de fuego desde las esferas), **F4** las dimensiones (cada una ocupa un sector libre y se desbloquea en `START_UNLOCKED`/historia), **F5** historia, objetos y recuerdos de la casa.
+
+## Sesión anterior (16 nov 2026) — Fase 1: Umbral = centro de habilidades + La Casa
 - Plan por fases (decisión de Pablo): **F1** Umbral + casa (esta) · **F2** rueda circular de mapas tipo GTA V · **F3** poderes (carga de energía tipo ki, barra de magia por hechizo, bola de fuego desde las esferas de poder) · **F4** las ~5 dimensiones, una por vez · **F5** historia (después de los mapas).
 - Eliminadas las dimensiones Planetas, Fuente y Cubo (con sus shaders). Se conserva la Cámara de los Anillos (la escultura flotante de anillos) y el Umbral.
 - Nueva escena `casa` (`HouseScene`): la casa de Andro de niño, **un recuerdo sin exterior** (se llega solo por portal): palacio gótico sobrio, gris y en sombras, de **11 cuartos enormes** (vestíbulo, sala, comedor, cocina, patio interior con óculo, galería, 4 habitaciones, baño) que se cargan **uno a la vez**: al cruzar el velo de bruma de una puerta se funde a gris, se libera el cuarto viejo, se construye el vecino y se reaparece en su puerta. Código en `stage/house/` (`house_rooms.gd` plano y mobiliario, `house_builder.gd` constructor, `house_materials.gd`). Detalle en `docs/NUEVO_RUMBO.md` (sección La Casa).

@@ -10,8 +10,7 @@ Nota: `docs/` lleva `.gdignore`, así que Godot no importa esas imágenes.
 2. Cada escena (`stage/scenes/*.gd`) hereda de `StageScene` y en `build()` crea su cielo, luz, piso, colisiones y un trigger de objetivo.
 3. El botón **PUERTA** (`interact`, tecla F/E) conjura un `Portal` 7.5 m delante de Andro si la historia lo permite. Al cruzarlo, el remolino cubre la
    pantalla, el Stage libera la escena vieja, construye la nueva, coloca a Andro en `spawn_pos` y abre el remolino.
-4. Hoy (provisional, hasta la rueda de mapas de la fase 2): desde el Umbral el portal lleva al siguiente de `Story.MAPS` (casa, anillos, casa…) y desde cualquier mapa
-   vuelve al Umbral. Los capítulos con objetivo siguen soportados por `Story` pero ya no se usan.
+4. El botón PUERTA lleva, desde el Umbral, al siguiente mapa abierto de `Story.MAPS` y desde cualquier mapa vuelve al Umbral; para ir a un mapa concreto está la **rueda de mapas** (abajo). Los capítulos con objetivo siguen soportados por `Story` pero ya no se usan.
    **El Umbral** es una dimensión vacía: un suelo divino de mármol negro azulado, pulido, con incrustaciones de oro (`divine_floor.gdshader`: rosa de los vientos en el centro, anillos dobles,
    estrella de 12 puntas, rosetón, arcos, franja de signos y borde triple con marcas; más allá del borde los anillos y rayos dorados se desvanecen hacia el horizonte) bajo un
    cielo azul de amanecer con nubes (`umbral_sky.gdshader`: cúmulos y cirros rosados hacia donde amanece, **sin disco de sol**). **Sin niebla** (`fog_enabled = false`); el piso lejano se funde
@@ -61,8 +60,16 @@ La casa de Andro cuando era un niño humano. **Es un recuerdo: no tiene exterior
 - **Agregar un cuarto**: una entrada en `HouseRooms.DEFS` (dimensiones y puertas con su retorno), una función `_mi_cuarto(b)` en `house_rooms.gd` y una línea en `make()`. Las chimeneas (`hearth`) y `reserve()` se llaman antes de `_shell` para que no haya ventanas encima.
 - Pruebas: `tests/house_test.gd`; capturas: `tests/house_room_shot.gd`.
 
+## Rueda de mapas (`ui/map_wheel.gd`, `story/map_catalog.gd`)
+Menú circular estilo GTA V para viajar a cualquier mapa desde cualquier mapa. `MapCatalog.SLOTS` define los sectores (el 0 arriba, horario): Umbral, Casa, Anillos y tres "???" para las dimensiones de la fase 4.
+- **Abrir**: botón MAPAS (táctil), Tab/M, Select del mando; solo si `Story.can_travel()` (la historia ya dio la puerta y no hay viaje en curso). Abierta: `Engine.time_scale` 0.2, `UiLock.blocked` (Andro, cámara, joystick y PUERTA ignorados), el aviso del HUD se oculta.
+- **Elegir**: tocar/soltar sobre el sector (ratón igual); ← → / A D mueven, Enter elige, Esc cierra; mando: palanca derecha + A/B. Si se puede, cierra y `Story.conjure_to(id)` crea (o reemplaza) el portal delante de Andro. Si no: mensaje en el centro ("Ya estás aquí.", "Aún no. Hay que pasar la historia.", "Aún no existe esta dimensión.") y sigue abierta. Tocar el centro o fuera del aro cierra.
+- **Desbloqueo**: `Story.unlocked` (se guarda en `user://noctis.cfg`), `unlock_map(id)` (la historia lo llamará), `MapCatalog.START_UNLOCKED` (hoy umbral, casa, anillos). Un sector con escena pero sin desbloquear sale con candado y "???".
+- **Agregar una dimensión**: escena en `Stage.SCENES` con el id de un sector libre de `MapCatalog.SLOTS` (renombrar su `name`/`title`/`desc`) y, cuando la historia la abra, `story.unlock_map(id)`.
+- Pruebas: `tests/map_wheel_test.gd`; captura: `tests/wheel_shot.gd`.
+
 ## Pendiente (hoja de ruta, 16 nov)
-- **F2** rueda circular de mapas (estilo GTA V; mapas bloqueados hasta pasar su historia) · **F3** poderes: carga de energía tipo ki, barra de magia por hechizo (empieza en 50 % mejorable con puntos, se recarga sola y rápido), bola de fuego que sale de las esferas de poder · **F4** ~5 dimensiones · **F5** historia.
+- **F2** ✔ rueda circular de mapas (16 nov) · **F3** poderes: carga de energía tipo ki, barra de magia por hechizo (empieza en 50 % mejorable con puntos, se recarga sola y rápido), bola de fuego que sale de las esferas de poder · **F4** ~5 dimensiones · **F5** historia.
 
 ## Pendiente de la versión anterior (sigue vigente)
 - Cómo conjura Andro los portales (gesto, efecto, sonido) y cómo se eligen los destinos.
