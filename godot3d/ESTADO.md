@@ -19,9 +19,11 @@ Reglas globales, capas de física, grupos y entradas: `CONTRACT.md`. Arquitectur
 - `tests/` pruebas headless: `stage_test.gd` (recorrido completo), `cloak_test.gd` (tela/esferas), `character_logic_test.gd`, `vehicle_physics_test.gd`; capturas: `stage_shot.gd`, `andro_cloak_shot.gd`, `transition_shot.gd`
 
 ## Estado (15 nov 2026)
-- Hecho: Andro = tres capas de tela sobre una esfera invisible (campo de fuerza, sin rasgos humanos) con resorte (se arrastra, rebota al frenar, se ladea al girar) + 5 esferas de cromo gris + golpe telequinético; Umbral plano con niebla gris y 34 m de área jugable; portal con
-  galaxia y remolino de viaje; 4 escenas de recuerdos (Camino de los Planetas, La Fuente, Cámara de los Anillos, El Cubo); historia con
-  subtítulos, objetivos y modo libre; mapa de Boston, modelo viejo de Andro y pruebas atadas a ellos eliminados.
+- Hecho: Andro según `docs/refs` 84070: cúpula lisa sobre una esfera invisible (campo de fuerza), capa interior y manto abierto al frente con ribetes ornamentados, sin rasgos humanos;
+  tela con resorte (se arrastra, rebota al frenar, se ladea al girar) + 5 esferas de cromo gris con estela de vidrio + golpe telequinético.
+  El Umbral es una dimensión vacía: piso pulido, humo gris en capas, cielo de colores suaves y esferas de energía enormes en el cielo (sin objetos, niebla gris, 34 m jugables).
+  Portal con galaxia y remolino de viaje; 4 escenas de recuerdos (Camino de los Planetas, La Fuente, Cámara de los Anillos, El Cubo); historia con subtítulos, objetivos y modo libre.
+- Pendiente (decisión de Pablo, 16 nov): la forma de crear portales, los diálogos, la historia, los escenarios y los objetos se diseñan después; lo que hay hoy es provisional.
 - Presupuesto medido (headless): máx. 29 k triángulos y 47 mallas por escena; luces: 1 direccional con sombra + 1–3 locales sin sombra (la cámara de anillos
   usa 1 foco con sombra).
 - **Sin medir en el teléfono**: FPS reales en Compatibility (aquí solo hay GL por software). Primero probar escena por escena en el teléfono.

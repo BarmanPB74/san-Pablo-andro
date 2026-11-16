@@ -14,18 +14,18 @@ func check(cond: bool, msg: String) -> void:
 func _initialize() -> void:
 	var mesh := AndroCloak.build_cloak_mesh()
 	var box := mesh.get_aabb()
-	check(box.size.y > 2.0 and box.size.y < 2.3, "la capa mide %.2f m de alto (capucha incluida)" % box.size.y)
+	check(box.end.y > 2.0 and box.end.y < 2.2, "la cúpula llega a %.2f m de altura" % box.end.y)
 	check(box.size.x < 1.8 and box.size.z < 1.8, "ancho del dobladillo razonable (%.2f × %.2f m)" % [box.size.x, box.size.z])
 	check(box.position.y >= 0.0, "ningún vértice bajo el piso (min y = %.2f)" % box.position.y)
 	var tris: int = (mesh.surface_get_arrays(0)[Mesh.ARRAY_INDEX] as PackedInt32Array).size() / 3
-	check(tris < 6500, "malla liviana: %d triángulos (3 capas)" % tris)
+	check(tris < 6500, "malla liviana: %d triángulos" % tris)
 
 	# sin rasgos humanos: el radio nunca se estrecha como un cuello entre la punta y la parte más ancha
 	var widest_y := 0.0
 	var widest_r := 0.0
 	var neck := false
 	var prev_r := 0.0
-	var y := AndroCloak.TOP_Y - 0.02
+	var y: float = AndroCloak.FIELD_Y + AndroCloak.FIELD_R + 0.02
 	while y > 1.0:
 		var r := AndroCloak.base_radius(y)
 		if r < prev_r - 0.002:
@@ -40,7 +40,19 @@ func _initialize() -> void:
 	var layers := {}
 	for c in (mesh.surface_get_arrays(0)[Mesh.ARRAY_COLOR] as PackedColorArray):
 		layers[snappedf(c.r, 0.1)] = true
-	check(layers.size() == 3, "tres capas de tela (%d)" % layers.size())
+	check(layers.size() == 2, "dos capas de tela: interior y manto (%d)" % layers.size())
+	# el manto está abierto al frente (-Z): ningún vértice del manto cerca del eje frontal a media altura
+	var arr := mesh.surface_get_arrays(0)
+	var vv: PackedVector3Array = arr[Mesh.ARRAY_VERTEX]
+	var cc: PackedColorArray = arr[Mesh.ARRAY_COLOR]
+	var front_blocked := false
+	var max_r := 0.0
+	for k in vv.size():
+		max_r = maxf(max_r, Vector2(vv[k].x, vv[k].z).length())
+		if cc[k].r > 0.5 and absf(vv[k].x) < 0.05 and vv[k].z < -0.3 and vv[k].y > 0.6 and vv[k].y < 1.4:
+			front_blocked = true
+	check(not front_blocked, "el manto está abierto al frente")
+	check(max_r <= Player.CAPSULE_RADIUS + 0.15, "la tela no sobresale mucho del campo de fuerza (%.2f m vs %.2f m)" % [max_r, Player.CAPSULE_RADIUS])
 	check(Player.CAPSULE_RADIUS >= AndroCloak.FIELD_R + 0.07, "el campo de fuerza (cápsula %.2f m) cubre la tela" % Player.CAPSULE_RADIUS)
 
 	var m := AndroCloak.new()
@@ -98,6 +110,18 @@ func _initialize() -> void:
 			min_z = o.position.z
 	check(min_z < -0.8, "el golpe lanza las esferas al frente (z = %.2f)" % min_z)
 	check(float(m._orb_mat.get_shader_parameter("glow")) > 0.2, "las esferas brillan al golpear")
+
+	# estelas: cada esfera tiene su estela y su cabeza coincide con la esfera
+	var trail_err := 0.0
+	var trails := 0
+	for i in 5:
+		var orb := m.get_node_or_null("Orb%d" % i) as Node3D
+		var tr := m.get_node_or_null("Trail%d" % i) as Node3D
+		if orb and tr:
+			trails += 1
+			var head: Vector3 = tr.global_transform * Vector3(0, 0, 1)
+			trail_err = maxf(trail_err, head.distance_to(orb.global_position))
+	check(trails == 5 and trail_err < 0.02, "5 estelas con la cabeza en su esfera (error %.3f m)" % trail_err)
 
 	# campo de fuerza: ninguna esfera entra, ni corriendo ni al golpear
 	var worst := 9.0

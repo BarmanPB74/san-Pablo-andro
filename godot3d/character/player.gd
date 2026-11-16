@@ -476,8 +476,8 @@ func _try_step_up(delta: float) -> void:
 		return
 	if col.get_normal().y > 0.7:
 		return  # es rampa o piso: el slide lo maneja
-	# Altura del borde justo delante
 	var space := get_world_3d().direct_space_state
+	# Altura del borde justo delante
 	var probe := global_position + dir * (CAPSULE_RADIUS + 0.06)
 	var q := PhysicsRayQueryParameters3D.create(probe + Vector3.UP * (step_height + 0.05),
 		probe + Vector3.DOWN * 0.05, collision_mask & ~(1 << 1))

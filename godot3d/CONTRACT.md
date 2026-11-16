@@ -63,7 +63,7 @@ func get_camera_anchor() -> Node3D
 - Geometría procedural compartida: `Geo` (`geo.gd`: rejillas, columnas, riscos, rocas, superficies de revolución).
 
 ## Andro — `res://character/andro_cloak.gd`
-`class_name AndroCloak extends Node3D`: tres capas de tela sobre una esfera invisible (campo de fuerza = cápsula del jugador, `Player.CAPSULE_RADIUS` 0.66; shader con resorte-amortiguador) + 5 esferas de cromo gris que orbitan fuera del campo. Sin rasgos humanos. API que usa `Player`: `levitate`, `punch_t`, `punch_idx`, `animate(state, speed, delta)`.
+`class_name AndroCloak extends Node3D`: cúpula + capa interior + manto abierto al frente con ribetes, sobre una esfera invisible (campo de fuerza = cápsula del jugador, `Player.CAPSULE_RADIUS` 0.66; shader con resorte-amortiguador) + 5 esferas de cromo gris con estela que orbitan fuera del campo. Sin rasgos humanos. API que usa `Player`: `levitate`, `punch_t`, `punch_idx`, `animate(state, speed, delta)`.
 `Player` conserva su física de caminar y suma `teleport(pos, yaw)`; el flote es solo visual (`HOVER_H`). `CameraRig` suma `snap_behind(yaw, pitch)`.
 
 ## Historia — `res://story/story.gd`
