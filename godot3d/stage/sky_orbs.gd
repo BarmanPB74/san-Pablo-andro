@@ -1,3 +1,4 @@
+## NOTA: ya no se usa en ninguna escena (el Umbral ahora tiene cielo azul de amanecer sin esferas). Se conserva por si se quiere en otra escena.
 class_name SkyOrbs
 extends Node3D
 ## Esferas de energía que flotan en el fondo del cielo, tan grandes y tan cerca que parecen planetas. Están a una

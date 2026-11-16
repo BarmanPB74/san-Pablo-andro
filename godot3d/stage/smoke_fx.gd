@@ -1,3 +1,4 @@
+## NOTA: ya no se usa en ninguna escena (el Umbral ahora no tiene humo ni niebla). Se conserva por si se quiere en otra escena.
 class_name SmokeFX
 extends Node3D
 ## Humo gris del Umbral: tres láminas de niebla espesa a distintas alturas (ruido en coordenadas de mundo, con viento)

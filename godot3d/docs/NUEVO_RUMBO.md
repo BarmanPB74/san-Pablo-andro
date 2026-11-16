@@ -5,14 +5,15 @@ Nota: `docs/` lleva `.gdignore`, así que Godot no importa esas imágenes.
 
 ## Cómo funciona
 1. `core/game.gd` crea cámara, jugador, `TransitionFX`, `Stage`, HUD, controles y `Story`, y la historia entra a la primera escena.
-2. Cada escena (`stage/scenes/*.gd`) hereda de `StageScene` y en `build()` crea su cielo, niebla, luz, piso, colisiones y un trigger de objetivo.
+2. Cada escena (`stage/scenes/*.gd`) hereda de `StageScene` y en `build()` crea su cielo, luz, piso, colisiones y un trigger de objetivo.
 3. El botón **PUERTA** (`interact`, tecla F/E) conjura un `Portal` 7.5 m delante de Andro si la historia lo permite. Al cruzarlo, el remolino cubre la
    pantalla, el Stage libera la escena vieja, construye la nueva, coloca a Andro en `spawn_pos` y abre el remolino.
 4. En cada recuerdo hay que llegar a su zona (objetivo); antes de eso la puerta "no responde" ("Aún no. Hay algo que ver aquí."). Al cumplirlo salen los
    subtítulos de cierre y se habilita la puerta al siguiente recuerdo. Al terminar el último, el Umbral queda en modo libre (la puerta rota por los recuerdos).
-   **El Umbral** es una dimensión vacía: piso liso y pulido, humo gris en tres láminas de ruido con viento (`smoke_fx.gd`, `smoke_layer.gdshader`) más bocanadas grandes que suben,
-   cielo de colores suaves (`umbral_sky.gdshader`: índigo, malva, nubes cian/rosa/ámbar) y **esferas de energía enormes y lejanas** (`sky_orbs.gd`: impostores de esfera con plasma +
-   resplandor, siguen al jugador como un cielo; la luz principal viene de la mayor). Niebla gris (0.03) que no afecta al cielo. Área jugable de 34 m; el muro queda dentro de la niebla.
+   **El Umbral** es una dimensión vacía: un suelo divino de mármol negro azulado, pulido, con incrustaciones de oro (`divine_floor.gdshader`: rosa de los vientos en el centro, anillos dobles,
+   estrella de 12 puntas, rosetón, arcos, franja de signos y borde triple con marcas; más allá del borde los anillos y rayos dorados se desvanecen hacia el horizonte) bajo un
+   cielo azul de amanecer con nubes (`umbral_sky.gdshader`: cúmulos y cirros rosados hacia donde amanece, **sin disco de sol**). **Sin niebla** (`fog_enabled = false`); el piso lejano se funde
+   con el color del horizonte. La luz viene del cielo (el sol direccional está en energía 0 para que no deje un destello en el suelo pulido). Área jugable de 34 m (muro invisible dentro del borde dorado).
    **No hay objetos**: Andro creará lo que necesite (diseño pendiente). La puerta de prueba que se conjura al abrir el capítulo es provisional.
 
 ## Andro (`character/andro_cloak.gd`)
@@ -50,4 +51,5 @@ Nota: `docs/` lleva `.gdignore`, así que Godot no importa esas imágenes.
 ## Pendiente (diseñar después)
 - Cómo conjura Andro los portales (gesto, efecto, sonido) y cómo se eligen los destinos.
 - Diálogos, historia, escenarios nuevos, y los objetos que Andro puede crear en el Umbral.
-- Medir FPS en el teléfono (Compatibility): láminas de humo (3 planos a pantalla completa) y bocanadas (26 quads grandes) son lo más caro del Umbral; si hace falta, bajar `PUFFS`/opacidad o dejar 2 láminas.
+- Medir FPS en el teléfono (Compatibility): lo más caro del Umbral es el shader del piso dorado (muchas líneas por pixel); si hace falta, quitar la franja de signos o el rosetón en `divine_floor.gdshader`.
+- `stage/sky_orbs.gd` y `stage/smoke_fx.gd` (esferas de energía y humo del Umbral anterior) quedan sin usar, por si se quieren en otra escena.

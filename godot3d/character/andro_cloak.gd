@@ -104,6 +104,7 @@ func _build() -> void:
 	key.light_color = Color(0.78, 0.84, 1.0)
 	key.light_energy = 0.9
 	key.omni_range = 7.0
+	key.light_specular = 0.15         # sin reflejo fuerte en pisos pulidos (el Umbral)
 	key.shadow_enabled = false
 	key.position = Vector3(0.9, 2.2, 2.4)
 	add_child(key)

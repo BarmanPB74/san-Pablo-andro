@@ -11,9 +11,8 @@ const CHAPTERS := [
 	{
 		"scene": "umbral",
 		"intro": [
-			"Aquí no hay calles ni nombres. Solo el suelo que olvidé.",
-			"Desde niño aprendí a no tocar la tierra. Alguien me enseñó.",
-			"Lo busco entre mis recuerdos. Cada puerta es uno de ellos.",
+			"He viajado por todas las realidades, ahora que sé que existe el demonio que me creó como un ser divino de la oscuridad.",
+			"Ahora puedo usar este poder para descubrir mi origen y mis recuerdos humanos.",
 		],
 		"objective": "",
 		"outro": [],
