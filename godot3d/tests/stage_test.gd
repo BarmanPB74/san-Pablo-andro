@@ -1,6 +1,6 @@
 extends SceneTree
-## Prueba headless del juego completo: Umbral → Planetas → Fuente → Anillos → Cubo → Umbral.
-## Verifica escenas, portales, objetivos, bloqueo de la puerta antes de cumplirlos y presupuesto de geometría.
+## Prueba headless del juego completo: Umbral → Casa → Umbral → Anillos → Umbral.
+## Verifica escenas, portales (ida y vuelta), la rotación de destinos del Umbral y el presupuesto de geometría.
 ## Uso: godot --headless --fixed-fps 60 --path . -s res://tests/stage_test.gd
 
 var fails := 0
@@ -11,13 +11,6 @@ var player: Player
 
 const TRI_BUDGET := 120000
 const MESH_BUDGET := 220
-## Dónde pararse para cumplir el objetivo de cada escena (centro de su zona).
-const OBJECTIVE_SPOT := {
-	"planetas": Vector3(0, 0.1, -54),
-	"fuente": Vector3(0, 0.1, -7),
-	"anillos": Vector3(0, 1.8, 0),
-	"cubo": Vector3(0, 0.1, -22),
-}
 
 
 func check(cond: bool, msg: String) -> void:
@@ -80,7 +73,7 @@ func _initialize() -> void:
 	check(get_nodes_in_group("vehicle").size() == 0, "no quedan vehículos del mapa viejo")
 	check(root.find_child("BostonDistrict", true, false) == null, "el mapa de Boston ya no existe")
 
-	var order := ["umbral", "planetas", "fuente", "anillos", "cubo"]
+	var order := ["umbral", "casa", "umbral", "anillos", "umbral"]
 	for i in order.size():
 		var id: String = order[i]
 		check(stage.current_id == id, "escena actual: %s (%s)" % [id, stage.current.title])
@@ -91,23 +84,20 @@ func _initialize() -> void:
 		check(stage.current.env != null and stage.current.sun != null, "  tiene ambiente y luz propios")
 		check(stage.get_child_count() == 1, "  solo una escena viva")
 
-		# antes de cumplir el objetivo la puerta no responde
-		if id != "umbral":
-			await press_interact()
-			check(stage.current.portals.size() == 0, "  la puerta aún no se conjura (hay algo que ver)")
-			check(story.hud.caption_text().begins_with("Aún no"), "  subtítulo: aún no")
-			stage.current.objective_reached.emit("otro_objetivo")      # objetivo equivocado no cuenta
-			check(not story.objective_done, "  un objetivo equivocado no abre la puerta")
-			player.call("teleport", stage.current.global_transform * OBJECTIVE_SPOT[id], 0.0)
-			await frames(20)
-			check(story.objective_done, "  llegar a la zona cumple el objetivo")
 		story.skip()
 		check(story.can_conjure, "  ya se puede conjurar la puerta")
+		if i == order.size() - 1:
+			break
 		var target := story.next_target()
+		check(target == order[i + 1], "  la puerta lleva a %s" % order[i + 1])
 		await press_interact()
 		check(stage.current.portals.size() == 1, "  PUERTA conjura un portal")
 		var portal: Portal = stage.current.portals[0]
 		check(portal.target == target, "  el portal lleva a %s" % target)
+		check(portal.size == stage.current.portal_size, "  el portal tiene el tamaño de la escena")
+		if id == "casa":
+			check(portal.global_position.y + portal.size.y + 1.0 < HouseScene.H, "  el portal cabe bajo el techo")
+			check(absf(portal.global_position.x) < 11.0 and absf(portal.global_position.z) < 7.0, "  el portal queda dentro de la casa")
 		var t := 0
 		while not portal.monitoring and t < 400:
 			await physics_frame
@@ -120,12 +110,11 @@ func _initialize() -> void:
 		if not ok:
 			break
 
-	# epílogo en el Umbral: modo libre, la puerta lleva a cualquier recuerdo
-	check(stage.current_id == "umbral", "el último portal regresa al Umbral")
+	# modo libre: desde el Umbral la puerta rota por los mapas; ya no hay dimensiones sueltas
 	check(story.chapter >= Story.CHAPTERS.size(), "historia en modo libre")
-	story.skip()
+	check(not stage.has_scene("planetas") and not stage.has_scene("fuente") and not stage.has_scene("cubo"), "las dimensiones viejas ya no existen")
 	await press_interact()
-	check(stage.current.portals.size() == 1 and (stage.current.portals[0] as Portal).target == "planetas", "en modo libre la puerta vuelve a los recuerdos")
+	check(stage.current.portals.size() == 1 and (stage.current.portals[0] as Portal).target == "casa", "en modo libre la rotación vuelve a la casa")
 
 	# movimiento: Andro avanza y la capa se arrastra
 	var p0 := player.global_position

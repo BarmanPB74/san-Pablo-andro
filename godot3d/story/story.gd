@@ -16,70 +16,16 @@ const CHAPTERS := [
 		],
 		"objective": "",
 		"outro": [],
-		"next": "planetas",
+		"next": "casa",
 		"hint": "Toca PUERTA para conjurar la primera",
-	},
-	{
-		"scene": "planetas",
-		"intro": [
-			"Mi primera lección: ordenar el cielo como quien ordena juguetes.",
-			"Camina hasta el último astro.",
-		],
-		"objective": "planeta_final",
-		"outro": [
-			"Una voz de niño contó los mundos conmigo. No recuerdo su rostro.",
-		],
-		"next": "fuente",
-		"hint": "Toca PUERTA para seguir",
-	},
-	{
-		"scene": "fuente",
-		"intro": [
-			"Este rostro nunca terminó de hablar.",
-			"Acércate al agua. Escucha lo que dice.",
-		],
-		"objective": "estanque",
-		"outro": [
-			"Me enseñó a callar para oír el agua. Todavía la oigo.",
-		],
-		"next": "anillos",
-		"hint": "Toca PUERTA para seguir",
-	},
-	{
-		"scene": "anillos",
-		"intro": [
-			"Tres anillos enlazados. Así medía yo el tiempo.",
-			"Sube hasta la luz.",
-		],
-		"objective": "altar",
-		"outro": [
-			"La luz me dijo que el poder no se gana: se presta.",
-		],
-		"next": "cubo",
-		"hint": "Toca PUERTA para seguir",
-	},
-	{
-		"scene": "cubo",
-		"intro": [
-			"El último recuerdo pesa más que todos.",
-			"Cruza la orilla hasta quedar bajo el cubo.",
-		],
-		"objective": "orilla_cubo",
-		"outro": [
-			"Él no estaba. Solo el cubo… y su sombra sobre mí.",
-		],
-		"next": "umbral_final",
-		"hint": "Toca PUERTA para volver",
 	},
 ]
 
-## Cuando ya se vio todo: el Umbral otra vez, con la puerta libre hacia cualquier recuerdo.
-const EPILOGUE := [
-	"Ya sé dónde empezar a buscarlo.",
-	"Pero antes debo recordar un poco más.",
-	"Fin del prólogo. Puedes seguir conjurando puertas.",
-]
-const FREE_ORDER := ["planetas", "fuente", "anillos", "cubo"]
+## La trama completa se escribe después de los mapas (decisión de Pablo, 16 nov): por ahora solo está el diálogo del Umbral.
+const EPILOGUE: Array = []
+## Mapas a los que se viaja desde el Umbral. Provisional: cada puerta lleva al siguiente de la lista; la rueda de mapas
+## (fase 2) reemplazará esta rotación con la elección del jugador. Desde cualquier otro mapa la puerta vuelve al Umbral.
+const MAPS := ["casa", "anillos"]
 
 var stage: Stage
 var player: Node3D
@@ -113,7 +59,7 @@ func skip() -> void:
 	_gen += 1
 	hud.fade_caption(0.3)
 	if chapter >= CHAPTERS.size():
-		_allow_conjure("Toca PUERTA para conjurar otro recuerdo")
+		_allow_conjure("Toca PUERTA para abrir un portal")
 		return
 	var ch: Dictionary = CHAPTERS[chapter]
 	if (ch["objective"] as String) == "" or objective_done:
@@ -194,7 +140,7 @@ func _run_free(id: String, gen: int) -> void:
 			var t := hud.say(line)
 			await get_tree().create_timer(t + 2.6).timeout
 		hud.fade_caption(1.0)
-	_allow_conjure("Toca PUERTA para conjurar otro recuerdo")
+	_allow_conjure("Toca PUERTA para abrir un portal")
 
 
 func _allow_conjure(hint: String) -> void:
@@ -209,13 +155,24 @@ func _process(_delta: float) -> void:
 		_try_conjure()
 
 
-## Destino al que lleva la próxima puerta.
+## Destino al que lleva la próxima puerta: desde el Umbral, el siguiente mapa; desde cualquier mapa, de vuelta al Umbral.
 func next_target() -> String:
+	if stage.current_id != "umbral":
+		return "umbral"
 	if chapter < CHAPTERS.size():
-		var nxt: String = CHAPTERS[chapter]["next"]
-		return "umbral" if nxt == "umbral_final" else nxt
-	var t: String = FREE_ORDER[free_index % FREE_ORDER.size()]
-	return t
+		return CHAPTERS[chapter]["next"]
+	return MAPS[free_index % MAPS.size()]
+
+
+## A qué distancia delante de Andro aparece el portal: la que pide la escena, pero sin meterse en una pared.
+func _portal_distance(fwd: Vector3) -> float:
+	var d: float = stage.current.portal_distance
+	var from: Vector3 = player.global_position + Vector3(0, 1.0, 0)
+	var q := PhysicsRayQueryParameters3D.create(from, from + fwd * (d + 1.0), 1)
+	var hit := player.get_world_3d().direct_space_state.intersect_ray(q)
+	if hit.is_empty():
+		return d
+	return clampf(from.distance_to(hit["position"]) - 1.0, minf(1.4, d), d)
 
 
 func _try_conjure() -> void:
@@ -228,7 +185,7 @@ func _try_conjure() -> void:
 		return
 	var f: float = player.call("get_facing")
 	var fwd := Vector3(-sin(f), 0.0, -cos(f))
-	var pos: Vector3 = player.global_position + fwd * 7.5
+	var pos: Vector3 = player.global_position + fwd * _portal_distance(fwd)
 	pos.y = player.global_position.y - 0.05
 	var target := next_target()
 	_door = stage.current.conjure_portal(target, pos, f)
@@ -238,7 +195,8 @@ func _try_conjure() -> void:
 
 
 func _on_door_crossed(_p: Portal, _target: String) -> void:
+	var from_umbral := stage.current_id == "umbral"
 	if chapter < CHAPTERS.size():
 		chapter += 1
-	else:
+	if from_umbral:
 		free_index += 1

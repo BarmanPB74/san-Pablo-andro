@@ -57,8 +57,8 @@ func get_camera_anchor() -> Node3D
 - Atropellos: si un Vehicle golpea al jugador a > 15 km/h, el jugador entra en estado `"stumble"` (cae, se levanta) — estilo GTA IV.
 
 ## Escenarios — `res://stage/`
-- `Stage` (`stage.gd`): `go(id)` viaja a una escena (remolino de `TransitionFX`), `current`, `current_id`, señales `scene_entered/scene_leaving`. Ids: `umbral, planetas, fuente, anillos, cubo` (tabla `Stage.SCENES`).
-- `StageScene` (`stage_scene.gd`): base de cada escena. Define `title`, `spawn_pos`, `spawn_yaw`, `spawn_pitch`; rellena `build()`; es dueña de su `WorldEnvironment` y su luz. Ayudantes: `make_environment`, `add_ground/box/cylinder/sphere`, `add_bounds_circle`, `add_trigger(objetivo, pos, tamaño)`, `conjure_portal(destino, pos, yaw)`. Señales `objective_reached(nombre)` y `portal_entered(destino)`.
+- `Stage` (`stage.gd`): `go(id)` viaja a una escena (remolino de `TransitionFX`), `current`, `current_id`, señales `scene_entered/scene_leaving`. Ids: `umbral, casa, anillos` (tabla `Stage.SCENES`).
+- `StageScene` (`stage_scene.gd`): base de cada escena. Define `title`, `spawn_pos`, `spawn_yaw`, `spawn_pitch`; rellena `build()`; es dueña de su `WorldEnvironment` y su luz. `portal_distance` y `portal_size` (distancia máxima y tamaño de los portales que se conjuran en la escena; en la casa son más chicos). Ayudantes: `make_environment`, `add_ground/box/cylinder/sphere`, `add_bounds_circle`, `add_trigger(objetivo, pos, tamaño)`, `conjure_portal(destino, pos, yaw)`. Señales `objective_reached(nombre)` y `portal_entered(destino)`.
 - `Portal` (`portal.gd`): Area3D con marco de bronce y galaxia; `open()/close()`; emite `entered` al cruzarlo el jugador.
 - Geometría procedural compartida: `Geo` (`geo.gd`: rejillas, columnas, riscos, rocas, superficies de revolución).
 

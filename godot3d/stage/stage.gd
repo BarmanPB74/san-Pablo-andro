@@ -9,10 +9,8 @@ signal travel_started(target: String)
 
 const SCENES := {
 	"umbral": "res://stage/scenes/hub_scene.gd",
-	"planetas": "res://stage/scenes/planets_scene.gd",
-	"fuente": "res://stage/scenes/fountain_scene.gd",
+	"casa": "res://stage/scenes/house_scene.gd",
 	"anillos": "res://stage/scenes/rings_scene.gd",
-	"cubo": "res://stage/scenes/cube_scene.gd",
 }
 
 var player: Node3D

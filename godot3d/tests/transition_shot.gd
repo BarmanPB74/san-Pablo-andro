@@ -5,7 +5,7 @@ func _initialize() -> void:
 	var amount := float(a[0]) if a.size() > 0 else 0.6
 	var out: String = a[1] if a.size() > 1 else "/tmp/transition.png"
 	var main: Node = load("res://main.tscn").instantiate()
-	main.set("start_scene", "planetas")
+	main.set("start_scene", "casa")
 	root.add_child(main)
 	for i in 50:
 		await physics_frame

@@ -30,7 +30,7 @@ func _initialize() -> void:
 		var st: Stage = main.get("stage")
 		var f0: float = p.call("get_facing")
 		var door := p.global_position + Vector3(-sin(f0), 0, -cos(f0)) * 7.0
-		st.current.conjure_portal("planetas", door, f0, 0.0)
+		st.current.conjure_portal("casa", door, f0, 0.0)
 		for i in 30:
 			await physics_frame
 	var rig: Node3D = get_nodes_in_group("camera_rig")[0]

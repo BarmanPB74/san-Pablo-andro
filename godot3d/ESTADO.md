@@ -11,7 +11,7 @@ Reglas globales, capas de física, grupos y entradas: `CONTRACT.md`. Arquitectur
 
 ## Mapa de carpetas
 - `core/` entradas y `game.gd` (arma Stage, cámara, jugador, HUD, controles, Story)
-- `stage/` Stage (gestor de escenas), Portal, TransitionFX, Geo (geometría procedural), `shaders/` y `scenes/` (umbral, planetas, fuente, anillos, cubo)
+- `stage/` Stage (gestor de escenas), Portal, TransitionFX, Geo (geometría procedural), `shaders/` y `scenes/` (umbral, casa, anillos)
 - `story/story.gd` capítulos, subtítulos telepáticos, objetivos y puerta
 - `character/` Player (física de caminar + flote visual), `andro_cloak.gd` (capas de tela, campo de fuerza y esferas de cromo), camera_rig, `shaders/` (capa y esferas)
 - `ui/` HUD (título, subtítulos, aviso) y controles táctiles (botón PUERTA)
@@ -22,12 +22,22 @@ Reglas globales, capas de física, grupos y entradas: `CONTRACT.md`. Arquitectur
 - Hecho: Andro según `docs/refs` 84070: cúpula lisa sobre una esfera invisible (campo de fuerza), capa interior y manto abierto al frente con ribetes ornamentados, sin rasgos humanos;
   tela con resorte (se arrastra, rebota al frenar, se ladea al girar) + 5 esferas de cromo gris + golpe telequinético.
   El Umbral es una dimensión vacía: piso pulido, humo gris en capas, cielo de colores suaves y esferas de energía enormes en el cielo (sin objetos, niebla gris, 34 m jugables).
-  Portal con galaxia y remolino de viaje; 4 escenas de recuerdos (Camino de los Planetas, La Fuente, Cámara de los Anillos, El Cubo); historia con subtítulos, objetivos y modo libre.
+  Portal con galaxia y remolino de viaje; escenas: Umbral, La Casa (16 nov) y la Cámara de los Anillos; historia con subtítulos y modo libre (Planetas, Fuente y Cubo se eliminaron el 16 nov).
 - Pendiente (decisión de Pablo, 16 nov): la forma de crear portales, los diálogos, la historia, los escenarios y los objetos se diseñan después; lo que hay hoy es provisional.
 - Presupuesto medido (headless): máx. 29 k triángulos y 47 mallas por escena; luces: 1 direccional con sombra + 1–3 locales sin sombra (la cámara de anillos
   usa 1 foco con sombra).
 - **Sin medir en el teléfono**: FPS reales en Compatibility (aquí solo hay GL por software). Primero probar escena por escena en el teléfono.
 - Pendiente a futuro: sonido, más escenas/portales, enemigos o puzles por escena, vehículos/aviones como forma de viaje (código dormido en `vehicles/`).
+
+## Última sesión (16 nov 2026) — Fase 1: Umbral = centro de habilidades + La Casa
+- Plan por fases (decisión de Pablo): **F1** Umbral + casa (esta) · **F2** rueda circular de mapas tipo GTA V · **F3** poderes (carga de energía tipo ki, barra de magia por hechizo, bola de fuego desde las esferas de poder) · **F4** las ~5 dimensiones, una por vez · **F5** historia (después de los mapas).
+- Eliminadas las dimensiones Planetas, Fuente y Cubo (con sus shaders). Se conserva la Cámara de los Anillos (la escultura flotante de anillos) y el Umbral.
+- Nueva escena `casa` (`stage/scenes/house_scene.gd`, `HouseScene`): la casa de Andro de niño. Un piso: 4 habitaciones, baño, cocina, sala, comedor, pasillo y patio grande con muro perimetral. Detalle en `docs/NUEVO_RUMBO.md` (sección La Casa).
+- El portal ahora se adapta a la escena: `StageScene.portal_size` / `portal_distance`, y `Story` lo acerca si hay una pared delante. Desde el Umbral el portal rota entre `Story.MAPS` (casa, anillos); desde cualquier mapa vuelve al Umbral (provisional hasta la rueda de mapas).
+- `Story`: quedó solo el diálogo del Umbral (la trama se escribe después de los mapas). El epílogo viejo se vació.
+- Pruebas: `stage_test` (recorrido Umbral → casa → Umbral → anillos → Umbral), `house_test` NUEVA (con la cápsula real de Andro: cabe por las 12 puertas, llega a todos los cuartos y al patio, no sale del lote, ninguna malla ve más de 6 luces, el portal no se mete en las paredes), `cloak_test`, `character_logic_test`: todas PASS. Vista en planta: `tests/house_plan_shot.gd`.
+- **Sin medir en el teléfono**: FPS de la casa. Riesgos conocidos: 10 luces Omni sin sombra (límite de 8 por objeto en el móvil) y sombras del sol sobre todo el lote; si baja de 40 FPS, quitar primero las luces del pasillo y acortar `directional_shadow_max_distance`.
+- Pendiente: nombre nuevo (Pablo aún no lo dice), rueda de mapas, poderes, resto de dimensiones, objetos/recuerdos de la casa, historia.
 
 ## Historial (diseño anterior del personaje y del barrio Boston — archivado)
 

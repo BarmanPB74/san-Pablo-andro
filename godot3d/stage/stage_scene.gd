@@ -14,6 +14,10 @@ var spawn_pos := Vector3(0, 0.1, 0)
 var spawn_yaw := 0.0
 ## Inclinación inicial de la cámara (rad; positivo = mira hacia arriba, negativo = hacia abajo).
 var spawn_pitch := -0.16
+## Portales que conjura Andro en esta escena: a qué distancia máxima aparecen delante de él (m) y de qué tamaño
+## (ancho × alto de la abertura). En espacios cerrados (la casa) se achican para que quepan bajo el techo.
+var portal_distance := 7.5
+var portal_size := Vector2(2.6, 5.6)
 var env: Environment
 var sun: DirectionalLight3D
 var portals: Array[Portal] = []
@@ -229,7 +233,7 @@ func add_bounds_circle(radius: float, height := 30.0, segments := 16) -> void:
 
 ## Conjura una puerta-portal hacia `target`. `yaw` orienta la cara de la galaxia (0 = mira a +Z).
 func conjure_portal(target: String, pos: Vector3, yaw := 0.0, open_time := 1.8) -> Portal:
-	var p := Portal.new(target)
+	var p := Portal.new(target, portal_size)
 	p.position = pos
 	p.rotation.y = yaw
 	add_child(p)

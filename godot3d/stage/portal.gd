@@ -114,6 +114,7 @@ func _box(parent: Node3D, pos: Vector3, sz: Vector3, mat: Material, collide := f
 func _build() -> void:
 	var w := size.x
 	var h := size.y
+	var k := minf(1.0, h / 5.6)            # portales chicos (dentro de la casa): la luz y la mancha del piso se achican igual
 	var post := 0.34
 	var depth := 0.42
 	_frame = Node3D.new()
@@ -167,18 +168,18 @@ func _build() -> void:
 	# luz que se derrama sobre el piso y mancha de luz
 	_light = OmniLight3D.new()
 	_light.light_color = Color(0.55, 0.62, 1.0)
-	_light.omni_range = 11.0
+	_light.omni_range = 11.0 * k
 	_light.light_energy = 0.0
 	_light.shadow_enabled = false
-	_light.position = Vector3(0, h * 0.45, 1.6)
+	_light.position = Vector3(0, h * 0.45, 1.6 * k)
 	add_child(_light)
 	_spill = MeshInstance3D.new()
 	var sq := QuadMesh.new()
-	sq.size = Vector2(w * 4.0, 7.0)
+	sq.size = Vector2(w * 4.0 * k, 7.0 * k)
 	sq.orientation = PlaneMesh.FACE_Y
 	_spill.mesh = sq
 	_spill.material_override = _spill_material()
-	_spill.position = Vector3(0, 0.035, 3.2)
+	_spill.position = Vector3(0, 0.035, 3.2 * k)
 	_spill.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(_spill)
 
