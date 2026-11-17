@@ -45,6 +45,16 @@ func spell_name(id: String) -> String:
 	return String(SPELLS[id].name)
 
 
+## Rango de mejora (0..Abilities.MAX_RANK) de una habilidad: "fireball" o "ki".
+func rank(id: String) -> int:
+	return progress.upgrade_count(id) if progress else 0
+
+
+## Velocidad de carga con ki: sube con el rango del ki.
+func charge_rate() -> float:
+	return CHARGE_RATE * Abilities.ki_rate_mult(rank("ki"))
+
+
 func cost(id: String) -> float:
 	return float(SPELLS[id].cost)
 
@@ -86,7 +96,7 @@ func try_cast(id: String) -> bool:
 
 
 func can_upgrade(id: String) -> bool:
-	return progress != null and progress.points > 0 and upgrades_of(id) < int(SPELLS[id].max_upgrades)
+	return progress != null and progress.points >= Abilities.POINT_COST and rank(id) < Abilities.MAX_RANK
 
 
 func upgrade(id: String) -> bool:
@@ -94,7 +104,7 @@ func upgrade(id: String) -> bool:
 		return false
 	if not progress.spend_point(id):
 		return false
-	changed.emit(id)
+	changed.emit("fireball")
 	upgraded.emit(id)
 	return true
 
@@ -105,7 +115,7 @@ func _process(delta: float) -> void:
 		var c := cap(id)
 		var v := value(id)
 		if v < c:
-			var nv := minf(c, v + (CHARGE_RATE if charging else REGEN_RATE) * delta)
+			var nv := minf(c, v + (charge_rate() if charging else REGEN_RATE) * delta)
 			values[id] = nv
 			changed.emit(id)
 			if nv >= c and v < c and charging:

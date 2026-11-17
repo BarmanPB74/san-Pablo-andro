@@ -9,6 +9,7 @@ extends StageScene
 signal room_changed(room_id: String, room_title: String)
 
 const MIN_CEILING := HouseRooms.MIN_CEILING
+const FLY_HEADROOM := 2.2                  # holgura bajo el techo al volar (m)
 
 var room_id := ""
 var room: HouseBuilder
@@ -85,6 +86,10 @@ func load_room(id: String, _from_id := "") -> void:
 
 func tick(delta: float, player: Node3D) -> void:
 	_player = player
+	if room != null and "fly_ceiling" in player:
+		# Techo de vuelo = altura de la sala menos lo que mide Andro (el origen está en los pies)
+		var dim: Vector3 = HouseRooms.DEFS[room_id]["dim"]
+		player.set("fly_ceiling", dim.y - FLY_HEADROOM)
 	if _swapping or room == null:
 		return
 	_cooldown = maxf(0.0, _cooldown - delta)

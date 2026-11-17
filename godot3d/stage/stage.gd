@@ -71,6 +71,8 @@ func _swap(id: String) -> void:
 func _place_player() -> void:
 	if player == null or current == null:
 		return
+	if "fly_ceiling" in player:
+		player.set("fly_ceiling", current.fly_ceiling)
 	if player.has_method("teleport"):
 		player.call("teleport", current.global_transform * current.spawn_pos, current.spawn_yaw)
 	else:

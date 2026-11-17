@@ -10,14 +10,16 @@ var _prompt: Label
 var _fps: Label
 var _cap_tween: Tween
 var _title_tween: Tween
-var _magic: MagicBar
+var panel: StatusPanel
 
 
 func _ready() -> void:
 	layer = 5
 	_title = _make_label(Vector2(24, 18), 22, Color(0.82, 0.86, 1.0))
 	_title.modulate.a = 0.0
-	_fps = _make_label(Vector2(24, 100), 14, Color(1, 1, 1, 0.45))
+	_fps = _make_label(Vector2(0, 8), 14, Color(1, 1, 1, 0.45))
+	_fps.set_anchors_preset(Control.PRESET_CENTER_TOP)
+	_fps.offset_left = -30.0
 
 	_caption = _make_label(Vector2.ZERO, 24, Color(0.93, 0.95, 1.0))
 	_caption.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
@@ -61,13 +63,13 @@ func _process(_delta: float) -> void:
 	_prompt.modulate.a = 0.0 if UiLock.blocked else 1.0         # con la rueda de mapas abierta el aviso estorba
 
 
-## Conecta la barra de magia y el nivel (aparece bajo el contador de FPS).
-func setup_powers(book: SpellBook, progress: Progress) -> void:
-	if _magic == null:
-		_magic = MagicBar.new()
-		_magic.position = Vector2(24, 126)
-		add_child(_magic)
-	_magic.setup(book, progress)
+## Conecta el panel de estado (vida, magia, nivel) arriba a la izquierda.
+func setup_powers(book: SpellBook, progress: Progress, vitals: Vitals, caster: PowerCaster) -> void:
+	if panel == null:
+		panel = StatusPanel.new()
+		panel.position = Vector2(16, 56)
+		add_child(panel)
+	panel.setup(book, progress, vitals, caster)
 	progress.leveled_up.connect(_on_level_changed)
 
 

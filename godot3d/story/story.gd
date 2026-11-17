@@ -30,6 +30,7 @@ const MAPS := ["casa", "anillos"]
 const SAVE_PATH := "user://noctis.cfg"
 static var save_enabled := true
 signal map_unlocked(id: String)
+signal stage_changed(index: int)
 
 var stage: Stage
 var player: Node3D
@@ -39,13 +40,33 @@ var objective_done := false
 var can_conjure := false
 var free_index := 0
 var unlocked: Array = MapCatalog.START_UNLOCKED.duplicate()
+## Etapa de la historia: 0 principio (portales de piedra), 1 mitad (celestiales), 2 final (dorados). La trama aún no está
+## escrita (F5): por ahora solo cambia con `set_stage` / `advance_stage` (y los atajos del panel de pausa).
+var stage_index := 0
 
 var _gen := 0                    # invalida corutinas viejas al cambiar de escena
 var _door: Portal = null
 
 
+func _ready() -> void:
+	add_to_group("story")
+
+
+## Fija la etapa de la historia y con ella el estilo de los portales nuevos (piedra, celestial, dorado).
+func set_stage(n: int) -> void:
+	stage_index = clampi(n, 0, 2)
+	Portal.style_index = stage_index
+	_save_progress()
+	stage_changed.emit(stage_index)
+
+
+func advance_stage() -> void:
+	set_stage(stage_index + 1)
+
+
 func setup(p_stage: Stage, p_player: Node3D, p_hud: GameHUD, start := "umbral") -> void:
 	_load_progress()
+	Portal.style_index = stage_index
 	stage = p_stage
 	player = p_player
 	hud = p_hud
@@ -203,6 +224,7 @@ func _load_progress() -> void:
 	var cf := ConfigFile.new()
 	if cf.load(SAVE_PATH) != OK:
 		return
+	stage_index = clampi(int(cf.get_value("historia", "etapa", 0)), 0, 2)
 	for id in cf.get_value("mapas", "desbloqueados", []):
 		if not unlocked.has(id):
 			unlocked.append(id)
@@ -214,6 +236,7 @@ func _save_progress() -> void:
 	var cf := ConfigFile.new()
 	cf.load(SAVE_PATH)
 	cf.set_value("mapas", "desbloqueados", unlocked)
+	cf.set_value("historia", "etapa", stage_index)
 	cf.save(SAVE_PATH)
 
 

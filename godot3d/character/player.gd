@@ -12,6 +12,8 @@ signal exited_vehicle(vehicle: Node3D)
 signal stumbled(impact_kmh: float)
 ## Un golpe del combo conectó con `body` (idx: 0 jab, 1 cruzado, 2 patada).
 signal punched(body: Node3D, idx: int)
+## Andro empezó o terminó de volar.
+signal flight_changed(on: bool)
 
 # ---------------- Ajustes de movimiento ----------------
 @export var walk_speed := 1.6
@@ -32,6 +34,9 @@ signal punched(body: Node3D, idx: int)
 @export var crouch_speed := 1.15
 @export var punch_reach := 1.15        # alcance del golpe (m) medido desde el pecho
 @export var push_speed := 1.5          # rapidez máxima empujando algo pesado
+@export var fly_speed := 9.0           # vuelo libre: rapidez horizontal (m/s)
+@export var fly_boost := 18.0          # con IMPULSO (sprint)
+@export var fly_climb := 5.5           # subir/bajar (m/s)
 
 const GRAVITY_MULT := 1.35
 const CAPSULE_RADIUS := 0.66            # = campo de fuerza de Andro: nada se acerca a la tela más que esto
@@ -68,6 +73,10 @@ var _entering_vehicle: VehicleBody3D = null
 var _step_smooth := 0.0                # compensación visual al subir escalones
 var _hover := 0.0                      # altura actual del flote (m)
 var charging := false                  # cargando ki (PowerCaster): Andro se queda quieto
+## Vuelo libre: sin gravedad; salto = subir, agacharse = bajar; la acción "fly" lo alterna. Aterriza solo al tocar el piso.
+var flying := false
+## Altura máxima del origen de Andro en vuelo (m); la fija cada escena (StageScene.fly_ceiling).
+var fly_ceiling := 1000.0
 # Interpolación visual: la física corre a 60 Hz pero la pantalla (p. ej. 120 Hz) se
 # redibuja más seguido. El modelo se anima y se desplaza entre ticks para que no "salte".
 var _vp_prev := Vector3.ZERO
@@ -185,6 +194,14 @@ func _physics_process(delta: float) -> void:
 		_vp_ready = false
 		return
 
+	if Input.is_action_just_pressed("fly") and not UiLock.blocked and state not in ["stumble", "enter_vehicle", "exit_vehicle"]:
+		set_flying(not flying)
+	if flying:
+		_process_flying(delta)
+		_check_vehicle_hits()
+		_sample_visual(delta)
+		return
+
 	match state:
 		"stumble":
 			_process_stumble(delta)
@@ -195,7 +212,11 @@ func _physics_process(delta: float) -> void:
 
 	_check_vehicle_hits()
 
-	# Muestras para la interpolación visual (ver _process)
+	_sample_visual(delta)
+
+
+## Muestras para la interpolación visual (ver _process).
+func _sample_visual(delta: float) -> void:
 	var hv := Vector2(velocity.x, velocity.z).length()
 	if not _vp_ready or global_position.distance_squared_to(_vp_cur) > 4.0:
 		_vp_prev = global_position
@@ -236,6 +257,55 @@ func _process(delta: float) -> void:
 	model.animate(state, hv, delta)
 
 
+## Enciende o apaga el vuelo libre.
+func set_flying(on: bool) -> void:
+	if on == flying:
+		return
+	flying = on
+	if on:
+		_set_crouch(false, true)
+		_punch_t = -1.0
+		floor_snap_length = 0.0
+		velocity.y = maxf(velocity.y, 2.5)       # despega
+		state = "fly"
+	else:
+		floor_snap_length = 0.45
+		state = "idle"
+		_speed = Vector2(velocity.x, velocity.z).length()
+	flight_changed.emit(on)
+
+
+## Vuelo libre: se mueve en cualquier dirección; el techo lo fija la escena (`fly_ceiling`).
+func _process_flying(delta: float) -> void:
+	var input := _get_move_input()
+	var len := minf(input.length(), 1.0)
+	var top := fly_boost if Input.is_action_pressed("sprint") else fly_speed
+	var up := Input.get_action_strength("jump") - Input.get_action_strength("crouch")
+	if charging:
+		top = 0.0
+		up = 0.0
+	if len > 0.05:
+		var desired := atan2(-input.x, -input.z)
+		var diff := wrapf(desired - _facing, -PI, PI)
+		_facing = wrapf(_facing + clampf(diff, -6.0 * delta, 6.0 * delta), -PI, PI)
+	var want := input.normalized() * top * len if len > 0.05 else Vector3.ZERO
+	var hv := Vector3(velocity.x, 0.0, velocity.z).lerp(want, 1.0 - exp(-3.2 * delta))
+	velocity.x = hv.x
+	velocity.z = hv.z
+	var vy_goal := up * fly_climb
+	if global_position.y >= fly_ceiling and vy_goal > 0.0:
+		vy_goal = 0.0
+	velocity.y = lerpf(velocity.y, vy_goal, 1.0 - exp(-5.0 * delta))
+	move_and_slide()
+	if global_position.y > fly_ceiling:
+		global_position.y = fly_ceiling
+		velocity.y = minf(velocity.y, 0.0)
+	_speed = hv.length()
+	state = "fly"
+	if is_on_floor() and up <= 0.1 and velocity.y <= 0.1:
+		set_flying(false)                       # tocó el piso: vuelve a flotar caminando
+
+
 ## Gira el cuerpo hacia `yaw` (0 = mira a -Z), p. ej. al lanzar un hechizo hacia donde mira la cámara.
 func face_yaw(yaw: float) -> void:
 	_facing = yaw
@@ -250,6 +320,7 @@ func teleport(pos: Vector3, yaw: float) -> void:
 	_skidding = false
 	_vp_ready = false
 	_hover = 0.0
+	set_flying(false)
 	if model:
 		model.rotation.y = yaw
 

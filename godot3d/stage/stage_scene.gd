@@ -18,6 +18,8 @@ var spawn_pitch := -0.16
 ## (ancho × alto de la abertura). En espacios cerrados (la casa) se achican para que quepan bajo el techo.
 var portal_distance := 7.5
 var portal_size := Vector2(2.6, 5.6)
+## Techo del vuelo libre: altura máxima (m) del origen de Andro. Donde hay techo real (la casa) manda la colisión.
+var fly_ceiling := 1000.0
 var env: Environment
 var sun: DirectionalLight3D
 var portals: Array[Portal] = []

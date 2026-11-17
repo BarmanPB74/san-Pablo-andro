@@ -16,6 +16,9 @@ var wheel: MapWheel
 var progress: Progress
 var spells: SpellBook
 var caster: PowerCaster
+var vitals: Vitals
+var strip: PowerStrip
+var pause_menu: PauseMenu
 
 
 func _ready() -> void:
@@ -54,7 +57,8 @@ func _ready() -> void:
 		stage.go(start_scene)
 
 
-## F3: nivel y puntos (Progress), barra de magia (SpellBook) y controlador de poderes (PowerCaster, hijo de Andro).
+## F3: nivel y puntos (Progress), barra de magia (SpellBook), vida (Vitals), poderes (PowerCaster, hijo de Andro),
+## selector de poderes (PowerStrip) y panel de pausa con mejoras (PauseMenu).
 func _setup_powers() -> void:
 	if player == null or not (player is Player):
 		return
@@ -65,12 +69,25 @@ func _setup_powers() -> void:
 	spells.name = "SpellBook"
 	add_child(spells)
 	spells.setup(progress)
+	vitals = Vitals.new()
+	vitals.name = "Vitals"
+	add_child(vitals)
 	caster = PowerCaster.new()
 	player.add_child(caster)
 	caster.setup(player as Player, camera_rig, spells, progress)
-	hud.setup_powers(spells, progress)
+	hud.setup_powers(spells, progress, vitals, caster)
+	touch.set_power_icon(hud.panel.icon_center())
 	touch.upgrade_points = progress.points
 	progress.points_changed.connect(func(n: int) -> void: touch.upgrade_points = n)
+	(player as Player).flight_changed.connect(func(on: bool) -> void: touch.flying = on)
+	strip = PowerStrip.new()
+	strip.name = "PowerStrip"
+	add_child(strip)                       # después de TouchControls: recibe los toques primero
+	strip.setup(spells, caster)
+	pause_menu = PauseMenu.new()
+	pause_menu.name = "PauseMenu"
+	add_child(pause_menu)
+	pause_menu.setup(spells, progress, vitals, touch)
 
 
 func _new_from(path: String) -> Node:

@@ -20,6 +20,7 @@ func _init() -> void:
 	title = "El Umbral"
 	spawn_pos = Vector3(0, 0.1, 6)
 	spawn_yaw = 0.0
+	fly_ceiling = portal_size.y         # el Umbral no tiene techo: se vuela hasta la altura del hueco del portal (5,6 m)
 
 
 func build() -> void:

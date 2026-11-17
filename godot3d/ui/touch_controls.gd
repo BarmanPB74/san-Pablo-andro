@@ -14,6 +14,19 @@ var _stick_vec := Vector2.ZERO
 var _look_touch := -1
 var _look_last := Vector2.ZERO
 var _buttons: Array[Dictionary] = []   # {action, rect, touch, label}
+const FLY_LABELS := {"jump": "SUBIR", "crouch": "BAJAR", "sprint": "IMPULSO"}
+## Andro está volando (cambia los textos de los botones).
+var flying := false:
+	set(v):
+		flying = v
+		if _draw_root:
+			_draw_root.queue_redraw()
+## Centro del icono del poder en el panel de estado (lo fija Game según el HUD).
+var _power_icon := Vector2(54, 96):
+	set(v):
+		_power_icon = v
+		if is_inside_tree() and _draw_root:
+			_layout()
 ## Puntos de mejora disponibles: el botón MEJORA solo existe (se ve y recibe toques) cuando hay alguno.
 var upgrade_points := 0:
 	set(v):
@@ -68,22 +81,41 @@ func _layout() -> void:
 		_add_button("handbrake", Vector2(s.x - 110, s.y - 90), r * 0.8, "MANO")
 		_add_button("horn", Vector2(s.x - 400, s.y - 90), r * 0.6, "PITO")
 	else:
-		_add_button("jump", Vector2(s.x - 110, s.y - 110), r, "SALTO")
-		_add_button("sprint", Vector2(s.x - 250, s.y - 90), r * 0.8, "CORRER")
-		_add_button("punch", Vector2(s.x - 250, s.y - 215), r * 0.75, "GOLPE")
-		_add_button("crouch", Vector2(s.x - 395, s.y - 130), r * 0.65, "AGACHAR")
-	_add_button("interact", Vector2(s.x - 110, s.y - 380), r * 0.8, "PUERTA")
-	_add_button("camera_toggle", Vector2(s.x - 70, 70), r * 0.5, "CAM")
-	_add_button("map_wheel", Vector2(s.x - 70, 185), r * 0.62, "MAPAS")
+		# Tres columnas en arco para el pulgar derecho. A (la más cercana al borde): lo que más se usa.
+		# B: movimiento extra y carga. C: golpe y vuelo. Con el vuelo encendido SALTO/AGACHAR pasan a SUBIR/BAJAR.
+		_add_button("jump", Vector2(s.x - 110, s.y - 105), r, "SALTO")
+		_add_button("cast", Vector2(s.x - 110, s.y - 245), r * 0.82, "FUEGO")
+		_add_button("crouch", Vector2(s.x - 262, s.y - 70), r * 0.68, "AGACHAR")
+		_add_button("sprint", Vector2(s.x - 262, s.y - 185), r * 0.74, "CORRER")
+		_add_button("charge", Vector2(s.x - 262, s.y - 305), r * 0.74, "CARGAR")
+		_add_button("fly", Vector2(s.x - 400, s.y - 120), r * 0.74, "VOLAR")
+		_add_button("punch", Vector2(s.x - 400, s.y - 245), r * 0.7, "GOLPE")
+	_add_button("interact", Vector2(s.x - 110, s.y - 375), r * 0.72, "PUERTA")
+	# fila superior derecha: PAUSA, MAPAS, CAM
+	_add_button("pause", Vector2(s.x - 55, 55), r * 0.5, "PAUSA")
+	_add_button("map_wheel", Vector2(s.x - 150, 62), r * 0.62, "MAPAS")
+	_add_button("camera_toggle", Vector2(s.x - 240, 55), r * 0.5, "CAM")
 	if not _in_vehicle:
-		_add_button("charge", Vector2(s.x - 110, s.y - 245), r * 0.7, "CARGAR")
-		_add_button("cast", Vector2(s.x - 395, s.y - 260), r * 0.7, "FUEGO")
-		_add_button("upgrade", Vector2(70, 285), r * 0.55, "MEJORA")
+		_add_button("power_panel", _power_icon, 38.0, "")               # el icono del poder en el panel de estado
+		_add_button("pause", _power_icon + Vector2(34, 150), r * 0.55, "MEJORA", "mejora")
 	_draw_root.queue_redraw()
 
 
-func _add_button(action: String, center: Vector2, radius: float, label: String) -> void:
-	_buttons.append({"action": action, "center": center, "radius": radius, "touch": -1, "label": label})
+func _add_button(action: String, center: Vector2, radius: float, label: String, tag := "") -> void:
+	_buttons.append({"action": action, "center": center, "radius": radius, "touch": -1, "label": label, "tag": tag})
+
+
+func set_power_icon(center: Vector2) -> void:
+	_power_icon = center
+
+
+## Texto del botón: con el vuelo encendido cambian SALTO, AGACHAR, CORRER y VOLAR.
+func _label_for(b: Dictionary) -> String:
+	if flying and FLY_LABELS.has(b.action):
+		return FLY_LABELS[b.action]
+	if b.action == "fly" and flying:
+		return "SUELO"
+	return b.label
 
 
 ## Suelta el joystick y todos los botones (al abrir la rueda de mapas, que se queda con los toques).
@@ -115,13 +147,15 @@ func _input(event: InputEvent) -> void:
 			_stick_vec = v.limit_length(1.0)
 			_apply_stick()
 		elif d.index == _look_touch:
-			Inputs.touch_look += d.position - _look_last
+			var inp := get_node_or_null("/root/Inputs")
+			if inp:
+				inp.touch_look += d.position - _look_last
 			_look_last = d.position
 		_draw_root.queue_redraw()
 
 
 func _hidden(b: Dictionary) -> bool:
-	return b.action == "upgrade" and upgrade_points <= 0
+	return b.tag == "mejora" and upgrade_points <= 0
 
 
 func _on_press(idx: int, pos: Vector2) -> void:
@@ -209,9 +243,14 @@ func _on_draw() -> void:
 		var pressed: bool = b.touch != -1
 		_draw_root.draw_circle(b.center, b.radius, Color(0.05, 0.08, 0.1, 0.55 if pressed else 0.35))
 		_draw_root.draw_arc(b.center, b.radius, 0, TAU, 40, Color(amber, 0.9 if pressed else 0.5), 3.0)
-		var fs := 18
-		var w := font.get_string_size(b.label, HORIZONTAL_ALIGNMENT_CENTER, -1, fs).x
-		_draw_root.draw_string(font, b.center + Vector2(-w * 0.5, fs * 0.35), b.label,
+		var lab := _label_for(b)
+		if b.tag == "mejora":
+			lab = "MEJORA +%d" % upgrade_points
+		var fs := 18 if b.radius >= 45.0 else 15
+		var w := font.get_string_size(lab, HORIZONTAL_ALIGNMENT_CENTER, -1, fs).x
+		if b.action == "fly" and flying:
+			_draw_root.draw_circle(b.center, b.radius, Color(amber, 0.25))
+		_draw_root.draw_string(font, b.center + Vector2(-w * 0.5, fs * 0.35), lab,
 			HORIZONTAL_ALIGNMENT_CENTER, -1, fs, Color(1, 1, 1, 0.9))
 
 
@@ -231,7 +270,8 @@ func _draw_clay() -> void:
 		var tint := Color(0.82, 0.78, 0.74) if pressed else Color.WHITE
 		_draw_root.draw_texture_rect(_tex_disc, Rect2(b.center - Vector2(rr, rr), Vector2(rr, rr) * 2.0), false, tint)
 		var fs := int(clampf(b.radius * 0.34, 14.0, 26.0))
-		var w := font.get_string_size(b.label, HORIZONTAL_ALIGNMENT_CENTER, -1, fs).x
+		var lab := _label_for(b)
+		var w := font.get_string_size(lab, HORIZONTAL_ALIGNMENT_CENTER, -1, fs).x
 		var at: Vector2 = b.center + Vector2(-w * 0.5, fs * 0.36)
-		_draw_root.draw_string_outline(font, at, b.label, HORIZONTAL_ALIGNMENT_CENTER, -1, fs, 5, Color(GOLD_INK, 0.85))
-		_draw_root.draw_string(font, at, b.label, HORIZONTAL_ALIGNMENT_CENTER, -1, fs, GOLD)
+		_draw_root.draw_string_outline(font, at, lab, HORIZONTAL_ALIGNMENT_CENTER, -1, fs, 5, Color(GOLD_INK, 0.85))
+		_draw_root.draw_string(font, at, lab, HORIZONTAL_ALIGNMENT_CENTER, -1, fs, GOLD)

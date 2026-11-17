@@ -1,8 +1,9 @@
 class_name PowerCaster
 extends Node3D
-## Controlador de poderes de Andro (hijo de Player). Lee las acciones "charge" (mantener: cargar ki), "cast" (lanzar la
-## bola de fuego) y "upgrade" (gastar un punto en subir el tope de la barra), gasta/recarga la barra (SpellBook), enciende
-## la aura (KiAura) y las esferas, y dispara la bola desde la esfera de poder que más apunta hacia donde mira la cámara.
+## Controlador de poderes de Andro (hijo de Player). Lee las acciones "charge" (mantener: cargar ki) y "cast" (lanzar el
+## poder activo: hoy la bola de fuego), gasta/recarga la barra (SpellBook), enciende la aura (KiAura) y las esferas con el color
+## del ki según su rango, y dispara la bola desde la esfera de poder que más apunta hacia donde mira la cámara.
+## Las mejoras (rangos) se compran en el panel de pausa (PauseMenu).
 
 const SPELL := "fireball"
 const WIND_UP := 0.18                   # s entre que la esfera se adelanta y sale la bola
@@ -17,6 +18,9 @@ var book: SpellBook
 var progress: Progress
 var aura: KiAura
 var charging := false
+## Poder elegido en el panel de poderes (ver PowerStrip). Hoy solo existe "fireball".
+var active := "fireball"
+var _ki_rank := -1
 var _pending := []                      # [{t, orb, dir}]
 var _was_full := true
 
@@ -33,18 +37,29 @@ func setup(p: Player, cam: Node, b: SpellBook, prog: Progress) -> void:
 		player.model.level = progress.level
 		progress.level_changed.connect(func(l: int) -> void: player.model.level = l)
 	book.filled.connect(func(_id: String) -> void: aura.pulse())
+	_refresh_tiers()
+
+
+## Colores del ki según su rango (blanco → amarillo → rojo → morado → morado y negro).
+func _refresh_tiers() -> void:
+	var r := book.rank("ki")
+	if r == _ki_rank:
+		return
+	_ki_rank = r
+	var t := Abilities.tier("ki", r)
+	aura.set_tier(t, r)
+	player.model.charge_color = t.glow
 
 
 func _process(delta: float) -> void:
 	if player == null or book == null:
 		return
 	var allowed := _allowed()
-	var want_charge := allowed and player.is_on_floor() and _pressed("charge") and book.fill(SPELL) >= 0.0
+	_refresh_tiers()
+	var want_charge := allowed and (player.is_on_floor() or player.flying) and _pressed("charge")
 	set_charging(want_charge)
 	if allowed and _just("cast"):
 		cast()
-	if allowed and _just("upgrade"):
-		book.upgrade(SPELL)
 	# lanzamientos en espera (la esfera ya se adelantó)
 	for c in _pending.duplicate():
 		c.t -= delta
@@ -105,5 +120,5 @@ func _launch(c: Dictionary) -> void:
 	var parent := player.get_parent()
 	if parent == null:
 		return
-	var ball := Fireball.launch(parent, from, Vector3(c.dir.x, 0.02, c.dir.z))
+	var ball := Fireball.launch(parent, from, Vector3(c.dir.x, 0.02, c.dir.z), book.rank(SPELL))
 	fireball_launched.emit(ball)

@@ -8,6 +8,11 @@ extends Area3D
 signal entered(portal: Portal)
 
 const GALAXY_SHADER := preload("res://stage/shaders/galaxy_portal.gdshader")
+const VIEW_SHADER := preload("res://stage/shaders/portal_view.gdshader")
+## Estilo de los portales NUEVOS (lo fija Story según la etapa de la historia): 0 piedra, 1 celestial, 2 dorado
+## (ver PortalStyles). LEGACY es el marco de bronce con galaxia de la versión anterior.
+const LEGACY := 3
+static var style_index := 0
 
 static var _bronze: StandardMaterial3D = null
 static var _gold: StandardMaterial3D = null
@@ -27,6 +32,8 @@ var _light: OmniLight3D
 var _spill: MeshInstance3D
 var _tween: Tween
 var _fired := false
+var style := 0
+var _light_energy := 2.6
 
 
 func _init(p_target := "", p_size := Vector2(2.6, 5.6)) -> void:
@@ -112,6 +119,58 @@ func _box(parent: Node3D, pos: Vector3, sz: Vector3, mat: Material, collide := f
 
 
 func _build() -> void:
+	style = style_index
+	if style >= LEGACY:
+		_build_legacy()
+		return
+	var w := size.x
+	var h := size.y
+	var k := minf(1.0, h / 5.6)
+	_frame = Node3D.new()
+	_frame.name = "Frame"
+	add_child(_frame)
+	var look := PortalStyles.build(_frame, style, w, h)
+	_surface = MeshInstance3D.new()
+	_surface.name = "View"
+	var q := QuadMesh.new()
+	q.size = Vector2(w, h)
+	_surface.mesh = q
+	_mat = ShaderMaterial.new()
+	_mat.shader = VIEW_SHADER
+	_mat.set_shader_parameter("style", style)
+	_mat.set_shader_parameter("size", size)
+	_surface.material_override = _mat
+	_surface.position = Vector3(0, h * 0.5, 0)
+	_surface.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(_surface)
+	_light_energy = float(look.energy)
+	_light = OmniLight3D.new()
+	_light.light_color = look.light
+	_light.omni_range = 11.0 * k
+	_light.light_energy = 0.0
+	_light.shadow_enabled = false
+	_light.position = Vector3(0, h * 0.45, 1.6 * k)
+	add_child(_light)
+	_spill = MeshInstance3D.new()
+	var sq := QuadMesh.new()
+	sq.size = Vector2(w * 4.0 * k, 7.0 * k)
+	sq.orientation = PlaneMesh.FACE_Y
+	_spill.mesh = sq
+	var sm := _spill_material().duplicate() as StandardMaterial3D
+	sm.albedo_color = look.spill
+	_spill.material_override = sm
+	_spill.position = Vector3(0, 0.035, 3.2 * k)
+	_spill.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(_spill)
+	var cs := CollisionShape3D.new()
+	var bs := BoxShape3D.new()
+	bs.size = Vector3(w * 0.9, h * 0.92, 0.7)
+	cs.shape = bs
+	cs.position = Vector3(0, h * 0.46, 0)
+	add_child(cs)
+
+
+func _build_legacy() -> void:
 	var w := size.x
 	var h := size.y
 	var k := minf(1.0, h / 5.6)            # portales chicos (dentro de la casa): la luz y la mancha del piso se achican igual
@@ -206,7 +265,7 @@ func _apply(t: float) -> void:
 	if _surface:
 		_surface.visible = iris > 0.001
 	if _light:
-		_light.light_energy = iris * 2.6
+		_light.light_energy = iris * _light_energy
 		_light.visible = iris > 0.001
 	if _spill:
 		_spill.visible = iris > 0.001

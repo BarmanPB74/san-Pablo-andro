@@ -6,12 +6,17 @@ extends Node3D
 
 const AURA_SHADER := preload("res://powers/shaders/ki_aura.gdshader")
 const RING_SHADER := preload("res://powers/shaders/ki_ring.gdshader")
+const DARK_SHADER := preload("res://powers/shaders/ki_dark.gdshader")
 const HEIGHT := 2.5
 
 var power := 0.0                 # intensidad visible (suavizada)
 var _target := 0.0
 var _boost := 0.0                # destello breve (barra llena / lanzamiento)
 var _layers: Array[ShaderMaterial] = []
+var _dark: MeshInstance3D
+var _dark_mat: ShaderMaterial
+var _tier := {}
+var _spark_grad: Gradient
 var _ring_mat: ShaderMaterial
 var _sparks: CPUParticles3D
 var _light: OmniLight3D
@@ -40,6 +45,25 @@ func _ready() -> void:
 		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		add_child(mi)
 		_layers.append(m)
+	# zarcillos negros (solo en la etapa "morado y negro")
+	var dcyl := CylinderMesh.new()
+	dcyl.top_radius = 0.62
+	dcyl.bottom_radius = 1.02
+	dcyl.height = HEIGHT
+	dcyl.radial_segments = 28
+	dcyl.rings = 10
+	dcyl.cap_top = false
+	dcyl.cap_bottom = false
+	_dark = MeshInstance3D.new()
+	_dark.mesh = dcyl
+	_dark.position = Vector3(0, HEIGHT * 0.5, 0)
+	_dark_mat = ShaderMaterial.new()
+	_dark_mat.shader = DARK_SHADER
+	_dark_mat.set_shader_parameter("height", HEIGHT)
+	_dark.material_override = _dark_mat
+	_dark.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_dark.visible = false
+	add_child(_dark)
 	var ring := MeshInstance3D.new()
 	var pm := PlaneMesh.new()
 	pm.size = Vector2(3.6, 3.6)
@@ -74,6 +98,7 @@ func _ready() -> void:
 	g.offsets = PackedFloat32Array([0.0, 0.5, 1.0])
 	g.colors = PackedColorArray([Color(1.0, 0.95, 0.65, 0.95), Color(1.0, 0.5, 0.1, 0.7), Color(0.4, 0.05, 0.0, 0.0)])
 	_sparks.color_ramp = g
+	_spark_grad = g
 	var q := QuadMesh.new()
 	q.size = Vector2(0.14, 0.14)
 	_sparks.mesh = q
@@ -81,13 +106,31 @@ func _ready() -> void:
 	_sparks.emitting = false
 	add_child(_sparks)
 	_light = OmniLight3D.new()
-	_light.light_color = Color(1.0, 0.6, 0.25)
+	_light.light_color = Color(0.85, 0.92, 1.0)
 	_light.omni_range = 5.0
 	_light.light_energy = 0.0
 	_light.shadow_enabled = false
 	_light.position = Vector3(0, 1.1, 0)
 	add_child(_light)
 	visible = false
+	set_tier(Abilities.tier("ki", 0), 0)
+
+
+## Colores de la etapa (ver Abilities) y tamaño según el rango del ki.
+func set_tier(t: Dictionary, rank: int) -> void:
+	_tier = t
+	var core: Color = t.core
+	var edge: Color = t.edge
+	var glow: Color = t.glow
+	for m in _layers:
+		m.set_shader_parameter("core_col", core)
+		m.set_shader_parameter("edge_col", edge)
+	_ring_mat.set_shader_parameter("col", glow)
+	_light.light_color = glow
+	_spark_grad.colors = PackedColorArray([Color(core, 0.95), Color(glow, 0.7), Color(edge.darkened(0.5), 0.0)])
+	_sparks.color_ramp = _spark_grad
+	_dark.visible = bool(t.get("dark", false))
+	scale = Vector3.ONE * Abilities.ki_aura_scale(rank)
 
 
 ## `charging`: ¿se mantiene la carga?; `fill` 0..1: qué tan llena está la barra (la aura crece con ella).
@@ -113,4 +156,5 @@ func update(delta: float) -> void:
 	for m in _layers:
 		m.set_shader_parameter("power", p)
 	_ring_mat.set_shader_parameter("power", p)
+	_dark_mat.set_shader_parameter("power", p)
 	_light.light_energy = 1.4 * p

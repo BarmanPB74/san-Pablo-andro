@@ -192,7 +192,7 @@ func _test_game_flow() -> void:
 	(main.get("story") as Story).skip()
 	await physics_frame
 
-	check(InputMap.has_action("cast") and InputMap.has_action("charge") and InputMap.has_action("upgrade"), "las acciones cast, charge y upgrade existen")
+	check(InputMap.has_action("cast") and InputMap.has_action("charge") and InputMap.has_action("fly") and InputMap.has_action("pause"), "las acciones cast, charge, fly y pause existen")
 	check(player.model.level == prog.level, "el nivel de Andro viene de Progress")
 	# lanzar
 	book.values["fireball"] = 0.5
@@ -226,11 +226,7 @@ func _test_game_flow() -> void:
 	# mejora con puntos desde la tecla
 	prog.add_points(1)
 	var cap0 := book.cap("fireball")
-	Input.action_press("upgrade")
-	await physics_frame
-	await physics_frame
-	Input.action_release("upgrade")
-	check(book.cap("fireball") > cap0 + 0.04, "la acción upgrade sube el tope a %.0f %%" % (book.cap("fireball") * 100.0))
+	check(book.upgrade("fireball") and book.cap("fireball") > cap0 + 0.04, "mejorar la bola de fuego sube el tope a %.0f %%" % (book.cap("fireball") * 100.0))
 	# sube de nivel y se ven las runas
 	prog.set_level(20)
 	check(player.model.level == 20, "al subir de nivel cambian las runas de la capa")

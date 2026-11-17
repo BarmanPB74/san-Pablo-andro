@@ -50,6 +50,14 @@ var level := 0:
 	set = set_level
 ## Carga de energía (0..1): aura en la tela y esferas encendidas y temblorosas.
 var charge := 0.0
+## Color de la carga (el del ki según su rango): tiñe el borde de la tela y el brillo de las esferas.
+var charge_color := Color(0.85, 0.92, 1.0):
+	set(c):
+		charge_color = c
+		if _cloak_mat:
+			_cloak_mat.set_shader_parameter("charge_col", Vector3(c.r, c.g, c.b))
+		if _orb_mat:
+			_orb_mat.set_shader_parameter("glow_col", Vector3(c.r, c.g, c.b))
 
 var _body: Node3D
 var _cloak: MeshInstance3D
@@ -92,10 +100,12 @@ func _build() -> void:
 	_cloak.material_override = _cloak_mat
 	_cloak_mat.set_shader_parameter("cloth_top", FIELD_Y)
 	_cloak_mat.set_shader_parameter("rune_level", float(level))
+	_cloak_mat.set_shader_parameter("charge_col", Vector3(charge_color.r, charge_color.g, charge_color.b))
 	_body.add_child(_cloak)
 
 	_orb_mat = ShaderMaterial.new()
 	_orb_mat.shader = ORB_SHADER
+	_orb_mat.set_shader_parameter("glow_col", Vector3(charge_color.r, charge_color.g, charge_color.b))
 	var sm := SphereMesh.new()
 	sm.radius = 1.0
 	sm.height = 2.0
@@ -385,6 +395,9 @@ func animate(state: String, speed: float, delta: float) -> void:
 			want_lean += 0.1 * want_pulse
 		"push":
 			want_lean += 0.12
+		"fly":
+			want_stretch = 0.5
+			want_lean += 0.1 + 0.2 * sp
 	_lean = lerpf(_lean, want_lean + want_tilt * -1.0, 1.0 - exp(-7.0 * delta))
 	_roll = lerpf(_roll, want_roll, 1.0 - exp(-7.0 * delta))
 	_crouch = lerpf(_crouch, want_crouch, 1.0 - exp(-9.0 * delta))

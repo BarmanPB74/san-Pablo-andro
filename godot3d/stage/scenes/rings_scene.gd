@@ -20,6 +20,7 @@ var _orb_light: OmniLight3D
 
 
 func _init() -> void:
+	fly_ceiling = 24.0                  # bajo la cúpula de la cámara de anillos
 	title = "La Cámara de los Anillos"
 	spawn_pos = Vector3(0, 0.1, 11.6)
 	spawn_yaw = 0.0

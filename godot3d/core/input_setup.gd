@@ -19,7 +19,9 @@ const ACTIONS := {
 	"map_wheel": [KEY_TAB, KEY_M],   # abre la rueda circular de mapas
 	"cast": [KEY_R],              # lanzar la bola de fuego
 	"charge": [KEY_V],            # mantener: cargar ki (llena la barra de magia más rápido)
-	"upgrade": [KEY_U],           # gastar un punto: sube el tope de la barra
+	"fly": [KEY_G],               # alternar vuelo libre (con vuelo: salto = subir, agacharse = bajar)
+	"pause": [KEY_P, KEY_ESCAPE],  # panel de pausa: mejorar habilidades
+	"power_panel": [KEY_T],       # abre el selector de poderes (← → elegir, Enter confirma)
 }
 
 const PAD_BUTTONS := {
@@ -34,7 +36,9 @@ const PAD_BUTTONS := {
 	"map_wheel": JOY_BUTTON_BACK,
 	"cast": JOY_BUTTON_RIGHT_SHOULDER,
 	"charge": JOY_BUTTON_DPAD_UP,
-	"upgrade": JOY_BUTTON_DPAD_DOWN,
+	"fly": JOY_BUTTON_LEFT_SHOULDER,
+	"pause": JOY_BUTTON_START,
+	"power_panel": JOY_BUTTON_DPAD_DOWN,
 }
 
 ## Vector de cámara inyectado por el HUD táctil (arrastre con el dedo).

@@ -4,6 +4,7 @@ shader_type spatial;
 // suelo oscuro, dos cajas de luz) para que el cromo se lea igual en cualquier escena, también en niebla gris.
 uniform vec3 tint : source_color = vec3(0.80, 0.82, 0.85);
 uniform float glow = 0.0;
+uniform vec3 glow_col : source_color = vec3(1.0);
 
 void fragment() {
 	vec3 n = normalize(NORMAL);
@@ -23,5 +24,5 @@ void fragment() {
 	METALLIC = 1.0;
 	ROUGHNESS = 0.06;
 	SPECULAR = 0.9;
-	EMISSION = env * tint * 0.72 + vec3(glow);
+	EMISSION = env * tint * 0.72 + glow_col * glow;
 }

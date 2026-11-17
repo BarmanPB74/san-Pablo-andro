@@ -58,3 +58,20 @@ static func halo(size: float, tint: Color) -> MeshInstance3D:
 	mi.material_override = m
 	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	return mi
+
+
+## Material de humo negro (mezcla normal, no aditivo): zarcillos oscuros de la bola "morada y negra".
+static func smoke_billboard() -> StandardMaterial3D:
+	var m := StandardMaterial3D.new()
+	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	m.cull_mode = BaseMaterial3D.CULL_DISABLED
+	m.albedo_texture = glow_tex()
+	m.albedo_color = Color.WHITE
+	m.vertex_color_use_as_albedo = true
+	m.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
+	m.billboard_keep_scale = true
+	m.particles_anim_h_frames = 1
+	m.particles_anim_v_frames = 1
+	m.disable_receive_shadows = true
+	return m

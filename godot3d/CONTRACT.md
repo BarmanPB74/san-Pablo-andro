@@ -27,7 +27,7 @@ Este documento es la fuente de verdad entre los agentes. Si algo no está aquí,
 - `"camera_rig"` — la cámara. (`spawn_player`/`spawn_vehicle` del juego anterior ya no se usan.)
 
 ## Entradas (autoload `Inputs`, ya existe)
-Acciones: `move_forward, move_back, move_left, move_right, sprint, jump, handbrake, interact, camera_toggle, horn, crouch, punch, map_wheel, cast, charge, upgrade`. `interact` = **PUERTA** (conjura el portal hacia el siguiente recuerdo).
+Acciones: `move_forward, move_back, move_left, move_right, sprint, jump, handbrake, interact, camera_toggle, horn, crouch, punch, map_wheel, cast, charge, fly, pause, power_panel`. (`upgrade` ya no existe: se mejora desde la pausa.) `interact` = **PUERTA** (conjura el portal hacia el siguiente recuerdo).
 `Inputs.move_vector()` → Vector2 (x derecha, y adelante). `Inputs.take_touch_look()` → delta de cámara del dedo (píxeles) a sumar al mouse.
 En auto: move_forward = acelerar, move_back = frenar/reversa, left/right = dirección, handbrake = freno de mano.
 
