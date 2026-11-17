@@ -11,6 +11,7 @@ const SCENES := {
 	"umbral": "res://stage/scenes/hub_scene.gd",
 	"casa": "res://stage/scenes/house_scene.gd",
 	"anillos": "res://stage/scenes/rings_scene.gd",
+	"dunas": "res://stage/scenes/dunes_scene.gd",
 }
 
 var player: Node3D

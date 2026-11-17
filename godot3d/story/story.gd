@@ -25,7 +25,7 @@ const CHAPTERS := [
 const EPILOGUE: Array = []
 ## El botón PUERTA lleva, desde el Umbral, al siguiente mapa abierto de esta lista (rotación); desde cualquier otro mapa
 ## vuelve al Umbral. Para ir a un mapa concreto (desde cualquier mapa) está la rueda circular (`MapWheel` → `conjure_to`).
-const MAPS := ["casa", "anillos"]
+const MAPS := ["casa", "anillos", "dunas"]
 ## Partida guardada: mapas desbloqueados (se puede apagar en pruebas con `Story.save_enabled = false`).
 const SAVE_PATH := "user://noctis.cfg"
 static var save_enabled := true

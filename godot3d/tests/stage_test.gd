@@ -115,7 +115,7 @@ func _initialize() -> void:
 	check(story.chapter >= Story.CHAPTERS.size(), "historia en modo libre")
 	check(not stage.has_scene("planetas") and not stage.has_scene("fuente") and not stage.has_scene("cubo"), "las dimensiones viejas ya no existen")
 	await press_interact()
-	check(stage.current.portals.size() == 1 and (stage.current.portals[0] as Portal).target == "casa", "en modo libre la rotación vuelve a la casa")
+	check(stage.current.portals.size() == 1 and Story.MAPS.has((stage.current.portals[0] as Portal).target), "en modo libre la rotación lleva a un mapa abierto (%s)" % (stage.current.portals[0] as Portal).target)
 
 	# movimiento: Andro avanza y la capa se arrastra
 	var p0 := player.global_position

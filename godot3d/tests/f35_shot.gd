@@ -1,6 +1,6 @@
 extends SceneTree
 ## Capturas de la tanda F3.5. Uso (SPA_TOUCH=1 para ver los botones):
-##   -s res://tests/f35_shot.gd -- <portal|pausa|selector|ki|fuego|vuelo> <salida.png> [param] [escena]
+##   -s res://tests/f35_shot.gd -- <portal|pausa|selector|ki|fuego|vuelo|dunas> <salida.png> [param] [escena]
 ## param: portal = etapa 0..2 · pausa = pestaña 0/1 · ki/fuego = rango de mejora 0..10
 
 func _initialize() -> void:
@@ -72,6 +72,23 @@ func _initialize() -> void:
 				await process_frame
 			Input.action_release("move_forward")
 			for i in 30:
+				await physics_frame
+				await process_frame
+		"dunas":
+			# param 0 = aparición · 1 = junto al arco · 2 = en vuelo sobre las dunas
+			match param:
+				1:
+					player.call("teleport", Vector3(2.0, DunesScene.height(2.0, -20.0) + 0.1, -20.0), 0.0)
+				2:
+					player.call("teleport", Vector3(0, 0.1, 14.0), 0.0)
+					Input.action_press("fly")
+					await physics_frame
+					Input.action_release("fly")
+					Input.action_press("jump")
+					for i in 90:
+						await physics_frame
+					Input.action_release("jump")
+			for i in 60:
 				await physics_frame
 				await process_frame
 	await process_frame

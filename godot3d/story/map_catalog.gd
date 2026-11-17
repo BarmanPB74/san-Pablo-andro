@@ -8,14 +8,14 @@ const SLOTS := [
 	{"id": "umbral", "name": "UMBRAL", "title": "El Umbral", "desc": "Centro de habilidades. Desde aquí se viaja a todo."},
 	{"id": "casa", "name": "CASA", "title": "La Casa", "desc": "El recuerdo de cuando era un niño humano."},
 	{"id": "anillos", "name": "ANILLOS", "title": "La Cámara de los Anillos", "desc": "Una escultura de anillos flotando en el vacío."},
-	{"id": "dim4", "name": "???", "title": "Dimensión por descubrir", "desc": ""},
+	{"id": "dunas", "name": "DUNAS", "title": "Las Dunas Blancas", "desc": "Un desierto de arena blanca bajo la Vía Láctea."},
 	{"id": "dim5", "name": "???", "title": "Dimensión por descubrir", "desc": ""},
 	{"id": "dim6", "name": "???", "title": "Dimensión por descubrir", "desc": ""},
 ]
 
-## Mapas que ya están abiertos al empezar una partida nueva. El Umbral siempre; casa y anillos están abiertos mientras
+## Mapas que ya están abiertos al empezar una partida nueva. El Umbral siempre; casa, anillos y dunas están abiertos mientras
 ## no exista la trama que los desbloquea (editar esta lista cuando la historia los vaya cerrando).
-const START_UNLOCKED := ["umbral", "casa", "anillos"]
+const START_UNLOCKED := ["umbral", "casa", "anillos", "dunas"]
 
 
 static func count() -> int:

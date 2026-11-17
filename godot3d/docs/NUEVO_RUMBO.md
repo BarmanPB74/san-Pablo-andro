@@ -75,7 +75,7 @@ Menú circular estilo GTA V para viajar a cualquier mapa desde cualquier mapa. `
 - Pruebas: `tests/powers_test.gd`; capturas: `tests/powers_shot.gd`, `tests/rune_shot.gd`.
 
 ## Pendiente (hoja de ruta, 16 nov)
-- **F2** ✔ rueda circular de mapas · **F3** ✔ poderes (carga de ki, barra de magia con tope 50 % mejorable, bola de fuego desde las esferas) y niveles 0–33 con runas · **F3.5** ✔ vuelo, mejoras en la pausa (colores de ki y fuego), selector de poderes y portales de piedra/celestial/dorado · **F4** ~5 dimensiones (en curso) · **F5** historia (aquí se decide cómo se gana experiencia de verdad).
+- **F2** ✔ rueda circular de mapas · **F3** ✔ poderes (carga de ki, barra de magia con tope 50 % mejorable, bola de fuego desde las esferas) y niveles 0–33 con runas · **F3.5** ✔ vuelo, mejoras en la pausa (colores de ki y fuego), selector de poderes y portales de piedra/celestial/dorado · **F4** ~5 dimensiones (en curso: 1ª hecha, Las Dunas Blancas; faltan dim5 y dim6 y las que Pablo quiera añadir) · **F5** historia (aquí se decide cómo se gana experiencia de verdad).
 
 ## Pendiente de la versión anterior (sigue vigente)
 - Cómo conjura Andro los portales (gesto, efecto, sonido) y cómo se eligen los destinos.

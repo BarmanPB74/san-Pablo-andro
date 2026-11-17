@@ -103,8 +103,8 @@ func _initialize() -> void:
 
 	# --- sectores no elegibles
 	wheel.open()
-	check(not wheel.choose(3) and wheel.is_open, "un sector sin dimensión no deja viajar y la rueda sigue abierta")
-	check(story.travel_block_reason("dim4") == "Aún no existe esta dimensión.", "  motivo: aún no existe")
+	check(not wheel.choose(4) and wheel.is_open, "un sector sin dimensión no deja viajar y la rueda sigue abierta")
+	check(story.travel_block_reason("dim5") == "Aún no existe esta dimensión.", "  motivo: aún no existe")
 	check(not wheel.choose(0) and story.travel_block_reason("umbral") == "Ya estás aquí.", "el mapa actual no es destino ('Ya estás aquí.')")
 	story.unlocked.erase("anillos")
 	check(not wheel.choose(2) and story.travel_block_reason("anillos") == "Aún no. Hay que pasar la historia.", "un mapa sin desbloquear sale con candado")
