@@ -68,8 +68,14 @@ Menú circular estilo GTA V para viajar a cualquier mapa desde cualquier mapa. `
 - **Agregar una dimensión**: escena en `Stage.SCENES` con el id de un sector libre de `MapCatalog.SLOTS` (renombrar su `name`/`title`/`desc`) y, cuando la historia la abra, `story.unlock_map(id)`.
 - Pruebas: `tests/map_wheel_test.gd`; captura: `tests/wheel_shot.gd`.
 
+## Poderes y niveles (`powers/`)
+- `Progress` (nivel 0–33, experiencia, puntos, mejoras; `user://noctis.cfg`), `SpellBook` (barra por hechizo: tope 50 % + 5 % por punto, costo, recarga sola/cargando), `PowerCaster` (hijo de Player: lee `charge`/`cast`/`upgrade`, enciende la aura, lanza), `KiAura` (carga estilo Dragon Ball), `Fireball` (proyectil con rayo por tick, explosión, empuja props), `PowerFx` (textura y material aditivo compartidos). HUD: `ui/magic_bar.gd`.
+- **Runas**: `AndroCloak.level` → uniform `rune_level` del shader; la palabra EISEN-KERN (fuente 5×5 por bits en `cloak.gdshader`) se enciende píxel a píxel con el nivel en el ribete del dobladillo.
+- **Agregar un hechizo**: entrada en `SpellBook.SPELLS` (nombre, costo, tope, mejoras, enfriamiento, xp), una función de lanzamiento en `PowerCaster` y, si hace falta, una acción en `Inputs`. La barra del HUD muestra hoy un solo hechizo (`MagicBar.SPELL`); con más habrá que elegir el activo.
+- Pruebas: `tests/powers_test.gd`; capturas: `tests/powers_shot.gd`, `tests/rune_shot.gd`.
+
 ## Pendiente (hoja de ruta, 16 nov)
-- **F2** ✔ rueda circular de mapas (16 nov) · **F3** poderes: carga de energía tipo ki, barra de magia por hechizo (empieza en 50 % mejorable con puntos, se recarga sola y rápido), bola de fuego que sale de las esferas de poder · **F4** ~5 dimensiones · **F5** historia.
+- **F2** ✔ rueda circular de mapas · **F3** ✔ poderes (carga de ki, barra de magia con tope 50 % mejorable, bola de fuego desde las esferas) y niveles 0–33 con runas · **F4** ~5 dimensiones · **F5** historia (aquí se decide cómo se gana experiencia de verdad).
 
 ## Pendiente de la versión anterior (sigue vigente)
 - Cómo conjura Andro los portales (gesto, efecto, sonido) y cómo se eligen los destinos.

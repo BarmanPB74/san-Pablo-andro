@@ -9,6 +9,8 @@ extends Node3D
 ## La tela se mueve con un resorte-amortiguador: al avanzar el borde se queda atrás, al frenar se adelanta
 ## y oscila, al girar se balancea; la capa interior y el manto se separan al moverse.
 ## API que usa Player: levitate, punch_t, punch_idx, animate(state, speed, delta).
+## API de poderes y nivel: level (0..MAX_LEVEL, enciende las runas EISEN-KERN del dobladillo), charge (0..1, aura de ki),
+## flash_orb(i) (una esfera se adelanta y brilla al lanzar un hechizo), orb_toward(dir) y orb_global_position(i).
 
 const CLOAK_SHADER := preload("res://character/shaders/cloak.gdshader")
 const ORB_SHADER := preload("res://character/shaders/orb.gdshader")
@@ -36,11 +38,18 @@ const ORBS := [
 ## Distancia mínima (horizontal, desde el eje) a la que puede estar el centro de una esfera: borde del campo + su radio.
 const ORB_CLEARANCE := 0.76
 const PUNCH_DUR := [0.34, 0.38, 0.5]
+const MAX_LEVEL := 33                   # niveles 0..33; en el 33 el dobladillo muestra completa la palabra EISEN-KERN
+const FLASH_DUR := 0.42                 # lo que dura el adelantón de una esfera al lanzar un hechizo
 
 # --- API de Player
 var levitate := true
 var punch_t := 0.0
 var punch_idx := 0
+## Nivel de Andro: cuanto más alto, más visibles las runas del ribete (ver cloak.gdshader).
+var level := 0:
+	set = set_level
+## Carga de energía (0..1): aura en la tela y esferas encendidas y temblorosas.
+var charge := 0.0
 
 var _body: Node3D
 var _cloak: MeshInstance3D
@@ -61,6 +70,7 @@ var _crouch := 0.0
 var _stretch := 0.0
 var _pulse := 0.0
 var _built := false
+var _flash := [0.0, 0.0, 0.0, 0.0, 0.0]    # por esfera: 1 recién lanzada .. 0 en reposo
 
 
 func _ready() -> void:
@@ -81,6 +91,7 @@ func _build() -> void:
 	_cloak_mat.shader = CLOAK_SHADER
 	_cloak.material_override = _cloak_mat
 	_cloak_mat.set_shader_parameter("cloth_top", FIELD_Y)
+	_cloak_mat.set_shader_parameter("rune_level", float(level))
 	_body.add_child(_cloak)
 
 	_orb_mat = ShaderMaterial.new()
@@ -109,6 +120,40 @@ func _build() -> void:
 	key.position = Vector3(0.9, 2.2, 2.4)
 	add_child(key)
 	_place_orbs(0.0)
+
+
+func set_level(l: int) -> void:
+	level = clampi(l, 0, MAX_LEVEL)
+	if _cloak_mat:
+		_cloak_mat.set_shader_parameter("rune_level", float(level))
+
+
+## Una esfera se adelanta y brilla un instante (la que va a disparar el hechizo).
+func flash_orb(i: int) -> void:
+	if i >= 0 and i < _flash.size():
+		_flash[i] = 1.0
+
+
+## Posición global de la esfera `i` (de ahí sale la bola de fuego).
+func orb_global_position(i: int) -> Vector3:
+	if not _built or i < 0 or i >= _orb_nodes.size():
+		return global_position + Vector3(0.0, 1.5, 0.0)
+	return _orb_nodes[i].global_position
+
+
+## Índice de la esfera que más apunta hacia `dir` (en el mundo): la más natural para disparar hacia allá.
+func orb_toward(dir: Vector3) -> int:
+	var best := 0
+	var best_d := -INF
+	var d := Vector3(dir.x, 0.0, dir.z).normalized()
+	for i in _orb_nodes.size():
+		var v := _orb_nodes[i].global_position - global_position
+		v.y = 0.0
+		var k := v.normalized().dot(d) + 0.15 * float(_orb_nodes[i].scale.x)
+		if k > best_d:
+			best_d = k
+			best = i
+	return best
 
 
 ## Radio base (capa interior) a la altura y: cúpula de la esfera invisible y falda que se abre hacia abajo.
@@ -242,7 +287,7 @@ func _place_orbs(delta: float) -> void:
 		var th: float = float(o[4]) + _time * float(o[3]) \
 				+ 0.22 * sin(_time * (0.31 + 0.07 * fi) + fi * 2.1) + 0.10 * sin(_time * (0.79 + 0.11 * fi) + fi * 4.7)
 		var breathe := 1.0 + 0.07 * sin(_time * (0.47 + 0.05 * fi) + fi * 1.3) + 0.04 * sin(_time * (1.05 + 0.09 * fi) + fi * 3.9)
-		var orbit_r: float = float(o[1]) * breathe * (1.0 - 0.35 * swell)
+		var orbit_r: float = float(o[1]) * breathe * (1.0 - 0.35 * swell - 0.12 * charge)
 		var bob := sin(_time * 1.3 + fi * 1.9) * 0.07 \
 				+ 0.10 * sin(_time * (0.43 + 0.06 * fi) + fi * 5.3) + 0.05 * sin(_time * (0.97 + 0.08 * fi) + fi * 0.9)
 		var p := Vector3(sin(th) * orbit_r, float(o[2]) + bob - _crouch * 0.3, cos(th) * orbit_r)
@@ -258,6 +303,10 @@ func _place_orbs(delta: float) -> void:
 			_:
 				hit = 1.0
 		p.z -= swell * 1.3 * hit
+		# hechizo: la esfera elegida se adelanta; cargando, todas tiemblan
+		var fl: float = _flash[i]
+		p.z -= 0.55 * sin(clampf(fl, 0.0, 1.0) * PI)
+		p += Vector3(sin(_time * 41.0 + fi * 3.0), sin(_time * 37.0 + fi * 5.0), sin(_time * 29.0 + fi)) * 0.012 * charge
 		# campo de fuerza: ninguna esfera puede entrar en él (se desliza por su borde)
 		var min_h := ORB_CLEARANCE + float(o[0])
 		var hxz := Vector2(p.x, p.z)
@@ -266,8 +315,12 @@ func _place_orbs(delta: float) -> void:
 			p.x = hxz.x
 			p.z = hxz.y
 		_orb_nodes[i].position = p
+		_orb_nodes[i].scale = Vector3.ONE * float(o[0]) * (1.0 + 0.5 * sin(clampf(fl, 0.0, 1.0) * PI) + 0.12 * charge)
 	if _orb_mat:
-		_orb_mat.set_shader_parameter("glow", swell * 0.55)
+		var fmax := 0.0
+		for f in _flash:
+			fmax = maxf(fmax, float(f))
+		_orb_mat.set_shader_parameter("glow", swell * 0.55 + charge * (0.45 + 0.15 * sin(_time * 9.0)) + fmax * 0.8)
 
 
 func animate(state: String, speed: float, delta: float) -> void:
@@ -346,5 +399,8 @@ func animate(state: String, speed: float, delta: float) -> void:
 	var idle := 0.016 if sp < 0.05 else 0.03
 	_cloak_mat.set_shader_parameter("drift", _drift)
 	_cloak_mat.set_shader_parameter("flutter", idle + sp * 0.035 + _pulse * 0.05)
-	_cloak_mat.set_shader_parameter("flare", _pulse * 0.12 + _stretch * 0.05)
+	_cloak_mat.set_shader_parameter("flare", _pulse * 0.12 + _stretch * 0.05 + charge * 0.05)
+	_cloak_mat.set_shader_parameter("charge", charge * (0.85 + 0.15 * sin(_time * 11.0)))
+	for i in _flash.size():
+		_flash[i] = maxf(0.0, float(_flash[i]) - delta / FLASH_DUR)
 	_place_orbs(delta)

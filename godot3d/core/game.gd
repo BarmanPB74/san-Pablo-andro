@@ -13,6 +13,9 @@ var touch: TouchControls
 var hud: GameHUD
 var story: Node
 var wheel: MapWheel
+var progress: Progress
+var spells: SpellBook
+var caster: PowerCaster
 
 
 func _ready() -> void:
@@ -35,6 +38,7 @@ func _ready() -> void:
 	add_child(hud)
 	touch = TouchControls.new()
 	add_child(touch)
+	_setup_powers()
 
 	if ResourceLoader.exists("res://story/story.gd"):
 		story = _new_from("res://story/story.gd")
@@ -48,6 +52,25 @@ func _ready() -> void:
 		wheel.opened.connect(touch.cancel_all)
 	else:
 		stage.go(start_scene)
+
+
+## F3: nivel y puntos (Progress), barra de magia (SpellBook) y controlador de poderes (PowerCaster, hijo de Andro).
+func _setup_powers() -> void:
+	if player == null or not (player is Player):
+		return
+	progress = Progress.new()
+	progress.name = "Progress"
+	add_child(progress)
+	spells = SpellBook.new()
+	spells.name = "SpellBook"
+	add_child(spells)
+	spells.setup(progress)
+	caster = PowerCaster.new()
+	player.add_child(caster)
+	caster.setup(player as Player, camera_rig, spells, progress)
+	hud.setup_powers(spells, progress)
+	touch.upgrade_points = progress.points
+	progress.points_changed.connect(func(n: int) -> void: touch.upgrade_points = n)
 
 
 func _new_from(path: String) -> Node:

@@ -14,6 +14,12 @@ var _stick_vec := Vector2.ZERO
 var _look_touch := -1
 var _look_last := Vector2.ZERO
 var _buttons: Array[Dictionary] = []   # {action, rect, touch, label}
+## Puntos de mejora disponibles: el botón MEJORA solo existe (se ve y recibe toques) cuando hay alguno.
+var upgrade_points := 0:
+	set(v):
+		upgrade_points = v
+		if _draw_root:
+			_draw_root.queue_redraw()
 var _in_vehicle := false
 
 var _draw_root: Control
@@ -69,6 +75,10 @@ func _layout() -> void:
 	_add_button("interact", Vector2(s.x - 110, s.y - 380), r * 0.8, "PUERTA")
 	_add_button("camera_toggle", Vector2(s.x - 70, 70), r * 0.5, "CAM")
 	_add_button("map_wheel", Vector2(s.x - 70, 185), r * 0.62, "MAPAS")
+	if not _in_vehicle:
+		_add_button("charge", Vector2(s.x - 110, s.y - 245), r * 0.7, "CARGAR")
+		_add_button("cast", Vector2(s.x - 395, s.y - 260), r * 0.7, "FUEGO")
+		_add_button("upgrade", Vector2(70, 285), r * 0.55, "MEJORA")
 	_draw_root.queue_redraw()
 
 
@@ -110,8 +120,14 @@ func _input(event: InputEvent) -> void:
 		_draw_root.queue_redraw()
 
 
+func _hidden(b: Dictionary) -> bool:
+	return b.action == "upgrade" and upgrade_points <= 0
+
+
 func _on_press(idx: int, pos: Vector2) -> void:
 	for b in _buttons:
+		if _hidden(b):
+			continue
 		if pos.distance_to(b.center) <= b.radius:
 			b.touch = idx
 			Input.action_press(b.action)
@@ -188,6 +204,8 @@ func _on_draw() -> void:
 		var hint := Vector2(170, s.y - 170)
 		_draw_root.draw_arc(hint, STICK_RADIUS, 0, TAU, 48, Color(1, 1, 1, 0.15), 2.0)
 	for b in _buttons:
+		if _hidden(b):
+			continue
 		var pressed: bool = b.touch != -1
 		_draw_root.draw_circle(b.center, b.radius, Color(0.05, 0.08, 0.1, 0.55 if pressed else 0.35))
 		_draw_root.draw_arc(b.center, b.radius, 0, TAU, 40, Color(amber, 0.9 if pressed else 0.5), 3.0)
@@ -206,6 +224,8 @@ func _draw_clay() -> void:
 	var kp := base + _stick_vec * STICK_RADIUS * 0.45
 	_draw_root.draw_texture_rect(_tex_knob, Rect2(kp - Vector2(kr, kr), Vector2(kr, kr) * 2.0), false)
 	for b in _buttons:
+		if _hidden(b):
+			continue
 		var pressed: bool = b.touch != -1
 		var rr: float = b.radius * (0.94 if pressed else 1.0)
 		var tint := Color(0.82, 0.78, 0.74) if pressed else Color.WHITE

@@ -27,7 +27,7 @@ Este documento es la fuente de verdad entre los agentes. Si algo no está aquí,
 - `"camera_rig"` — la cámara. (`spawn_player`/`spawn_vehicle` del juego anterior ya no se usan.)
 
 ## Entradas (autoload `Inputs`, ya existe)
-Acciones: `move_forward, move_back, move_left, move_right, sprint, jump, handbrake, interact, camera_toggle, horn, crouch, punch`. `interact` = **PUERTA** (conjura el portal hacia el siguiente recuerdo).
+Acciones: `move_forward, move_back, move_left, move_right, sprint, jump, handbrake, interact, camera_toggle, horn, crouch, punch, map_wheel, cast, charge, upgrade`. `interact` = **PUERTA** (conjura el portal hacia el siguiente recuerdo).
 `Inputs.move_vector()` → Vector2 (x derecha, y adelante). `Inputs.take_touch_look()` → delta de cámara del dedo (píxeles) a sumar al mouse.
 En auto: move_forward = acelerar, move_back = frenar/reversa, left/right = dirección, handbrake = freno de mano.
 
@@ -66,13 +66,15 @@ func get_camera_anchor() -> Node3D
 `class_name AndroCloak extends Node3D`: cúpula + capa interior + manto abierto al frente con ribetes, sobre una esfera invisible (campo de fuerza = cápsula del jugador, `Player.CAPSULE_RADIUS` 0.66; shader con resorte-amortiguador) + 5 esferas de cromo gris que orbitan fuera del campo. Sin rasgos humanos. API que usa `Player`: `levitate`, `punch_t`, `punch_idx`, `animate(state, speed, delta)`.
 - `MapWheel` (`ui/map_wheel.gd`): rueda circular de mapas; señales `opened/closed/chosen`, `open()/close()/choose(i)`. `MapCatalog` (`story/map_catalog.gd`): sectores y `START_UNLOCKED`. `Story`: `unlocked`, `is_unlocked`, `unlock_map(id)` (señal `map_unlocked`), `can_travel()`, `travel_block_reason(id)`, `conjure_to(id)`. `UiLock.blocked` (`core/ui_lock.gd`): true mientras la rueda está abierta. Acción de entrada nueva: `map_wheel` (Tab/M/Select; botón MAPAS).
 
+- Poderes — `res://powers/`: `Progress` (`level` 0..33, `xp`, `points`, `add_xp`, `set_level`, `spend_point`; señales `level_changed`, `leveled_up`, `points_changed`), `SpellBook` (`SPELLS`, `cap/value/fill`, `try_cast`, `upgrade`, `charging`), `PowerCaster` (`cast()`, `aim_dir()`, `charging`), `KiAura`, `Fireball.launch(parent, from, dir)`. `AndroCloak`: `level` (0..`MAX_LEVEL` 33, runas EISEN-KERN), `charge` (0..1), `flash_orb(i)`, `orb_toward(dir)`, `orb_global_position(i)`. `Player`: `charging` (quieto al cargar), `face_yaw(yaw)`. Acciones nuevas: `cast` (R / R1 / botón FUEGO), `charge` (V / D-pad ↑ / CARGAR, mantener), `upgrade` (U / D-pad ↓ / MEJORA, solo con puntos). En tests poner `Progress.save_enabled = false` y `Story.save_enabled = false`.
+
 `Player` conserva su física de caminar y suma `teleport(pos, yaw)`; el flote es solo visual (`HOVER_H`). `CameraRig` suma `snap_behind(yaw, pitch)`.
 
 ## Historia — `res://story/story.gd`
 `class_name Story extends Node`: capítulos (`CHAPTERS`), subtítulos vía `GameHUD.say()`, objetivos por escena y puerta bloqueada hasta cumplirlos; `skip()` salta el diálogo; tras el último capítulo, modo libre.
 
 ## Escena principal — `res://main.tscn` (`core/game.gd`)
-Instancia CameraRig, Player, TransitionFX, Stage, GameHUD, TouchControls y Story. `start_scene` exportado permite empezar en cualquier escena.
+Instancia CameraRig, Player, TransitionFX, Stage, GameHUD, TouchControls, Progress, SpellBook, PowerCaster y Story. `start_scene` exportado permite empezar en cualquier escena.
 
 ## Herramienta de validación
 Godot headless: `godot --headless --path godot3d --import` y luego `godot --headless --fixed-fps 60 --path godot3d -s res://tests/stage_test.gd` (también `cloak_test.gd`, `character_logic_test.gd`).

@@ -16,6 +16,10 @@ uniform float cloth_bottom = 0.05;
 uniform float flare = 0.0;          // abre la falda (al golpear / saltar)
 uniform float trim_edge_w = 0.10;  // ancho del ribete de la abertura (m)
 uniform float trim_hem_w = 0.088;   // ancho del ribete del dobladillo (m)
+uniform float rune_level : hint_range(0.0, 33.0) = 0.0;   // nivel de Andro (0..33): a más nivel, más visibles las runas
+uniform vec3 rune_col : source_color = vec3(0.62, 0.70, 0.86);
+uniform float charge = 0.0;         // 0..1: carga de energía (aura de ki), enciende el borde y los ribetes
+uniform vec3 charge_col : source_color = vec3(1.0, 0.62, 0.22);
 
 varying float w_cloth;
 varying float layer;
@@ -23,6 +27,14 @@ varying float edge_d;
 varying float hem_d;
 varying float gap_open;
 varying vec2 vuv;
+
+// Runas del dobladillo: la palabra EISEN-KERN en una fuente de píxeles 5×5 (bit = fila*5 + columna).
+const int WORD_N = 10;
+const int WORD[10] = int[](32554047, 32641183, 16267326, 32554047, 18667121, 14336, 18128177, 32554047, 18136623, 18667121);
+const float RUNE_PX = 0.0092;       // lado de cada píxel de letra (m)
+const float RUNE_X0 = 0.35;         // arranque de la primera palabra a lo largo del manto (m)
+const float RUNE_PERIOD = 0.74;     // la palabra se repite 5 veces alrededor, centrada en la espalda
+const float RUNE_Y0 = 0.021;        // base de las letras sobre el borde del dobladillo (m)
 
 void vertex() {
 	layer = COLOR.r;
@@ -61,6 +73,12 @@ float ornament(vec2 p, float w) {
 	return clamp((line + leaf * 0.75) * aa + rails, 0.0, 1.0);
 }
 
+float hash21(vec2 p) {
+	p = fract(p * vec2(123.34, 456.21));
+	p += dot(p, p + 45.32);
+	return fract(p.x * p.y);
+}
+
 void fragment() {
 	float outer = step(0.5, layer);
 	float open_k = smoothstep(0.08, 0.5, gap_open);
@@ -86,7 +104,42 @@ void fragment() {
 	damask *= 1.0 - smoothstep(0.35, 0.9, fwidth(bp.x));
 	float cloth_k = mix(0.7, 1.0, layer) * mix(1.0 + 0.45 * pleat, 1.7, dome) * (1.0 + 0.5 * outer * skirt * damask);
 	vec3 cloth = albedo_col * cloth_k;
-	vec3 trim_c = trim_col * (0.45 + 0.95 * orn);
+
+	// ---- runas: nivel 0 = nada; cada nivel enciende más píxeles de las letras y más fuerte, hasta la palabra completa en 33
+	float vis = clamp(rune_level / 33.0, 0.0, 1.0);
+	float lx = vuv.x - RUNE_X0;
+	float k_inst = floor(lx / RUNE_PERIOD);
+	float lw = lx - k_inst * RUNE_PERIOD;                    // posición dentro de la palabra (m)
+	float cell = RUNE_PX * 6.0;                              // 5 columnas de letra + 1 de espacio
+	float gx = lw / cell;
+	int gi = int(floor(gx));
+	float fx = fract(gx) * 6.0;                              // 0..6 en píxeles de letra
+	float fy = (hem_d - RUNE_Y0) / RUNE_PX;                  // 0..5 de abajo hacia arriba
+	bool in_word = lx >= 0.0 && k_inst < 5.0 && gi >= 0 && gi < WORD_N;
+	float rune_zone = 0.0;
+	float rune_on = 0.0;
+	if (in_word && fy > -0.6 && fy < 5.6 && fx < 5.6) {
+		rune_zone = in_hem;
+		int col = int(floor(fx));
+		int row = 4 - int(floor(clamp(fy, 0.0, 4.999)));       // fila 0 = arriba
+		bool inside = fx >= 0.0 && fx < 5.0 && fy >= 0.0 && fy < 5.0;
+		int bit = (WORD[gi] >> (row * 5 + col)) & 1;
+		float h = hash21(vec2(float(gi) * 7.0 + float(col), float(row) + 3.0));
+		float reveal = step(h, vis) * step(0.0001, vis);     // con nivel 33 (vis = 1) entran todos los píxeles
+		vec2 q = vec2(fract(fx), fract(fy)) - 0.5;
+		float px_shape = 1.0 - smoothstep(0.34, 0.5, max(abs(q.x), abs(q.y)));
+		float lit = float(bit) * reveal * px_shape * float(inside);
+		// de lejos los píxeles se funden en un hilo de luz con la densidad media de la palabra
+		float far_k = smoothstep(0.004, 0.012, fwidth(vuv.x));
+		float avg = 0.42 * vis * float(inside);
+		rune_on = mix(lit, avg, far_k) * in_hem;
+	}
+	float rune_b = mix(0.10, 1.0, pow(vis, 1.4)) * (1.0 + 0.12 * sin(TIME * 1.6 + float(gi) * 0.7) * vis);
+	// a más nivel los ribetes se ven más; en la zona de las letras la enredadera cede el sitio
+	orn = mix(orn, orn * 0.12, rune_zone);
+	float trim_vis = mix(0.55, 1.0, vis);
+	vec3 trim_c = trim_col * (0.45 + 0.95 * orn) * trim_vis;
+	trim_c = mix(trim_c, rune_col * rune_b, rune_on);
 	ALBEDO = mix(cloth, trim_c, trim);
 	ROUGHNESS = mix(mix(0.88, 0.62, dome), 0.42, trim);
 	METALLIC = trim * 0.3;
@@ -98,4 +151,6 @@ void fragment() {
 	}
 	float fres = pow(1.0 - clamp(dot(NORMAL, VIEW), 0.0, 1.0), 3.0);
 	EMISSION = rim_col * fres * 0.2 + trim_c * trim * 0.12;
+	EMISSION += rune_col * rune_b * rune_on * (0.25 + 0.6 * vis);
+	EMISSION += charge_col * charge * (fres * 1.1 + trim * 0.35 + 0.05);
 }

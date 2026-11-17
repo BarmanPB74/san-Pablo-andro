@@ -10,6 +10,7 @@ var _prompt: Label
 var _fps: Label
 var _cap_tween: Tween
 var _title_tween: Tween
+var _magic: MagicBar
 
 
 func _ready() -> void:
@@ -58,6 +59,24 @@ func _make_label(pos: Vector2, size: int, color: Color) -> Label:
 func _process(_delta: float) -> void:
 	_fps.text = "%d FPS" % Engine.get_frames_per_second()
 	_prompt.modulate.a = 0.0 if UiLock.blocked else 1.0         # con la rueda de mapas abierta el aviso estorba
+
+
+## Conecta la barra de magia y el nivel (aparece bajo el contador de FPS).
+func setup_powers(book: SpellBook, progress: Progress) -> void:
+	if _magic == null:
+		_magic = MagicBar.new()
+		_magic.position = Vector2(24, 126)
+		add_child(_magic)
+	_magic.setup(book, progress)
+	progress.leveled_up.connect(_on_level_changed)
+
+
+func _on_level_changed(level: int) -> void:
+	if level >= Progress.MAX_LEVEL:
+		say("Nivel %d. El dobladillo ya dice EISEN-KERN." % level)
+	else:
+		say("Nivel %d. Ganaste un punto de mejora." % level)
+	get_tree().create_timer(3.0).timeout.connect(fade_caption.bind(1.2))
 
 
 ## Muestra el nombre de la escena y lo desvanece.

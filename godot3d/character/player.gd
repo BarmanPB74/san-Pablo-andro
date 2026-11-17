@@ -67,6 +67,7 @@ var _approach_timer := 0.0
 var _entering_vehicle: VehicleBody3D = null
 var _step_smooth := 0.0                # compensación visual al subir escalones
 var _hover := 0.0                      # altura actual del flote (m)
+var charging := false                  # cargando ki (PowerCaster): Andro se queda quieto
 # Interpolación visual: la física corre a 60 Hz pero la pantalla (p. ej. 120 Hz) se
 # redibuja más seguido. El modelo se anima y se desplaza entre ticks para que no "salte".
 var _vp_prev := Vector3.ZERO
@@ -235,6 +236,11 @@ func _process(delta: float) -> void:
 	model.animate(state, hv, delta)
 
 
+## Gira el cuerpo hacia `yaw` (0 = mira a -Z), p. ej. al lanzar un hechizo hacia donde mira la cámara.
+func face_yaw(yaw: float) -> void:
+	_facing = yaw
+
+
 ## Reubica a Andro (cambio de escena): posición, rumbo (yaw 0 = mira a -Z) y sin inercia.
 func teleport(pos: Vector3, yaw: float) -> void:
 	global_position = pos
@@ -297,6 +303,8 @@ func _process_on_foot(delta: float) -> void:
 	_update_punch(delta, on_floor)
 	if _punch_t >= 0.0:
 		target_speed = minf(target_speed, 1.0)
+	if charging:
+		target_speed = 0.0
 	if _push_t > 0.0:
 		target_speed = minf(target_speed, push_speed)
 

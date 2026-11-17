@@ -17,6 +17,9 @@ const ACTIONS := {
 	"crouch": [KEY_CTRL, KEY_X],  # a pie: agacharse (alterna)
 	"punch": [KEY_J, KEY_Q],      # a pie: golpear (combo de 3)
 	"map_wheel": [KEY_TAB, KEY_M],   # abre la rueda circular de mapas
+	"cast": [KEY_R],              # lanzar la bola de fuego
+	"charge": [KEY_V],            # mantener: cargar ki (llena la barra de magia más rápido)
+	"upgrade": [KEY_U],           # gastar un punto: sube el tope de la barra
 }
 
 const PAD_BUTTONS := {
@@ -29,6 +32,9 @@ const PAD_BUTTONS := {
 	"crouch": JOY_BUTTON_B,
 	"punch": JOY_BUTTON_X,
 	"map_wheel": JOY_BUTTON_BACK,
+	"cast": JOY_BUTTON_RIGHT_SHOULDER,
+	"charge": JOY_BUTTON_DPAD_UP,
+	"upgrade": JOY_BUTTON_DPAD_DOWN,
 }
 
 ## Vector de cámara inyectado por el HUD táctil (arrastre con el dedo).
